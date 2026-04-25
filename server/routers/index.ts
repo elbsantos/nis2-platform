@@ -5,16 +5,17 @@
  */
 
 import { router } from "../_core/trpc";
-import { scanRouter } from "./scan.router";
+import { scanRouter }          from "./scan.router";
 import { questionnaireRouter } from "./questionnaire.router";
-import { remediationRouter } from "./remediation.router";
+import { remediationRouter }   from "./remediation.router";
+import { billingRouter }       from "./billing.router";
 
 export const appRouter = router({
   scan:          scanRouter,
   questionnaire: questionnaireRouter,
   remediation:   remediationRouter,
-  // course: courseRouter,   — Week 7-8
-  // billing: billingRouter, — Week 7-8
+  billing:       billingRouter,
+  // course: courseRouter,  — Week 7-8
 });
 
 export type AppRouter = typeof appRouter;

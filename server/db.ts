@@ -263,6 +263,12 @@ export async function getOrgByStripeCustomerId(customerId: string) {
   return getOrganizationById(rows[0].organizationId);
 }
 
+export async function getUserByOrgId(orgId: number) {
+  const org = await getOrganizationById(orgId);
+  if (!org?.ownerId) return null;
+  return getUserById(org.ownerId);
+}
+
 export async function countScansThisMonth(orgId: number): Promise<number> {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);

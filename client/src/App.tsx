@@ -4,6 +4,7 @@ import ScanResults     from "./pages/ScanResults";
 import ScanHistory     from "./pages/ScanHistory";
 import Questionnaire   from "./pages/Questionnaire";
 import Remediation     from "./pages/Remediation";
+import Billing         from "./pages/Billing";
 
 function Nav() {
   const base = "px-3 py-2 text-sm font-medium rounded-md transition-colors";
@@ -18,6 +19,7 @@ function Nav() {
         <NavLink to="/scan/history" className={({ isActive }) => isActive ? active : inactive}>Histórico</NavLink>
         <NavLink to="/questionnaire" className={({ isActive }) => isActive ? active : inactive}>Questionário</NavLink>
         <NavLink to="/remediation"   className={({ isActive }) => isActive ? active : inactive}>Remediação</NavLink>
+        <NavLink to="/billing"       className={({ isActive }) => isActive ? active : inactive}>Planos</NavLink>
       </div>
     </nav>
   );
@@ -35,6 +37,7 @@ export default function App() {
         <Route path="/questionnaire"                 element={<Questionnaire />} />
         <Route path="/questionnaire/:sessionId"      element={<Questionnaire />} />
         <Route path="/remediation"                   element={<Remediation />} />
+        <Route path="/billing"                       element={<Billing />} />
         <Route path="*"                              element={<Navigate to="/scan/start" replace />} />
       </Routes>
     </div>
