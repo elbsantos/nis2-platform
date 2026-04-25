@@ -283,10 +283,75 @@ export async function countScansThisMonth(orgId: number): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// Questionnaire sessions
+// Course progress
 // ---------------------------------------------------------------------------
 
-import { questionnaireSessions, remediationItems } from "../drizzle/schema";
+import { questionnaireSessions, remediationItems, courseProgress } from "../drizzle/schema";
+
+export async function markLessonComplete(data: {
+  userId: number;
+  organizationId: number;
+  moduleId: string;
+  lessonId: string;
+  certificateUrl?: string;
+}) {
+  const existing = await getDb()
+    .select({ id: courseProgress.id })
+    .from(courseProgress)
+    .where(
+      and(eq(courseProgress.userId, data.userId), eq(courseProgress.lessonId, data.lessonId))
+    )
+    .limit(1);
+
+  if (existing.length === 0) {
+    return getDb().insert(courseProgress).values({
+      userId:         data.userId,
+      organizationId: data.organizationId,
+      moduleId:       data.moduleId,
+      lessonId:       data.lessonId,
+      certificateUrl: data.certificateUrl,
+    });
+  }
+
+  if (data.certificateUrl) {
+    return getDb()
+      .update(courseProgress)
+      .set({ certificateUrl: data.certificateUrl })
+      .where(
+        and(eq(courseProgress.userId, data.userId), eq(courseProgress.lessonId, data.lessonId))
+      );
+  }
+}
+
+export async function getLessonProgress(userId: number, organizationId: number) {
+  return getDb()
+    .select()
+    .from(courseProgress)
+    .where(
+      and(
+        eq(courseProgress.userId, userId),
+        eq(courseProgress.organizationId, organizationId)
+      )
+    );
+}
+
+export async function getCertificateUrl(userId: number): Promise<string | null> {
+  const rows = await getDb()
+    .select({ certificateUrl: courseProgress.certificateUrl })
+    .from(courseProgress)
+    .where(
+      and(
+        eq(courseProgress.userId, userId),
+        sql`${courseProgress.certificateUrl} IS NOT NULL`
+      )
+    )
+    .limit(1);
+  return rows[0]?.certificateUrl ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Questionnaire sessions
+// ---------------------------------------------------------------------------
 
 export async function createQuestionnaireSession(data: {
   organizationId: number;

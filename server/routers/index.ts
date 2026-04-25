@@ -9,13 +9,14 @@ import { scanRouter }          from "./scan.router";
 import { questionnaireRouter } from "./questionnaire.router";
 import { remediationRouter }   from "./remediation.router";
 import { billingRouter }       from "./billing.router";
+import { courseRouter }        from "./course.router";
 
 export const appRouter = router({
   scan:          scanRouter,
   questionnaire: questionnaireRouter,
   remediation:   remediationRouter,
   billing:       billingRouter,
-  // course: courseRouter,  — Week 7-8
+  course:        courseRouter,
 });
 
 export type AppRouter = typeof appRouter;

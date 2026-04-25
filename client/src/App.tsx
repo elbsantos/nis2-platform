@@ -5,6 +5,8 @@ import ScanHistory     from "./pages/ScanHistory";
 import Questionnaire   from "./pages/Questionnaire";
 import Remediation     from "./pages/Remediation";
 import Billing         from "./pages/Billing";
+import Course          from "./pages/Course";
+import Lesson          from "./pages/Lesson";
 
 function Nav() {
   const base = "px-3 py-2 text-sm font-medium rounded-md transition-colors";
@@ -19,6 +21,7 @@ function Nav() {
         <NavLink to="/scan/history" className={({ isActive }) => isActive ? active : inactive}>Histórico</NavLink>
         <NavLink to="/questionnaire" className={({ isActive }) => isActive ? active : inactive}>Questionário</NavLink>
         <NavLink to="/remediation"   className={({ isActive }) => isActive ? active : inactive}>Remediação</NavLink>
+        <NavLink to="/course"         className={({ isActive }) => isActive ? active : inactive}>Curso</NavLink>
         <NavLink to="/billing"       className={({ isActive }) => isActive ? active : inactive}>Planos</NavLink>
       </div>
     </nav>
