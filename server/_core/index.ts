@@ -7,89 +7,74 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import {
-  createApiLimiter,
-  createAuthLimiter,
-  getRedisClient,
-} from "../middlewares/rateLimit";
+import { createApiLimiter, createAuthLimiter, getRedisClient } from "../middlewares/rateLimit";
+import { registerWebhookRoutes } from "../middlewares/webhookHandler";
+import { logEnvStatus } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
-    server.on("error", () => resolve(false));
+    const s = net.createServer();
+    s.listen(port, () => s.close(() => resolve(true)));
+    s.on("error", () => resolve(false));
   });
 }
 
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) return port;
+async function findAvailablePort(start = 3000): Promise<number> {
+  for (let p = start; p < start + 20; p++) {
+    if (await isPortAvailable(p)) return p;
   }
-  throw new Error(`No available port found starting from ${startPort}`);
+  throw new Error("No available port found");
 }
 
 async function startServer() {
+  logEnvStatus();
+
   const app = express();
   const server = createServer(app);
 
-  // ---- Body parser -------------------------------------------------------
+  // ── 1. Stripe webhook — raw body, BEFORE json parser ───────────────────
+  registerWebhookRoutes(app);
+
+  // ── 2. Body parsers ─────────────────────────────────────────────────────
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // ---- Security headers --------------------------------------------------
+  // ── 3. Security headers ─────────────────────────────────────────────────
   app.use((_req, res, next) => {
-    res.setHeader(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains"
-    );
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     next();
   });
 
-  // ---- Force HTTPS in production -----------------------------------------
+  // ── 4. Force HTTPS in production ────────────────────────────────────────
   if (process.env.NODE_ENV === "production") {
     app.use((req, res, next) => {
-      const proto =
-        req.headers["x-forwarded-proto"] ?? req.protocol;
-      if (proto !== "https") {
-        return res.redirect(301, `https://${req.headers.host}${req.url}`);
-      }
+      const proto = req.headers["x-forwarded-proto"] ?? req.protocol;
+      if (proto !== "https") return res.redirect(301, `https://${req.headers.host}${req.url}`);
       next();
     });
   }
 
-  // ---- Rate limiters (initialised once, reused per request) --------------
-  const apiLimiter = await createApiLimiter();
-  const authLimiter = await createAuthLimiter();
-
-  // General API rate limit — all /api/* routes
+  // ── 5. Rate limiters ────────────────────────────────────────────────────
+  const [apiLimiter, authLimiter] = await Promise.all([
+    createApiLimiter(),
+    createAuthLimiter(),
+  ]);
   app.use("/api", apiLimiter);
-
-  // Stricter limit for auth routes
   app.use("/api/oauth", authLimiter);
 
-  // ---- Health check (not rate limited) -----------------------------------
-  app.get("/health", (_req, res) => {
-    res.json({ status: "ok", ts: Date.now() });
-  });
+  // ── 6. Health check ─────────────────────────────────────────────────────
+  app.get("/health", (_req, res) => res.json({ status: "ok", ts: Date.now() }));
 
-  // ---- OAuth callback under /api/oauth/callback --------------------------
+  // ── 7. OAuth ────────────────────────────────────────────────────────────
   registerOAuthRoutes(app);
 
-  // ---- tRPC API ----------------------------------------------------------
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
+  // ── 8. tRPC ─────────────────────────────────────────────────────────────
+  app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
-  // ---- Static / Vite -----------------------------------------------------
+  // ── 9. Vite / Static ────────────────────────────────────────────────────
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
@@ -98,25 +83,15 @@ async function startServer() {
 
   const preferredPort = parseInt(process.env.PORT ?? "3000");
   const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
+  if (port !== preferredPort) console.log(`Port ${preferredPort} busy — using ${port}`);
 
   server.listen(port, () => {
-    console.log(`[NIS2] Server running on http://localhost:${port}/`);
-    console.log(
-      `[NIS2] Rate limiting: ${process.env.REDIS_URL ? "Redis" : "in-memory (set REDIS_URL for production)"}`
-    );
+    console.log(`[NIS2] Server on http://localhost:${port}/`);
   });
 
-  // ---- Graceful shutdown -------------------------------------------------
   process.on("SIGTERM", async () => {
-    console.log("[NIS2] SIGTERM — shutting down gracefully");
-    try {
-      const redis = await getRedisClient();
-      await redis.quit();
-    } catch {}
+    console.log("[NIS2] Shutting down…");
+    try { await (await getRedisClient()).quit(); } catch {}
     server.close(() => process.exit(0));
   });
 }
