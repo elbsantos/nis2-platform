@@ -1,151 +1,118 @@
-/**
- * client/src/pages/ScanStart.tsx
- *
- * Simple UI to start a NIS2 scan.
- * Week 3 — functional but not polished.
- */
-
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 
 export default function ScanStart() {
-  const [domain, setDomain] = useState("");
+  const navigate = useNavigate();
+  const [domain, setDomain]     = useState("");
   const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const [token, setToken] = useState("");
+  const [verified, setVerified]   = useState(false);
+  const [token, setToken]         = useState("");
+  const [error, setError]         = useState("");
 
   const verifyMutation = trpc.scan.verifyOwnership.useMutation();
-  const startMutation = trpc.scan.start.useMutation();
+  const startMutation  = trpc.scan.start.useMutation();
 
   const handleVerify = async () => {
     setVerifying(true);
+    setError("");
     try {
       const result = await verifyMutation.mutateAsync({ domain });
       setVerified(result.verified);
       setToken(result.token);
-    } catch (err) {
-      console.error("Verification error:", err);
+    } catch (err: any) {
+      setError(err.message ?? "Erro ao verificar ownership");
     } finally {
       setVerifying(false);
     }
   };
 
   const handleStart = async () => {
+    setError("");
     try {
       const result = await startMutation.mutateAsync({ target: domain, mode: "sme" });
-      alert(`Scan iniciado! ID: ${result.scanId}`);
-      // Redirect to scan results page (build in week 4)
+      navigate(`/scan/results/${result.scanId}`);
     } catch (err: any) {
-      alert(err.message ?? "Erro ao iniciar scan");
+      setError(err.message ?? "Erro ao iniciar scan");
     }
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
-      <h1>Iniciar Scan NIS2</h1>
+    <div className="max-w-xl mx-auto px-4 py-12">
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Iniciar Scan NIS2</h1>
+      <p className="text-gray-500 text-sm mb-8">
+        Verifica a conformidade NIS2 do teu domínio ou endereço IP.
+      </p>
 
-      <div style={{ marginTop: "1rem" }}>
-        <label htmlFor="domain" style={{ display: "block", marginBottom: "0.5rem" }}>
-          Domínio ou IP:
+      {/* Domain input */}
+      <div className="mb-4">
+        <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-1">
+          Domínio ou IP
         </label>
         <input
           id="domain"
           type="text"
           value={domain}
-          onChange={(e) => setDomain(e.target.value)}
+          onChange={(e) => { setDomain(e.target.value); setVerified(false); setToken(""); }}
           placeholder="exemplo.pt ou 1.2.3.4"
-          style={{
-            width: "100%",
-            padding: "0.5rem",
-            fontSize: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {!verified ? (
-        <div style={{ marginTop: "1rem" }}>
+        <>
           <button
             onClick={handleVerify}
             disabled={!domain || verifying}
-            style={{
-              padding: "0.75rem 1.5rem",
-              fontSize: "1rem",
-              background: "#1d4ed8",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: domain ? "pointer" : "not-allowed",
-            }}
+            className="w-full py-2.5 px-4 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {verifying ? "A verificar..." : "Verificar ownership"}
+            {verifying ? "A verificar…" : "Verificar ownership"}
           </button>
 
           {token && (
-            <div
-              style={{
-                marginTop: "1rem",
-                padding: "1rem",
-                background: "#fef3c7",
-                border: "1px solid #fbbf24",
-                borderRadius: "4px",
-              }}
-            >
-              <p style={{ margin: 0, fontSize: "0.875rem" }}>
-                <strong>Ownership não verificado.</strong>
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm font-medium text-amber-800 mb-1">Ownership não verificado</p>
+              <p className="text-xs text-amber-700 mb-2">
+                Adiciona este DNS TXT record ao domínio e tenta novamente:
               </p>
-              <p style={{ margin: "0.5rem 0 0", fontSize: "0.875rem" }}>
-                Adiciona este DNS TXT record ao domínio:
-              </p>
-              <code
-                style={{
-                  display: "block",
-                  marginTop: "0.5rem",
-                  padding: "0.5rem",
-                  background: "#fff",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "4px",
-                  fontFamily: "monospace",
-                }}
-              >
+              <code className="block text-xs bg-white border border-gray-200 rounded p-2 font-mono break-all">
                 {token}
               </code>
             </div>
           )}
-        </div>
+        </>
       ) : (
-        <div style={{ marginTop: "1rem" }}>
-          <div
-            style={{
-              padding: "1rem",
-              background: "#d1fae5",
-              border: "1px solid #10b981",
-              borderRadius: "4px",
-              marginBottom: "1rem",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: "0.875rem" }}>
-              ✅ <strong>Ownership verificado!</strong>
-            </p>
+        <>
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md flex items-center gap-2 text-sm text-green-800">
+            <span>✓</span>
+            <span><strong>Ownership verificado!</strong> Podes iniciar o scan.</span>
           </div>
 
           <button
             onClick={handleStart}
             disabled={startMutation.isPending}
-            style={{
-              padding: "0.75rem 1.5rem",
-              fontSize: "1rem",
-              background: "#10b981",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
+            className="w-full py-2.5 px-4 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
-            {startMutation.isPending ? "A iniciar scan..." : "Iniciar Scan NIS2 →"}
+            {startMutation.isPending ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                A iniciar scan…
+              </>
+            ) : (
+              "Iniciar Scan NIS2 →"
+            )}
           </button>
-        </div>
+        </>
       )}
     </div>
   );
