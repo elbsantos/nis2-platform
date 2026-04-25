@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Test & lint
+    name: Test & typecheck
     runs-on: ubuntu-latest
 
     services:
@@ -25,29 +25,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Type check
-        run: pnpm check
+        run: npm run typecheck
 
       - name: Run tests
-        run: pnpm test
+        run: npm test
         env:
           NODE_ENV: test
           REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci-test-secret-min-32-chars-long
+          COOKIE_SECRET: ci-test-cookie-secret-min-32-chars
 
       - name: Build
-        run: pnpm build
+        run: npm run build
 
   deploy:
     name: Deploy to production
@@ -58,20 +56,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build
-        run: pnpm build
+        run: npm run build
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -82,8 +76,8 @@ jobs:
           script: |
             cd /opt/nis2-platform
             git pull origin main
-            pnpm install --frozen-lockfile --prod
-            pnpm build
-            pnpm db:push
+            npm ci --omit=dev
+            npm run build
+            npm run db:push
             pm2 reload nis2-platform --update-env
             echo "Deploy concluído: $(date)"

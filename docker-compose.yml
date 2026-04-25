@@ -1,6 +1,31 @@
 version: "3.9"
 
+# Usage:
+#   docker compose up -d            # start all services
+#   docker compose logs -f app      # follow app logs
+#   docker compose down -v          # destroy including volumes
+
 services:
+  # ── Application ─────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      target: runner
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://nis2user:nis2pass@db:3306/nis2db
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: mysql:8.0
     restart: unless-stopped

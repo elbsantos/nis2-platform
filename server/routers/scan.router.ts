@@ -10,13 +10,19 @@ import { freeProcedure, proProcedure } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyDomainOwnership } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId } from "../db";
 import { checkScanLimit } from "../middlewares/planGuard";
+import { isSafeTarget } from "../middlewares/security";
+
+// Zod refinement: reject private/internal targets before any DNS or API call
+const safeTarget = z.string().min(1).refine(isSafeTarget, {
+  message: "Target inválido: apenas domínios públicos são permitidos.",
+});
 
 export const scanRouter = {
   /**
    * Verify domain ownership before allowing scan
    */
   verifyOwnership: freeProcedure
-    .input(z.object({ domain: z.string().min(1) }))
+    .input(z.object({ domain: safeTarget }))
     .query(async ({ ctx, input }) => {
       const result = await verifyDomainOwnership(input.domain, ctx.org.id);
       return {
@@ -32,7 +38,7 @@ export const scanRouter = {
   start: freeProcedure
     .input(
       z.object({
-        target: z.string().min(1),
+        target: safeTarget,
         mode: z.enum(["sme", "supply"]).default("sme"),
       })
     )

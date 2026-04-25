@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { createApiLimiter, createAuthLimiter, getRedisClient } from "../middlewares/rateLimit";
 import { registerWebhookRoutes } from "../middlewares/webhookHandler";
+import { securityHeaders, corsHeaders } from "../middlewares/security";
 import { logEnvStatus } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -39,12 +40,13 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // ── 3. Security headers ─────────────────────────────────────────────────
+  // ── 3. Security headers + CORS ──────────────────────────────────────────
+  app.use(corsHeaders);
+  app.use(securityHeaders);
   app.use((_req, res, next) => {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (process.env.NODE_ENV === "production") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    }
     next();
   });
 
