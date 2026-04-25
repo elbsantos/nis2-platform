@@ -275,3 +275,116 @@ export async function countScansThisMonth(orgId: number): Promise<number> {
 
   return Number(rows[0]?.count ?? 0);
 }
+
+// ---------------------------------------------------------------------------
+// Questionnaire sessions
+// ---------------------------------------------------------------------------
+
+import { questionnaireSessions, remediationItems } from "../drizzle/schema";
+
+export async function createQuestionnaireSession(data: {
+  organizationId: number;
+  userId: number;
+  sector?: string;
+}) {
+  const [row] = await getDb().insert(questionnaireSessions).values(data).$returningId();
+  return { id: row.id, ...data, status: "in_progress" as const, answers: [] };
+}
+
+export async function getQuestionnaireSessionById(sessionId: number) {
+  const rows = await getDb()
+    .select()
+    .from(questionnaireSessions)
+    .where(eq(questionnaireSessions.id, sessionId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getQuestionnaireSessionsByOrgId(orgId: number) {
+  return getDb()
+    .select()
+    .from(questionnaireSessions)
+    .where(eq(questionnaireSessions.organizationId, orgId))
+    .orderBy(desc(questionnaireSessions.createdAt));
+}
+
+export async function updateQuestionnaireSession(
+  sessionId: number,
+  data: {
+    answers?: Array<{ controlId: string; answer: string; score: number }>;
+    score?: string;
+    articleScores?: Record<string, number>;
+    status?: "in_progress" | "completed";
+    completedAt?: Date;
+  }
+) {
+  return getDb()
+    .update(questionnaireSessions)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(questionnaireSessions.id, sessionId));
+}
+
+// ---------------------------------------------------------------------------
+// Remediation items
+// ---------------------------------------------------------------------------
+
+export async function createRemediationItem(data: {
+  organizationId: number;
+  scanId?: number;
+  vulnId?: number;
+  title: string;
+  steps?: Array<{ order: number; instruction: string; platform: string }>;
+  effort: "low" | "medium" | "high";
+  nis2Articles?: string[];
+  dueDate?: string;
+}) {
+  const [row] = await getDb().insert(remediationItems).values(data).$returningId();
+  return { id: row.id, ...data };
+}
+
+export async function getRemediationItemsByOrgId(
+  orgId: number,
+  status?: "todo" | "in_progress" | "done" | "wont_fix"
+) {
+  const q = getDb()
+    .select()
+    .from(remediationItems)
+    .where(
+      status
+        ? and(
+            eq(remediationItems.organizationId, orgId),
+            eq(remediationItems.status, status)
+          )
+        : eq(remediationItems.organizationId, orgId)
+    )
+    .orderBy(desc(remediationItems.createdAt));
+  return q;
+}
+
+export async function getRemediationItemsByScanId(scanId: number) {
+  return getDb()
+    .select()
+    .from(remediationItems)
+    .where(eq(remediationItems.scanId, scanId))
+    .orderBy(desc(remediationItems.createdAt));
+}
+
+export async function updateRemediationStatus(
+  itemId: number,
+  orgId: number,
+  status: "todo" | "in_progress" | "done" | "wont_fix"
+) {
+  return getDb()
+    .update(remediationItems)
+    .set({
+      status,
+      resolvedAt: status === "done" ? new Date() : undefined,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(remediationItems.id, itemId),
+        eq(remediationItems.organizationId, orgId)
+      )
+    );
+}

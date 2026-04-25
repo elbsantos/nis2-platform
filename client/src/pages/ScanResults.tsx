@@ -150,7 +150,7 @@ export default function ScanResults() {
       </section>
 
       {/* Actions */}
-      <div className="flex gap-3 pt-2">
+      <div className="flex flex-wrap gap-3 pt-2">
         <Link
           to="/scan/start"
           className="px-4 py-2 border border-gray-300 text-sm rounded-md text-gray-700 hover:bg-gray-50"
@@ -162,6 +162,12 @@ export default function ScanResults() {
           className="px-4 py-2 border border-gray-300 text-sm rounded-md text-gray-700 hover:bg-gray-50"
         >
           Ver histórico
+        </Link>
+        <Link
+          to={`/remediation?scanId=${scan.id}`}
+          className="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800"
+        >
+          Gerar plano de remediação IA
         </Link>
       </div>
     </div>
