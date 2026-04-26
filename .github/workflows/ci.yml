@@ -56,28 +56,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          script: |
-            cd /opt/nis2-platform
-            git pull origin main
-            npm ci --omit=dev
-            npm run build
-            npm run db:push
-            pm2 reload nis2-platform --update-env
-            echo "Deploy concluído: $(date)"
+          script: bash /opt/nis2-platform/scripts/deploy.sh

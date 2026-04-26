@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output (rebuilt inside Docker)
+dist/
+
+# Environment secrets — never in the image
+.env
+.env.*
+!.env.example
+
+# Dev tooling
+*.log
+logs/
+.vscode/
+.idea/
+
+# Tests
+**/*.test.ts
+vitest.config.ts
+coverage/
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs and scripts not needed at runtime
+*.md
+deploy/
+scripts/
+NIS-Curso/
