@@ -68,7 +68,7 @@ export const courseRouter = router({
    * Single lesson content (quiz questions without correct answers, templates)
    */
   getLesson: freeProcedure
-    .input(z.object({ lessonId: z.string() }))
+    .input(z.object({ lessonId: z.string().max(100) }))
     .query(async ({ ctx, input }) => {
       const lesson = getLessonById(input.lessonId);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
@@ -108,13 +108,13 @@ export const courseRouter = router({
   submitQuiz: freeProcedure
     .input(
       z.object({
-        lessonId: z.string(),
+        lessonId: z.string().max(100),
         answers: z.array(
           z.object({
-            questionId:    z.string(),
+            questionId:    z.string().max(100),
             selectedIndex: z.number().int().min(0).max(3),
           })
-        ),
+        ).max(20),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -157,7 +157,7 @@ export const courseRouter = router({
    * Mark lesson as completed and (if all done) generate certificate
    */
   markComplete: freeProcedure
-    .input(z.object({ lessonId: z.string() }))
+    .input(z.object({ lessonId: z.string().max(100) }))
     .mutation(async ({ ctx, input }) => {
       const lesson = getLessonById(input.lessonId);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });

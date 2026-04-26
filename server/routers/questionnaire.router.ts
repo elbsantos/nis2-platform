@@ -30,7 +30,7 @@ export const questionnaireRouter = router({
    * Start a new questionnaire session
    */
   start: freeProcedure
-    .input(z.object({ sector: z.string().optional() }))
+    .input(z.object({ sector: z.string().max(100).optional() }))
     .mutation(async ({ ctx, input }) => {
       const session = await createQuestionnaireSession({
         organizationId: ctx.org.id,
@@ -70,10 +70,10 @@ export const questionnaireRouter = router({
         sessionId: z.number().int().positive(),
         answers: z.array(
           z.object({
-            controlId: z.string(),
+            controlId: z.string().max(20),
             answer: z.enum(["yes", "partial", "no", "na"]),
           })
-        ),
+        ).max(42),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -133,7 +133,7 @@ export const questionnaireRouter = router({
    * AI explanation of a control (pro/mssp only)
    */
   explainControl: proProcedure
-    .input(z.object({ controlId: z.string() }))
+    .input(z.object({ controlId: z.string().max(20) }))
     .query(async ({ ctx, input }) => {
       const control = NIS2_CONTROLS.find((c) => c.id === input.controlId);
       if (!control) throw new TRPCError({ code: "NOT_FOUND" });

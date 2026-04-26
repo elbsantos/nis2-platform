@@ -7,7 +7,8 @@
 
 import type { Application } from "express";
 import { SignJWT } from "jose";
-import { createHash } from "crypto";
+import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { getUserByEmail, createUser, createOrganization, getOrganizationByOwnerId } from "../db";
 
 const COOKIE_NAME = "auth_token";
@@ -19,15 +20,54 @@ const COOKIE_OPTIONS = {
   path: "/",
 };
 
-function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET ?? "dev-secret-change-in-production-min-32-chars";
-  return new TextEncoder().encode(secret);
-}
+// ---------------------------------------------------------------------------
+// Input validation schemas
+// ---------------------------------------------------------------------------
+
+const registerSchema = z.object({
+  email:   z.string().email().max(255).toLowerCase().trim(),
+  password: z.string().min(8).max(128),
+  name:    z.string().max(255).trim().optional(),
+  orgName: z.string().min(1).max(255).trim(),
+});
+
+const loginSchema = z.object({
+  email:    z.string().email().max(255).toLowerCase().trim(),
+  password: z.string().min(1).max(128),
+});
+
+// ---------------------------------------------------------------------------
+// Password hashing — scrypt (OWASP-recommended, Node built-in)
+// Format stored: "<hex-salt>:<hex-hash>"
+// ---------------------------------------------------------------------------
 
 function hashPassword(password: string): string {
-  return createHash("sha256")
-    .update(password + (process.env.COOKIE_SECRET ?? "salt"))
-    .digest("hex");
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  try {
+    const [salt, storedHash] = stored.split(":");
+    if (!salt || !storedHash) return false;
+    const hash = scryptSync(password, salt, 64);
+    return timingSafeEqual(hash, Buffer.from(storedHash, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// JWT
+// ---------------------------------------------------------------------------
+
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("[Auth] JWT_SECRET is not set in production");
+  }
+  return new TextEncoder().encode(secret ?? "dev-secret-change-in-production-min-32-chars");
 }
 
 async function signToken(userId: number): Promise<string> {
@@ -38,21 +78,20 @@ async function signToken(userId: number): Promise<string> {
     .sign(getJwtSecret());
 }
 
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+
 export function registerOAuthRoutes(app: Application): void {
   // ── POST /api/auth/register ──────────────────────────────────────────────
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, name, orgName } = req.body as {
-        email?: string;
-        password?: string;
-        name?: string;
-        orgName?: string;
-      };
-
-      if (!email || !password || !orgName) {
-        res.status(400).json({ error: "email, password e orgName são obrigatórios" });
+      const parsed = registerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Dados inválidos" });
         return;
       }
+      const { email, password, name, orgName } = parsed.data;
 
       const existing = await getUserByEmail(email);
       if (existing) {
@@ -62,13 +101,12 @@ export function registerOAuthRoutes(app: Application): void {
 
       const passwordHash = hashPassword(password);
       const user = await createUser({ email, name, passwordHash, role: "admin" });
-
-      const org = await createOrganization({ name: orgName, ownerId: user.id });
+      const org  = await createOrganization({ name: orgName, ownerId: user.id });
 
       await import("../db").then(({ getDb }) => {
         const { users } = require("../../drizzle/schema");
-        const { eq } = require("drizzle-orm");
-        return getDb()
+        const { eq }    = require("drizzle-orm");
+        return getDb()!
           .update(users)
           .set({ organizationId: org.id })
           .where(eq(users.id, user.id));
@@ -86,15 +124,21 @@ export function registerOAuthRoutes(app: Application): void {
   // ── POST /api/auth/login ─────────────────────────────────────────────────
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email, password } = req.body as { email?: string; password?: string };
-
-      if (!email || !password) {
-        res.status(400).json({ error: "email e password são obrigatórios" });
+      const parsed = loginSchema.safeParse(req.body);
+      if (!parsed.success) {
+        // Return same message as wrong credentials to avoid user enumeration
+        res.status(401).json({ error: "Credenciais inválidas" });
         return;
       }
+      const { email, password } = parsed.data;
 
       const user = await getUserByEmail(email);
-      if (!user || user.passwordHash !== hashPassword(password)) {
+
+      // Always run verifyPassword to prevent timing-based user enumeration
+      const dummyHash = "0000000000000000:0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+      const valid = user ? verifyPassword(password, user.passwordHash ?? "") : verifyPassword(password, dummyHash);
+
+      if (!user || !valid) {
         res.status(401).json({ error: "Credenciais inválidas" });
         return;
       }

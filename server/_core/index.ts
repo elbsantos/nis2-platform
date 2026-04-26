@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -36,9 +37,10 @@ async function startServer() {
   // ── 1. Stripe webhook — raw body, BEFORE json parser ───────────────────
   registerWebhookRoutes(app);
 
-  // ── 2. Body parsers ─────────────────────────────────────────────────────
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // ── 2. Body parsers + cookie parser ────────────────────────────────────
+  app.use(cookieParser(process.env.COOKIE_SECRET));
+  app.use(express.json({ limit: "2mb" }));
+  app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
   // ── 3. Security headers + CORS ──────────────────────────────────────────
   app.use(corsHeaders);
