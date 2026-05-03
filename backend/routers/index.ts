@@ -10,6 +10,7 @@ import { questionnaireRouter } from "./questionnaire.router";
 import { remediationRouter }   from "./remediation.router";
 import { billingRouter }       from "./billing.router";
 import { courseRouter }        from "./course.router";
+import { docsRouter }          from "./docs.router";
 
 export const appRouter = router({
   scan:          scanRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   remediation:   remediationRouter,
   billing:       billingRouter,
   course:        courseRouter,
+  docs:          docsRouter,
 });
 
 export type AppRouter = typeof appRouter;

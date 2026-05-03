@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { createApiLimiter, createAuthLimiter, getRedisClient } from "../middlewares/rateLimit";
 import { registerWebhookRoutes } from "../middlewares/webhookHandler";
+import { registerDocsHandler } from "../middlewares/docs.handler";
 import { securityHeaders, corsHeaders } from "../middlewares/security";
 import { logEnvStatus } from "./env";
 
@@ -72,7 +73,10 @@ async function startServer() {
   app.use("/api", apiLimiter);
   app.use("/api/oauth", authLimiter);
 
-  // ── 7. OAuth ────────────────────────────────────────────────────────────
+  // ── 7. Docs download ────────────────────────────────────────────────────
+  registerDocsHandler(app);
+
+  // ── 8. OAuth ────────────────────────────────────────────────────────────
   registerOAuthRoutes(app);
 
   // ── 8. tRPC ─────────────────────────────────────────────────────────────

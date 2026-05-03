@@ -33,6 +33,9 @@ COPY --from=builder /app/dist ./dist
 COPY drizzle.config.ts ./
 COPY database/ ./database/
 
+# Course documents served at runtime
+COPY backend/content/ ./backend/content/
+
 # Switch to non-root user
 USER nis2
 
