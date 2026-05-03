@@ -26,7 +26,8 @@ export const ENV = {
   appUrl: optional("APP_URL", "http://localhost:3000"),
 
   // ── Database ──────────────────────────────────────────────────────────────
-  databaseUrl: required("DATABASE_URL"),
+  // Railway MySQL exposes MYSQL_URL; fallback keeps DATABASE_URL working locally
+  databaseUrl: process.env.DATABASE_URL || process.env.MYSQL_URL || (() => { if (process.env.NODE_ENV === "production") throw new Error("[Env] DATABASE_URL or MYSQL_URL required"); return ""; })(),
 
   // ── Redis ─────────────────────────────────────────────────────────────────
   redisUrl: optional("REDIS_URL", "redis://localhost:6379"),
