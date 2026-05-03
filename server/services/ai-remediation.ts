@@ -111,7 +111,7 @@ async function generatePlanForVuln(
     port?: number | null;
     remediation?: string | null;
   },
-  orgContext: { name: string; sector?: string | null; size?: string | null }
+  orgContext: { name: string; sector?: string | null; size?: string | null; orgId?: number; plan?: string }
 ): Promise<ParsedPlan> {
   const prompt = `Gera um plano de remediação para a seguinte vulnerabilidade detectada numa PME portuguesa:
 
@@ -133,10 +133,12 @@ Segue rigorosamente este formato:
 4. Indica os artigos NIS2 relevantes (ex.: Art. 21(2)(e))`;
 
   const raw = await chat({
-    system: SYSTEM_PROMPTS.remediationPlanner,
-    messages: [{ role: "user", content: prompt }],
-    maxTokens: 800,
+    system:      SYSTEM_PROMPTS.remediationPlanner,
+    messages:    [{ role: "user", content: prompt }],
+    maxTokens:   800,
     temperature: 0.2,
+    orgId:       orgContext.orgId,
+    plan:        orgContext.plan,
   });
 
   return parseAIPlan(raw, `${vuln.cveId} — ${vuln.affectedComponent}`);
@@ -148,7 +150,8 @@ Segue rigorosamente este formato:
 
 export async function generateRemediationForScan(
   scanId: number,
-  organizationId: number
+  organizationId: number,
+  plan?: string
 ): Promise<number> {
   const [scan, org] = await Promise.all([
     getScanById(scanId),
@@ -171,6 +174,8 @@ export async function generateRemediationForScan(
     name:   org?.name ?? "Organização",
     sector: org?.sector,
     size:   org?.size,
+    orgId:  organizationId,
+    plan,
   };
 
   // Process sequentially to avoid rate limiting

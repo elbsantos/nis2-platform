@@ -5,6 +5,8 @@
  * lessons metadata, IDs, and multiple-choice quiz questions (5 per lesson).
  */
 
+import { lessonContent } from "./course-content";
+
 export interface QuizQuestion {
   id: string;
   question: string;
@@ -20,6 +22,7 @@ export interface Lesson {
   title: string;
   description: string;
   durationMinutes: number;
+  content?: string;    // Markdown body — rendered in the lesson page
   quiz: QuizQuestion[];
 }
 
@@ -524,6 +527,7 @@ export const courseModules: Module[] = [
         description:
           "Enquadramento histórico e legal da NIS2: o que mudou em relação à NIS1, porque surgiu, quem supervisiona em Portugal e o impacto real para as PMEs.",
         durationMinutes: 18,
+        content: lessonContent["lesson-1-1"],
         quiz: quizzes["lesson-1-1"],
       },
       {
@@ -534,6 +538,7 @@ export const courseModules: Module[] = [
         description:
           "Os dois eixos de classificação (setor e dimensão), os Anexos I e II, o cálculo de UTAs, a distinção EE/EI e o fluxograma de 5 passos para saber onde a sua empresa se encaixa.",
         durationMinutes: 21,
+        content: lessonContent["lesson-1-2"],
         quiz: quizzes["lesson-1-2"],
       },
       {
@@ -544,6 +549,7 @@ export const courseModules: Module[] = [
         description:
           "Obrigações dos órgãos de gestão, responsabilidade pessoal, nomeação do CISO, formação obrigatória e o regime de coimas até €10M.",
         durationMinutes: 24,
+        content: lessonContent["lesson-1-3"],
         quiz: quizzes["lesson-1-3"],
       },
       {
@@ -554,6 +560,7 @@ export const courseModules: Module[] = [
         description:
           "O caso SolarWinds, os 6 tipos de fornecedores digitais de qualquer PME, a lógica do ataque one-to-many, e o processo de avaliação de fornecedores exigido pelo Art. 21.º.",
         durationMinutes: 29,
+        content: lessonContent["lesson-1-4"],
         quiz: quizzes["lesson-1-4"],
       },
     ],
@@ -572,6 +579,7 @@ export const courseModules: Module[] = [
         description:
           "As 10 medidas do Art. 21.º(2) ordenadas por ROI de segurança: MFA, segmentação de rede, gestão de patches, backups, criptografia e mais — cada uma com uma ação concreta para começar hoje.",
         durationMinutes: 33,
+        content: lessonContent["lesson-2-1"],
         quiz: quizzes["lesson-2-1"],
       },
       {
@@ -582,6 +590,7 @@ export const courseModules: Module[] = [
         description:
           "O guia de sobrevivência para as 72 horas após um incidente: o que é um incidente reportável, os três prazos legais (24h/72h/1 mês), o processo de contenção e o relatório final para o CNCS.",
         durationMinutes: 27,
+        content: lessonContent["lesson-2-2"],
         quiz: quizzes["lesson-2-2"],
       },
       {
@@ -592,6 +601,7 @@ export const courseModules: Module[] = [
         description:
           "Os poderes do CNCS, as diferenças de supervisão entre EE e EI, como preparar o Dossier de Conformidade e o plano de ação para os 30 dias seguintes.",
         durationMinutes: 25,
+        content: lessonContent["lesson-2-3"],
         quiz: quizzes["lesson-2-3"],
       },
     ],

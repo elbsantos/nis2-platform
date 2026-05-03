@@ -14,7 +14,11 @@ export async function getRedisClient() {
   redisClient = createClient({
     url: process.env.REDIS_URL ?? "redis://localhost:6379",
     socket: {
-      reconnectStrategy: (retries) => Math.min(retries * 100, 3000),
+      connectTimeout: 2000,
+      reconnectStrategy: (retries) => {
+        if (retries > 3) return new Error("Redis unavailable");
+        return Math.min(retries * 100, 1000);
+      },
     },
   });
 
@@ -50,7 +54,7 @@ function keyGenerator(req: Request): string {
 // Build store — Redis when available, memory fallback for dev/test
 // ---------------------------------------------------------------------------
 async function buildStore() {
-  if (process.env.NODE_ENV === "test") return undefined; // vitest: memory store
+  if (process.env.NODE_ENV !== "production") return undefined; // dev/test: memory store
 
   try {
     const client = await getRedisClient();
@@ -59,9 +63,7 @@ async function buildStore() {
       prefix: "rl:",
     });
   } catch {
-    console.warn(
-      "[RateLimit] Redis unavailable — falling back to in-memory store"
-    );
+    console.warn("[RateLimit] Redis unavailable — falling back to in-memory store");
     return undefined;
   }
 }

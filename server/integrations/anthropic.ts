@@ -6,10 +6,16 @@
  * non-streaming (for async remediation plan generation).
  *
  * Model: claude-sonnet-4-6  (set in ENV, easy to change)
+ *
+ * Cost protections:
+ *   1. AI_ENABLED=false disables all AI calls (feature flag)
+ *   2. Per-org monthly token budget tracked in Redis
+ *      Pro: 50 000 tokens/month  |  MSSP: 200 000 tokens/month
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
+import { getRedisClient } from "../middlewares/rateLimit";
 
 // ---------------------------------------------------------------------------
 // Singleton client
@@ -35,6 +41,10 @@ export interface ChatOptions {
   messages: MessageParam[];
   maxTokens?: number;
   temperature?: number;
+  /** Pass to enable per-org token budget enforcement */
+  orgId?: number;
+  /** "free" | "pro" | "mssp" — determines monthly token limit */
+  plan?: string;
 }
 
 export interface StreamOptions extends ChatOptions {
@@ -43,19 +53,85 @@ export interface StreamOptions extends ChatOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Cost protection 2 — per-org monthly token budget (Redis)
+// ---------------------------------------------------------------------------
+
+const TOKEN_LIMITS: Record<string, number> = {
+  pro:  50_000,
+  mssp: 200_000,
+};
+
+function tokenKey(orgId: number): string {
+  const now = new Date();
+  const ym  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return `ai:tokens:org:${orgId}:${ym}`;
+}
+
+async function checkTokenBudget(orgId: number, plan: string): Promise<void> {
+  const limit = TOKEN_LIMITS[plan];
+  if (!limit) return; // mssp or unknown — no hard cap
+
+  try {
+    const redis   = await getRedisClient();
+    const current = await redis.get(tokenKey(orgId));
+    if (current && parseInt(current, 10) >= limit) {
+      throw new Error(
+        `[Anthropic] Limite mensal de ${limit.toLocaleString()} tokens atingido ` +
+        `(org ${orgId}, plano ${plan}). Aguarda o início do próximo mês.`
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("[Anthropic] Limite")) throw err;
+    // Redis unavailable — log and allow the call rather than blocking the user
+    console.warn("[Anthropic] Redis indisponível — verificação de tokens ignorada:", (err as Error).message);
+  }
+}
+
+async function recordTokenUsage(orgId: number, tokens: number): Promise<void> {
+  if (tokens <= 0) return;
+  try {
+    const redis  = await getRedisClient();
+    const key    = tokenKey(orgId);
+    const result = await redis.incrBy(key, tokens);
+    if (result === tokens) {
+      // First write this month — set TTL of 35 days so it auto-expires
+      await redis.expire(key, 35 * 24 * 60 * 60);
+    }
+  } catch (err) {
+    console.warn("[Anthropic] Redis indisponível — uso de tokens não registado:", (err as Error).message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Non-streaming — for background jobs (remediation plans, PDF summaries)
 // ---------------------------------------------------------------------------
 
 export async function chat(opts: ChatOptions): Promise<string> {
+  // Protection 3: AI feature flag
+  if (process.env.AI_ENABLED === "false") {
+    throw new Error("[Anthropic] Funcionalidades AI desactivadas (AI_ENABLED=false)");
+  }
+
+  // Protection 2: check token budget before the API call
+  if (opts.orgId !== undefined && opts.plan) {
+    await checkTokenBudget(opts.orgId, opts.plan);
+  }
+
   const client = getClient();
 
   const response = await client.messages.create({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
-    max_tokens: opts.maxTokens ?? 1024,
+    model:       process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+    max_tokens:  opts.maxTokens ?? 1024,
     temperature: opts.temperature ?? 0.3,
-    system: opts.system,
-    messages: opts.messages,
+    system:      opts.system,
+    messages:    opts.messages,
   });
+
+  // Protection 2: record actual token usage
+  if (opts.orgId !== undefined) {
+    const used = (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0);
+    await recordTokenUsage(opts.orgId, used);
+  }
 
   const block = response.content[0];
   if (block.type !== "text") throw new Error("[Anthropic] Unexpected content type");
@@ -68,15 +144,25 @@ export async function chat(opts: ChatOptions): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export async function streamChat(opts: StreamOptions): Promise<void> {
+  // Protection 3: AI feature flag
+  if (process.env.AI_ENABLED === "false") {
+    throw new Error("[Anthropic] Funcionalidades AI desactivadas (AI_ENABLED=false)");
+  }
+
+  // Protection 2: check token budget before the API call
+  if (opts.orgId !== undefined && opts.plan) {
+    await checkTokenBudget(opts.orgId, opts.plan);
+  }
+
   const client = getClient();
   let fullText = "";
 
-  const stream = await client.messages.stream({
-    model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
-    max_tokens: opts.maxTokens ?? 1024,
+  const stream = client.messages.stream({
+    model:       process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+    max_tokens:  opts.maxTokens ?? 1024,
     temperature: opts.temperature ?? 0.3,
-    system: opts.system,
-    messages: opts.messages,
+    system:      opts.system,
+    messages:    opts.messages,
   });
 
   for await (const chunk of stream) {
@@ -86,6 +172,17 @@ export async function streamChat(opts: StreamOptions): Promise<void> {
     ) {
       opts.onChunk(chunk.delta.text);
       fullText += chunk.delta.text;
+    }
+  }
+
+  // Protection 2: record actual token usage from the final streamed message
+  if (opts.orgId !== undefined) {
+    try {
+      const finalMsg = await stream.finalMessage();
+      const used = (finalMsg.usage.input_tokens ?? 0) + (finalMsg.usage.output_tokens ?? 0);
+      await recordTokenUsage(opts.orgId, used);
+    } catch {
+      // Non-fatal — stream already completed
     }
   }
 

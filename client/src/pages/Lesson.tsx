@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc";
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,75 @@ function VideoPlaceholder({ title, duration }: { title: string; duration: number
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lesson body — markdown content with custom element renderers
+// ---------------------------------------------------------------------------
+
+const mdComponents = {
+  h2: ({ children }: any) => (
+    <h2 className="text-base font-bold text-gray-900 mt-8 mb-3 first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 className="text-sm font-bold text-gray-800 mt-5 mb-2">{children}</h3>
+  ),
+  p: ({ children }: any) => (
+    <p className="text-sm text-gray-700 leading-relaxed mb-3">{children}</p>
+  ),
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-gray-900">{children}</strong>
+  ),
+  em: ({ children }: any) => <em className="italic text-gray-600">{children}</em>,
+  ul: ({ children }: any) => (
+    <ul className="list-disc list-inside space-y-1.5 mb-4 pl-2">{children}</ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className="list-decimal list-inside space-y-1.5 mb-4 pl-2">{children}</ol>
+  ),
+  li: ({ children }: any) => (
+    <li className="text-sm text-gray-700 leading-relaxed">{children}</li>
+  ),
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-4 border-blue-400 bg-blue-50 px-4 py-3 rounded-r-lg my-4">
+      <div className="text-sm text-blue-900 [&>p]:mb-0">{children}</div>
+    </blockquote>
+  ),
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto my-4">
+      <table className="w-full text-xs border-collapse border border-gray-200 rounded-lg overflow-hidden">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: any) => <thead className="bg-gray-100">{children}</thead>,
+  tbody: ({ children }: any) => <tbody className="divide-y divide-gray-100">{children}</tbody>,
+  tr: ({ children }: any) => <tr className="hover:bg-gray-50">{children}</tr>,
+  th: ({ children }: any) => (
+    <th className="px-3 py-2 text-left font-semibold text-gray-700 border-b border-gray-200">
+      {children}
+    </th>
+  ),
+  td: ({ children }: any) => (
+    <td className="px-3 py-2 text-gray-600">{children}</td>
+  ),
+  a: ({ href, children }: any) => (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+       className="text-blue-600 hover:underline">
+      {children}
+    </a>
+  ),
+  hr: () => <hr className="border-gray-200 my-6" />,
+};
+
+function LessonBody({ content }: { content: string }) {
+  return (
+    <section className="space-y-0">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+        {content}
+      </ReactMarkdown>
+    </section>
   );
 }
 
@@ -320,6 +391,9 @@ export default function Lesson() {
           )}
         </div>
       </div>
+
+      {/* Lesson content */}
+      {lesson.content && <LessonBody content={lesson.content} />}
 
       {/* Templates */}
       <TemplatesSection templates={lesson.templates} />

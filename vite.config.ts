@@ -15,6 +15,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "client/src"),
     },
   },
+  optimizeDeps: {
+    exclude: ["@trpc/client"],
+  },
   server: {
     port: 5173,
     proxy: {

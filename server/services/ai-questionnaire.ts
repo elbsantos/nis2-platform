@@ -452,7 +452,7 @@ export function calculateScores(
 
 export async function explainControl(
   control: NIS2Control,
-  context: { sector?: string; size?: string; orgName?: string }
+  context: { sector?: string; size?: string; orgName?: string; orgId?: number; plan?: string }
 ): Promise<string> {
   const contextLine = [
     context.orgName ? `Empresa: ${context.orgName}` : null,
@@ -477,5 +477,7 @@ Inclui: (1) porquê este controlo existe na lei, (2) o que significa na prática
     ],
     maxTokens: 512,
     temperature: 0.3,
+    orgId: context.orgId,
+    plan:  context.plan,
   });
 }

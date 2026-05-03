@@ -96,6 +96,7 @@ export const courseRouter = router({
         title:          lesson.title,
         description:    lesson.description,
         durationMinutes: lesson.durationMinutes,
+        content:        lesson.content ?? null,
         quiz:           sanitizeQuiz(lesson),
         templates,
         completed,
