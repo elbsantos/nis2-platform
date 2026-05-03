@@ -42,7 +42,10 @@ async function startServer() {
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
-  // ── 3. Security headers + CORS ──────────────────────────────────────────
+  // ── 3. Health check — before HTTPS redirect so Railway probe works ─────
+  app.get("/health", (_req, res) => res.json({ status: "ok", ts: Date.now() }));
+
+  // ── 4. Security headers + CORS ──────────────────────────────────────────
   app.use(corsHeaders);
   app.use(securityHeaders);
   app.use((_req, res, next) => {
@@ -52,7 +55,7 @@ async function startServer() {
     next();
   });
 
-  // ── 4. Force HTTPS in production ────────────────────────────────────────
+  // ── 5. Force HTTPS in production ────────────────────────────────────────
   if (process.env.NODE_ENV === "production") {
     app.use((req, res, next) => {
       const proto = req.headers["x-forwarded-proto"] ?? req.protocol;
@@ -61,16 +64,13 @@ async function startServer() {
     });
   }
 
-  // ── 5. Rate limiters ────────────────────────────────────────────────────
+  // ── 6. Rate limiters ────────────────────────────────────────────────────
   const [apiLimiter, authLimiter] = await Promise.all([
     createApiLimiter(),
     createAuthLimiter(),
   ]);
   app.use("/api", apiLimiter);
   app.use("/api/oauth", authLimiter);
-
-  // ── 6. Health check ─────────────────────────────────────────────────────
-  app.get("/health", (_req, res) => res.json({ status: "ok", ts: Date.now() }));
 
   // ── 7. OAuth ────────────────────────────────────────────────────────────
   registerOAuthRoutes(app);
