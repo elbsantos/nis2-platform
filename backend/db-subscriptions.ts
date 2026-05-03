@@ -67,7 +67,7 @@ export async function getOrgByStripeCustomerId(customerId: string) {
 
   if (!rows[0]) return null;
 
-  const { organizations } = await import("../drizzle/schema");
+  const { organizations } = await import("../database/schema");
   const orgs = await db
     .select()
     .from(organizations)
@@ -79,7 +79,7 @@ export async function getOrgByStripeCustomerId(customerId: string) {
 
 /** Count scans this calendar month for an org (free tier limit check) */
 export async function countScansThisMonth(orgId: number): Promise<number> {
-  const { scans } = await import("../drizzle/schema");
+  const { scans } = await import("../database/schema");
   const { gte, and } = await import("drizzle-orm");
   const { sql } = await import("drizzle-orm");
 
