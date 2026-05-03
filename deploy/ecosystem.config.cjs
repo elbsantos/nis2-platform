@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "nis2-platform",
-      script: "./dist/backend/_core/index.js",
+      script: "./dist/backend/backend/_core/index.js",
 
       // Cluster mode: 2 workers on a Hetzner CX22 (2 vCPU).
       // Increase to "max" on larger instances.

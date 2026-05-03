@@ -9,7 +9,7 @@
     "dev:api": "tsx watch backend/_core/index.ts",
     "dev:web": "vite",
     "build": "tsc -p tsconfig.backend.json && vite build",
-    "start": "node dist/backend/_core/index.js",
+    "start": "node dist/backend/backend/_core/index.js",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
