@@ -46,7 +46,7 @@ export function serveStatic(app: Application): void {
     return;
   }
 
-  const { default: express } = require("express");
+  const express = require("express");
   app.use(express.static(distPath));
 
   app.get("*", (req, res, next) => {
