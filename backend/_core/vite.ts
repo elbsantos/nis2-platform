@@ -26,7 +26,7 @@ export async function setupVite(app: Application, _server: Server): Promise<void
 
     try {
       const template = fs.readFileSync(
-        path.resolve(process.cwd(), "client/index.html"),
+        path.resolve(process.cwd(), "frontend/index.html"),
         "utf-8"
       );
       const html = await vite.transformIndexHtml(req.originalUrl, template);

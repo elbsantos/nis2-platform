@@ -104,7 +104,7 @@ export function registerOAuthRoutes(app: Application): void {
       const org  = await createOrganization({ name: orgName, ownerId: user.id });
 
       await import("../db").then(({ getDb }) => {
-        const { users } = require("../../drizzle/schema");
+        const { users } = require("../../database/schema");
         const { eq }    = require("drizzle-orm");
         return getDb()!
           .update(users)

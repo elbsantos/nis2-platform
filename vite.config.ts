@@ -5,14 +5,14 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  root: "client",
+  root: "frontend",
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "client/src"),
+      "@": path.resolve(__dirname, "frontend/src"),
     },
   },
   optimizeDeps: {

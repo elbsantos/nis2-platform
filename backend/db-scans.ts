@@ -6,7 +6,7 @@
  */
 
 import { db } from "./db";
-import { scans, vulnerabilities } from "../drizzle/schema";
+import { scans, vulnerabilities } from "../database/schema";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 

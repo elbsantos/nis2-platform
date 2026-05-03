@@ -7,14 +7,14 @@
 
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import * as schema from "../drizzle/schema";
+import * as schema from "../database/schema";
 import {
   organizations,
   users,
   scans,
   vulnerabilities,
   subscriptions,
-} from "../drizzle/schema";
+} from "../database/schema";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
 // Types
 // ---------------------------------------------------------------------------
 
-export type { User, Organization, Scan, Vulnerability, Subscription } from "../drizzle/schema";
+export type { User, Organization, Scan, Vulnerability, Subscription } from "../database/schema";
 
 // ---------------------------------------------------------------------------
 // Users
@@ -286,7 +286,7 @@ export async function countScansThisMonth(orgId: number): Promise<number> {
 // Course progress
 // ---------------------------------------------------------------------------
 
-import { questionnaireSessions, remediationItems, courseProgress } from "../drizzle/schema";
+import { questionnaireSessions, remediationItems, courseProgress } from "../database/schema";
 
 export async function markLessonComplete(data: {
   userId: number;

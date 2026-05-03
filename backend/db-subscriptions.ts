@@ -6,7 +6,7 @@
  */
 
 import { db } from "./db";
-import { subscriptions } from "../drizzle/schema";
+import { subscriptions } from "../database/schema";
 import { eq } from "drizzle-orm";
 
 export interface SubscriptionData {
