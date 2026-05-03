@@ -100,7 +100,7 @@ async function buildCertificate(opts: {
        .text(opts.userName, 0, 182, { align: "center", width: W });
 
     // ── Underline name ──
-    const nameWidth = Math.min(doc.widthOfString(opts.userName, { fontSize: 28 }) + 40, 400);
+    const nameWidth = Math.min(doc.widthOfString(opts.userName, { fontSize: 28 } as any) + 40, 400);
     doc.moveTo(W / 2 - nameWidth / 2, 218)
        .lineTo(W / 2 + nameWidth / 2, 218)
        .strokeColor(C.gold).lineWidth(1.5).stroke();

@@ -95,7 +95,7 @@ async function internetDbLookup(ip: string): Promise<ShodanHostResult> {
 
   if (!res.ok) throw new Error(`Shodan InternetDB ${res.status}: ${await res.text()}`);
 
-  const data = await res.json();
+  const data = await res.json() as any;
 
   return {
     ip,
@@ -124,7 +124,7 @@ async function apiLookup(ip: string): Promise<ShodanHostResult> {
 
   if (!res.ok) throw new Error(`Shodan API ${res.status}: ${await res.text()}`);
 
-  const data = await res.json();
+  const data = await res.json() as any;
 
   const ports: ShodanPort[] = (data.data ?? []).map((svc: any) => ({
     port: svc.port,

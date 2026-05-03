@@ -59,7 +59,7 @@ export async function updateScanStatus(
       status,
       startedAt,
       completedAt,
-      results: results ? JSON.stringify(results) : undefined,
+      results: results as any,
       updatedAt: new Date(),
     })
     .where(eq(scans.id, scanId));
@@ -83,7 +83,7 @@ export async function createVulnerability(data: CreateVulnerabilityData) {
     organizationId: data.organizationId,
     cveId: data.cveId,
     severity: data.severity,
-    cvssScore: data.cvssScore,
+    cvssScore: String(data.cvssScore),
     description: data.description,
     affectedComponent: data.affectedComponent,
     port: data.port,

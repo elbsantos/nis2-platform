@@ -30,9 +30,9 @@ export function getDb() {
       waitForConnections: true,
       connectionLimit: 10,
     });
-    _db = drizzle(pool, { schema, mode: "default" });
+    _db = drizzle(pool, { schema, mode: "default" }) as unknown as ReturnType<typeof drizzle<typeof schema>>;
   }
-  return _db;
+  return _db!;
 }
 
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
@@ -148,7 +148,7 @@ export async function updateScanStatus(
       status,
       ...(startedAt ? { startedAt } : {}),
       ...(completedAt ? { completedAt } : {}),
-      ...(results ? { results } : {}),
+      ...(results ? { results: results as any } : {}),
       updatedAt: new Date(),
     })
     .where(eq(scans.id, scanId));
@@ -407,9 +407,12 @@ export async function createRemediationItem(data: {
   steps?: Array<{ order: number; instruction: string; platform: string }>;
   effort: "low" | "medium" | "high";
   nis2Articles?: string[];
-  dueDate?: string;
+  dueDate?: string | Date | null;
 }) {
-  const [row] = await getDb().insert(remediationItems).values(data).$returningId();
+  const [row] = await getDb().insert(remediationItems).values({
+    ...data,
+    dueDate: typeof data.dueDate === "string" ? new Date(data.dueDate) : data.dueDate,
+  }).$returningId();
   return { id: row.id, ...data };
 }
 
