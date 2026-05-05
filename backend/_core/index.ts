@@ -104,4 +104,9 @@ async function startServer() {
   });
 }
 
+// Prevent Redis/DB connection errors from crashing the process after startup
+process.on("unhandledRejection", (reason) => {
+  console.error("[NIS2] Unhandled rejection (non-fatal):", reason);
+});
+
 startServer().catch(console.error);
