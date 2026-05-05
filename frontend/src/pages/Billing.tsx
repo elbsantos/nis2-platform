@@ -40,7 +40,7 @@ const PLANS: PlanDef[] = [
   {
     id:          "pro",
     name:        "Pro",
-    price:       "€29",
+    price:       "€49",
     period:      "mês",
     badge:       "Mais popular",
     description: "Para PMEs que precisam de conformidade NIS2 completa.",
@@ -60,7 +60,7 @@ const PLANS: PlanDef[] = [
   {
     id:          "mssp",
     name:        "MSSP",
-    price:       "€199",
+    price:       "€119",
     period:      "mês",
     description: "Para MSPs e consultores que gerem múltiplos clientes.",
     features: [
@@ -119,7 +119,7 @@ function SubscriptionCard() {
 
   if (!sub || sub.plan === "free") return null;
 
-  const planLabel = sub.plan === "pro" ? "Pro (€29/mês)" : "MSSP (€199/mês)";
+  const planLabel = sub.plan === "pro" ? "Pro (€49/mês)" : "MSSP (€119/mês)";
   const renewDate = sub.currentPeriodEnd
     ? new Date(sub.currentPeriodEnd).toLocaleDateString("pt-PT")
     : null;

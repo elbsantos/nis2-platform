@@ -631,7 +631,7 @@ export default function Landing() {
                 <div className="type">Plano Pro NIS2 PT — por mês</div>
                 <div className="sub">Scanner + Curso + Remediação IA</div>
               </div>
-              <div className="amount">€29</div>
+              <div className="amount">€49</div>
             </div>
             <div className="penalty-note">
               * Valores conforme Arts. 31.º–35.º DL 125/2025. As coimas são calculadas sobre o volume de negócios anual total mundial do exercício anterior, o valor que for mais elevado.
@@ -668,7 +668,7 @@ export default function Landing() {
           <div className="testi-card fade-in">
             <div className="testi-stars">★★★★★</div>
             <p className="testi-text">
-              "Usamos a plataforma para três clientes PME em simultâneo com o plano MSSP. Em vez de gastar €20.000 por cliente num consultor, gastámos €199/mês e os resultados foram equivalentes — com o dossier de conformidade completo."
+              "Usamos a plataforma para três clientes PME em simultâneo com o plano MSSP. Em vez de gastar €20.000 por cliente num consultor, gastámos €119/mês e os resultados foram equivalentes — com o dossier de conformidade completo."
             </p>
             <div className="testi-author">
               <strong>Pedro Rodrigues</strong>
@@ -716,7 +716,7 @@ export default function Landing() {
             <p className="tagline">Para a empresa inteira. Scanner ilimitado, curso completo e IA de remediação.</p>
             <div className="price-amount">
               <span className="currency">€</span>
-              <span className="value">29</span>
+              <span className="value">49</span>
               <div className="period">por mês · Cancele quando quiser</div>
             </div>
             <ul className="price-features">
@@ -738,7 +738,7 @@ export default function Landing() {
             <p className="tagline">Para consultoras e MSPs que gerem NIS2 de múltiplas organizações clientes.</p>
             <div className="price-amount">
               <span className="currency">€</span>
-              <span className="value">199</span>
+              <span className="value">119</span>
               <div className="period">por mês · Multi-organização</div>
             </div>
             <ul className="price-features">
