@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { freeProcedure, proProcedure } from "../middlewares/planGuard";
-import { executeAgentlessScan, verifyDomainOwnership } from "../services/scan-executor";
+import { executeAgentlessScan, verifyOwnership, isIpAddress } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId } from "../db";
 import { checkScanLimit } from "../middlewares/planGuard";
 import { isSafeTarget } from "../middlewares/security";
@@ -19,16 +19,23 @@ const safeTarget = z.string().min(1).refine(isSafeTarget, {
 
 export const scanRouter = {
   /**
-   * Verify domain ownership before allowing scan
+   * Verify target ownership before allowing scan.
+   * Domains → DNS TXT record.  Public IPs → HTTP .well-known file.
    */
   verifyOwnership: freeProcedure
     .input(z.object({ domain: safeTarget }))
-    .query(async ({ ctx, input }) => {
-      const result = await verifyDomainOwnership(input.domain, ctx.org.id);
+    .mutation(async ({ ctx, input }) => {
+      const isIp  = isIpAddress(input.domain);
+      const result = await verifyOwnership(input.domain, ctx.org.id);
+      const token  = `nis2pt-verify=${ctx.org.id}`;
       return {
         verified: result.verified,
-        method: result.method,
-        token: `nis2pt-verify=${ctx.org.id}`,
+        method:   result.method,
+        isIp,
+        token,
+        // Convenience fields for the frontend
+        dnsName:    isIp ? null  : input.domain,
+        wellKnownUrl: isIp ? `http://${input.domain}/.well-known/nis2pt.txt` : null,
       };
     }),
 
@@ -53,12 +60,12 @@ export const scanRouter = {
       }
 
       // Verify ownership
-      const ownership = await verifyDomainOwnership(input.target, ctx.org.id);
+      const ownership = await verifyOwnership(input.target, ctx.org.id);
       if (!ownership.verified) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Verificação de ownership falhou. Adiciona este DNS TXT ao domínio: nis2pt-verify=${ctx.org.id}`,
-        });
+        const hint = isIpAddress(input.target)
+          ? `Cria http://${input.target}/.well-known/nis2pt.txt com o conteúdo: nis2pt-verify=${ctx.org.id}`
+          : `Adiciona este DNS TXT ao domínio: nis2pt-verify=${ctx.org.id}`;
+        throw new TRPCError({ code: "FORBIDDEN", message: `Verificação de ownership falhou. ${hint}` });
       }
 
       // Create scan record

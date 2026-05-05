@@ -25,6 +25,16 @@ describe("isSafeTarget", () => {
     expect(isSafeTarget(target)).toBe(true);
   });
 
+  // Valid public IPv4 addresses
+  it.each([
+    "185.1.2.3",
+    "8.8.8.8",
+    "1.1.1.1",
+    "203.0.113.5",
+  ])("allows public IPv4: %s", (target) => {
+    expect(isSafeTarget(target)).toBe(true);
+  });
+
   // RFC 1918 private ranges
   it.each([
     "10.0.0.1",

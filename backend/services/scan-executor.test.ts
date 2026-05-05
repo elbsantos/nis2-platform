@@ -26,32 +26,39 @@ vi.mock("dns/promises", () => ({
   resolveTxt: vi.fn(),
 }));
 
-import { executeAgentlessScan, verifyDomainOwnership } from "./scan-executor";
+import { executeAgentlessScan, verifyOwnership } from "./scan-executor";
 import { lookupHost as shodanLookup } from "../integrations/shodan";
 import { lookupHost as censysLookup } from "../integrations/censys";
 import { resolveTxt } from "dns/promises";
 
-describe("verifyDomainOwnership", () => {
+describe("verifyOwnership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
+  // Domain — DNS TXT path
   it("returns verified=true when DNS TXT record matches", async () => {
     vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=123"]]);
-    const result = await verifyDomainOwnership("example.com", 123);
+    const result = await verifyOwnership("example.com", 123);
     expect(result.verified).toBe(true);
     expect(result.method).toBe("dns-txt");
   });
 
   it("returns verified=false when DNS TXT record missing", async () => {
     vi.mocked(resolveTxt).mockResolvedValue([["other-record"]]);
-    const result = await verifyDomainOwnership("example.com", 123);
+    const result = await verifyOwnership("example.com", 123);
     expect(result.verified).toBe(false);
   });
 
   it("returns verified=false on DNS lookup failure", async () => {
     vi.mocked(resolveTxt).mockRejectedValue(new Error("NXDOMAIN"));
-    const result = await verifyDomainOwnership("nonexistent.local", 123);
+    const result = await verifyOwnership("nonexistent.local", 123);
+    expect(result.verified).toBe(false);
+  });
+
+  // IP — HTTP .well-known path (http module is not mocked, so this returns false)
+  it("returns verified=false for IP when .well-known is unreachable", async () => {
+    const result = await verifyOwnership("185.0.0.1", 42);
     expect(result.verified).toBe(false);
   });
 });

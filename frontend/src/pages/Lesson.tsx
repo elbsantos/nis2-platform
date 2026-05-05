@@ -115,18 +115,17 @@ function LessonBody({ content }: { content: string }) {
 
 function TemplatesSection({ templates }: { templates: any[] }) {
   if (templates.length === 0) return null;
-  const available = templates.filter((t) => t.available);
-  const pending   = templates.filter((t) => !t.available);
+  const locked = templates.filter((t) => !t.available).length;
 
   return (
     <section>
       <h3 className="text-sm font-bold text-gray-900 mb-3">
-        📁 Templates desta aula ({templates.length})
+        📁 Documentos desta aula ({templates.length})
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {templates.map((t: any) => (
           <div
-            key={t.name}
+            key={t.id ?? t.name}
             className={`flex items-start gap-3 p-3 rounded-lg border transition-colors
               ${t.available
                 ? "border-gray-200 hover:border-blue-300 hover:bg-blue-50"
@@ -138,29 +137,33 @@ function TemplatesSection({ templates }: { templates: any[] }) {
               <p className={`text-xs font-medium ${t.available ? "text-gray-900" : "text-gray-400"}`}>
                 {t.name}
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">{t.description}</p>
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="text-xs text-gray-400">{TYPE_LABEL[t.type]}</span>
                 {t.available ? (
                   <a
                     href={t.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    download
                     className="text-xs text-blue-600 font-medium hover:underline"
                   >
                     ↓ Descarregar
                   </a>
                 ) : (
-                  <span className="text-xs text-amber-600">Em breve</span>
+                  <a
+                    href="/billing"
+                    className="text-xs text-amber-600 font-medium hover:underline"
+                  >
+                    🔒 Plano Pro
+                  </a>
                 )}
               </div>
             </div>
           </div>
         ))}
       </div>
-      {pending.length > 0 && (
+      {locked > 0 && (
         <p className="text-xs text-gray-400 mt-2">
-          {pending.length} template(s) disponíveis em Maio 2026 após configuração do servidor.
+          {locked} documento(s) disponíveis no{" "}
+          <a href="/billing" className="text-blue-600 hover:underline">plano Pro</a>.
         </p>
       )}
     </section>

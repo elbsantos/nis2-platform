@@ -25,7 +25,7 @@ const MIME: Record<string, string> = {
 };
 
 export function registerDocsHandler(app: Application): void {
-  app.get("/api/docs/download/:docId", async (req: Request, res: Response) => {
+  app.get("/api/docs/download/:docId", async (req: Request<{ docId: string }>, res: Response) => {
     try {
       // ── 1. Auth ──────────────────────────────────────────────────────────
       const token =

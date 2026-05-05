@@ -5,6 +5,7 @@
  * Integrates Shodan + Censys + ownership verification + NIS2 scoring.
  */
 
+import http from "http";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
 
@@ -140,25 +141,56 @@ const NIS2_ARTICLE_MAP: Record<string, {
 };
 
 // ---------------------------------------------------------------------------
-// Domain ownership verification via DNS TXT
+// Helpers
 // ---------------------------------------------------------------------------
 
-export async function verifyDomainOwnership(
-  domain: string,
+const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
+
+export function isIpAddress(target: string): boolean {
+  return IPV4_RE.test(target.trim());
+}
+
+// ---------------------------------------------------------------------------
+// Ownership verification — DNS TXT for domains, HTTP .well-known for IPs
+// ---------------------------------------------------------------------------
+
+function fetchWellKnownToken(ip: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const req = http.get(
+      { host: ip, path: "/.well-known/nis2pt.txt", timeout: 5000 },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+        res.on("end", () => resolve(body.trim()));
+      }
+    );
+    req.on("error", () => resolve(null));
+    req.on("timeout", () => { req.destroy(); resolve(null); });
+  });
+}
+
+export async function verifyOwnership(
+  target: string,
   orgId: number
 ): Promise<{ verified: boolean; method?: string }> {
-  const { resolveTxt } = await import("dns/promises");
   const token = `nis2pt-verify=${orgId}`;
 
+  if (isIpAddress(target)) {
+    const found = await fetchWellKnownToken(target);
+    return found === token
+      ? { verified: true, method: "http-file" }
+      : { verified: false };
+  }
+
+  // Domain — DNS TXT record
+  const { resolveTxt } = await import("dns/promises");
   try {
-    const records = await resolveTxt(domain);
-    const flat = records.flat();
-    if (flat.some((r) => r === token)) {
+    const records = await resolveTxt(target);
+    if (records.flat().some((r) => r === token)) {
       return { verified: true, method: "dns-txt" };
     }
   } catch {}
 
-  // Future: could add .well-known/nis2pt.txt file check here
   return { verified: false };
 }
 
@@ -257,12 +289,13 @@ export async function executeAgentlessScan(
     const { updateScanStatus } = await import("../db");
     await updateScanStatus(options.scanId, "running", new Date());
 
-    // ── 1. Verify domain ownership ────────────────────────────────────────
-    const ownership = await verifyDomainOwnership(options.target, options.organizationId);
+    // ── 1. Verify ownership (DNS TXT for domains, HTTP .well-known for IPs) ─
+    const ownership = await verifyOwnership(options.target, options.organizationId);
     if (!ownership.verified) {
-      throw new Error(
-        `Verificação de ownership falhou. Adiciona o DNS TXT: nis2pt-verify=${options.organizationId}`
-      );
+      const hint = isIpAddress(options.target)
+        ? `Cria http://${options.target}/.well-known/nis2pt.txt com o conteúdo: nis2pt-verify=${options.organizationId}`
+        : `Adiciona o DNS TXT record: nis2pt-verify=${options.organizationId}`;
+      throw new Error(`Verificação de ownership falhou. ${hint}`);
     }
 
     // ── 2. Shodan lookup ───────────────────────────────────────────────────

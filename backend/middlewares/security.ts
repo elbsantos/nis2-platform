@@ -104,6 +104,9 @@ const PRIVATE_IP_RE = new RegExp(
 const VALID_HOSTNAME_RE =
   /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
+// Public IPv4 — each octet 0–255
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
 // Blocked hostnames regardless of IP
 const BLOCKED_HOSTNAMES = new Set([
   "localhost",
@@ -111,11 +114,23 @@ const BLOCKED_HOSTNAMES = new Set([
   "169.254.169.254", // AWS IMDS
 ]);
 
+function isValidPublicIpv4(target: string): boolean {
+  const m = IPV4_RE.exec(target);
+  if (!m) return false;
+  if ([m[1], m[2], m[3], m[4]].some((o) => parseInt(o) > 255)) return false;
+  return !PRIVATE_IP_RE.test(target);
+}
+
 export function isSafeTarget(target: string): boolean {
   const lower = target.toLowerCase().trim();
 
   if (BLOCKED_HOSTNAMES.has(lower)) return false;
   if (PRIVATE_IP_RE.test(lower)) return false;
+
+  // Accept valid public IPv4 (e.g. 185.1.2.3) — verified via HTTP .well-known
+  if (IPV4_RE.test(lower)) return isValidPublicIpv4(lower);
+
+  // Accept standard public domain
   if (!VALID_HOSTNAME_RE.test(lower)) return false;
 
   return true;

@@ -21,8 +21,14 @@ import {
   getLessonById,
   type Lesson,
 } from "../services/course-config";
-import { LESSON_TEMPLATES }      from "../services/course-templates";
+import { getDocsByLesson }        from "../content/docs-catalog";
 import { generateCertificate }   from "../services/certificate-generator";
+
+// "module-1/lesson-1-1" → "1.1", "module-2/lesson-2-3" → "2.3"
+function toCatalogLessonId(lessonId: string): string {
+  const m = lessonId.match(/lesson-(\d+)-(\d+)$/);
+  return m ? `${m[1]}.${m[2]}` : "";
+}
 
 const TOTAL_LESSONS = getAllLessons().length; // 7
 
@@ -55,7 +61,7 @@ export const courseRouter = router({
           title:          lesson.title,
           description:    lesson.description,
           durationMinutes: lesson.durationMinutes,
-          templateCount:  (LESSON_TEMPLATES[lesson.id] ?? []).length,
+          templateCount:  getDocsByLesson(toCatalogLessonId(lesson.id)).length,
           completed:      completedIds.has(lesson.id),
           locked,
           requiresPro,
@@ -82,13 +88,17 @@ export const courseRouter = router({
 
       const progress  = await getLessonProgress(ctx.user.id, ctx.org.id);
       const completed = progress.some((p) => p.lessonId === lesson.id);
-      const templates = (LESSON_TEMPLATES[lesson.id] ?? []).map((t) => ({
-        name:        t.name,
-        type:        t.type,
-        description: t.description,
-        url:         t.url,
-        available:   t.url !== null,
-      }));
+      const catalogId = toCatalogLessonId(lesson.id);
+      const templates = getDocsByLesson(catalogId).map((doc) => {
+        const accessible = doc.plan === "free" || ctx.plan !== "free";
+        return {
+          id:        doc.id,
+          name:      doc.label,
+          type:      doc.type,
+          url:       accessible ? `/api/docs/download/${doc.id}` : null,
+          available: accessible,
+        };
+      });
 
       return {
         id:             lesson.id,

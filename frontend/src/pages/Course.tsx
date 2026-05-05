@@ -93,7 +93,7 @@ function ModuleCard({ module, completedIds }: {
                   <span className="text-xs text-gray-400">{lesson.durationMinutes} min</span>
                   {lesson.templateCount > 0 && (
                     <span className="text-xs text-gray-400">
-                      <IconDoc /> {lesson.templateCount} templates
+                      <IconDoc /> {lesson.templateCount} docs
                     </span>
                   )}
                   {isLocked && (
@@ -154,7 +154,7 @@ export default function Course() {
       <div className="mb-8">
         <h1 className="text-xl font-bold text-gray-900">Curso NIS2 para PMEs em Portugal</h1>
         <p className="text-sm text-gray-400 mt-0.5">
-          7 aulas · 2 módulos · 36 templates prontos a usar
+          7 aulas · 2 módulos · 35 documentos prontos a usar
         </p>
 
         {progress && (
