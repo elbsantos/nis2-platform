@@ -8,6 +8,8 @@
 import http from "http";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
+import type { EmailSecurityResult } from "../integrations/email-security";
+import type { HttpHeadersResult } from "../integrations/http-headers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,6 +39,8 @@ export interface AgentlessScanResult {
   tlsIssues: TlsIssueFinding[];
   nis2Scores: NIS2ArticleScore[];
   overallScore: number;
+  emailSecurity?: EmailSecurityResult;
+  httpHeaders?: HttpHeadersResult;
   error?: string;
   durationMs: number;
 }
@@ -223,10 +227,17 @@ function mapCveToNIS2Articles(cveId: string, description: string): string[] {
 // Calculate NIS2 scores per article
 // ---------------------------------------------------------------------------
 
+interface ExtraDeduction {
+  article: string;
+  finding: string;
+  deduction: number;
+}
+
 function calculateNIS2Scores(
   ports: PortFinding[],
   vulns: VulnFinding[],
-  tlsIssues: TlsIssueFinding[]
+  tlsIssues: TlsIssueFinding[],
+  extraDeductions: ExtraDeduction[] = []
 ): { scores: NIS2ArticleScore[]; overall: number } {
   const openPortSet = new Set(ports.map((p) => p.port));
   const scores: NIS2ArticleScore[] = [];
@@ -263,6 +274,14 @@ function calculateNIS2Scores(
       for (const tls of tlsIssues) {
         findings.push(`Porto ${tls.port}: ${tls.issue}`);
         deduction += tls.severity === "critical" ? 20 : 15;
+      }
+    }
+
+    // Email security + HTTP header deductions
+    for (const extra of extraDeductions) {
+      if (extra.article === article) {
+        findings.push(extra.finding);
+        deduction += extra.deduction;
       }
     }
 
@@ -389,16 +408,81 @@ export async function executeAgentlessScan(
       });
     }
 
-    // ── 6. Calculate NIS2 scores ───────────────────────────────────────────
-    const { scores, overall } = calculateNIS2Scores(allPorts, vulns, tlsIssues);
+    // ── 6. Email security + HTTP headers (parallel, domain-only for email) ─
+    const isDomain = !isIpAddress(options.target);
 
-    // ── 7. Mark scan complete ──────────────────────────────────────────────
+    const [emailSecurity, httpHeaders] = await Promise.all([
+      isDomain
+        ? import("../integrations/email-security").then((m) =>
+            m.checkEmailSecurity(options.target).catch(() => null)
+          )
+        : Promise.resolve(null),
+      import("../integrations/http-headers").then((m) =>
+        m.checkHttpHeaders(options.target).catch(() => null)
+      ),
+    ]);
+
+    // Convert failed email checks to synthetic vulns
+    const extraDeductions: ExtraDeduction[] = [];
+
+    if (emailSecurity) {
+      for (const check of emailSecurity.checks) {
+        if (check.status === "fail") {
+          const cvssScore = check.name === "DMARC" ? 7.0 : 5.0;
+          const cveId = `NIS2-EMAIL-${check.name.replace(/[^A-Z0-9]/gi, "").toUpperCase()}`;
+          vulns.push({
+            cveId,
+            cvssScore,
+            severity: cvssScore >= 7 ? "high" : "medium",
+            description: check.detail,
+            affectedService: "email",
+            nis2Articles: [check.nis2Article],
+            remediationHint: `Configura ${check.name} no DNS do domínio ${options.target}.`,
+          });
+          extraDeductions.push({ article: check.nis2Article, finding: `${check.name}: ${check.detail}`, deduction: 20 });
+        } else if (check.status === "warn") {
+          extraDeductions.push({ article: check.nis2Article, finding: `${check.name} (aviso): ${check.detail}`, deduction: 8 });
+        }
+      }
+    }
+
+    // Convert failed HTTP header checks to synthetic vulns
+    if (httpHeaders) {
+      for (const check of httpHeaders.checks) {
+        if (check.status === "fail") {
+          const cvssScore = check.name === "HSTS" || check.name === "CSP" ? 6.5 : 4.0;
+          const cveId = `NIS2-HEADER-${check.name.replace(/[^A-Z0-9]/gi, "").toUpperCase()}`;
+          vulns.push({
+            cveId,
+            cvssScore,
+            severity: cvssScore >= 7 ? "high" : cvssScore >= 4 ? "medium" : "low",
+            description: check.detail,
+            affectedService: "http",
+            nis2Articles: [check.nis2Article],
+            remediationHint: `Adiciona o header ${check.name} na configuração do servidor web.`,
+          });
+          extraDeductions.push({ article: check.nis2Article, finding: `${check.name}: ${check.detail}`, deduction: 12 });
+        } else if (check.status === "warn") {
+          extraDeductions.push({ article: check.nis2Article, finding: `${check.name} (aviso): ${check.detail}`, deduction: 4 });
+        }
+      }
+    }
+
+    // ── 7. Calculate NIS2 scores ───────────────────────────────────────────
+    const { scores, overall } = calculateNIS2Scores(allPorts, vulns, tlsIssues, extraDeductions);
+
+    // ── 8. Mark scan complete ──────────────────────────────────────────────
     await updateScanStatus(options.scanId, "completed", undefined, new Date(), {
+      nis2Scores: scores,
+      overallScore: overall,
       vulnerabilitiesFound: vulns.length,
       criticalCount: vulns.filter((v) => v.severity === "critical").length,
       highCount: vulns.filter((v) => v.severity === "high").length,
       mediumCount: vulns.filter((v) => v.severity === "medium").length,
       lowCount: vulns.filter((v) => v.severity === "low").length,
+      vulnerabilities: vulns,
+      emailSecurity: emailSecurity ?? undefined,
+      httpHeaders: httpHeaders ?? undefined,
     });
 
     return {
@@ -410,6 +494,8 @@ export async function executeAgentlessScan(
       tlsIssues,
       nis2Scores: scores,
       overallScore: overall,
+      emailSecurity: emailSecurity ?? undefined,
+      httpHeaders: httpHeaders ?? undefined,
       durationMs: Date.now() - startTime,
     };
   } catch (err) {

@@ -78,20 +78,25 @@ export default function ScanResults() {
           {scan.status === "pending" ? "Scan na fila…" : "A executar scan NIS2…"}
         </p>
         <p className="text-sm text-gray-400 mt-2">
-          A analisar <span className="font-mono">{scan.target}</span> via Shodan + Censys.
+          A analisar <span className="font-mono">{scan.target}</span> via Shodan + Censys + DNS.
           Pode demorar 1–3 minutos.
         </p>
-        <div className="mt-8 flex justify-center gap-3">
-          {["Verificação de ownership", "Análise Shodan", "Análise TLS Censys", "Score NIS2"].map(
-            (step, i) => (
-              <div key={i} className="flex flex-col items-center gap-1">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center animate-pulse">
-                  <span className="text-blue-700 text-xs font-bold">{i + 1}</span>
-                </div>
-                <span className="text-xs text-gray-400 max-w-[70px] text-center">{step}</span>
+        <div className="mt-8 flex justify-center gap-3 flex-wrap">
+          {[
+            "Verificação de ownership",
+            "Análise Shodan",
+            "Análise TLS Censys",
+            "Segurança Email",
+            "Headers HTTP",
+            "Score NIS2",
+          ].map((step, i) => (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center animate-pulse">
+                <span className="text-blue-700 text-xs font-bold">{i + 1}</span>
               </div>
-            )
-          )}
+              <span className="text-xs text-gray-400 max-w-[70px] text-center">{step}</span>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -138,7 +143,29 @@ export default function ScanResults() {
         )}
       </section>
 
-      {/* Vulnerability list — requires vuln data */}
+      {/* Email security section */}
+      {results?.emailSecurity && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Segurança de Email</h2>
+          <SecurityChecklist checks={results.emailSecurity.checks} />
+        </section>
+      )}
+
+      {/* HTTP headers section */}
+      {results?.httpHeaders && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-1">
+            Headers de Segurança HTTP
+          </h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Analisado via{" "}
+            <span className="font-mono">{results.httpHeaders.url}</span>
+          </p>
+          <SecurityChecklist checks={results.httpHeaders.checks} />
+        </section>
+      )}
+
+      {/* Vulnerability list */}
       <section className="bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
           Vulnerabilidades
@@ -146,7 +173,7 @@ export default function ScanResults() {
             <span className="ml-2 text-sm font-normal text-gray-400">({vulnCount})</span>
           )}
         </h2>
-        <VulnerabilityListFromScan scanId={scan.id} />
+        <VulnerabilityListFromScan results={results} />
       </section>
 
       {/* Actions */}
@@ -215,15 +242,73 @@ function PdfButton({ scanId, type, label }: { scanId: number; type: string; labe
   );
 }
 
-function VulnerabilityListFromScan({ scanId }: { scanId: number }) {
-  const { data, isLoading } = trpc.scan.getById.useQuery({ scanId });
+// ---------------------------------------------------------------------------
+// SecurityChecklist — pass/warn/fail badges for email & header checks
+// ---------------------------------------------------------------------------
 
-  if (isLoading) return <p className="text-sm text-gray-400">A carregar…</p>;
+interface SecurityCheck {
+  name: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+  nis2Article: string;
+}
 
-  // Vulnerabilities are fetched via a separate query in production.
-  // For now, we surface the summary counts from scan.results.
-  const results = (data?.results as any) ?? {};
-  if (!results.vulnerabilitiesFound) {
+function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
+  const badge = (status: "pass" | "warn" | "fail") => {
+    if (status === "pass")
+      return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Pass</span>;
+    if (status === "warn")
+      return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">Aviso</span>;
+    return <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">Falha</span>;
+  };
+
+  return (
+    <ul className="space-y-3">
+      {checks.map((c) => (
+        <li key={c.name} className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0">{badge(c.status)}</div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-800">
+              {c.name}
+              <span className="ml-2 text-xs font-normal text-gray-400">{c.nis2Article}</span>
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">{c.detail}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VulnerabilityListFromScan — reads from pre-fetched results JSON
+// ---------------------------------------------------------------------------
+
+interface VulnSummary {
+  cveId: string;
+  severity: string;
+  cvssScore: number;
+  description: string;
+  affectedService: string;
+  nis2Articles: string[];
+}
+
+function severityColor(s: string) {
+  if (s === "critical") return "text-red-700 bg-red-50";
+  if (s === "high")     return "text-orange-700 bg-orange-50";
+  if (s === "medium")   return "text-yellow-700 bg-yellow-50";
+  return "text-blue-700 bg-blue-50";
+}
+
+function severityLabel(s: string) {
+  if (s === "critical") return "Crítica";
+  if (s === "high")     return "Alta";
+  if (s === "medium")   return "Média";
+  return "Baixa";
+}
+
+function VulnerabilityListFromScan({ results }: { results: any }) {
+  if (!results?.vulnerabilitiesFound) {
     return (
       <p className="text-sm text-gray-500 text-center py-6">
         Nenhuma vulnerabilidade registada.
@@ -231,39 +316,77 @@ function VulnerabilityListFromScan({ scanId }: { scanId: number }) {
     );
   }
 
+  const vulns: VulnSummary[] = results.vulnerabilities ?? [];
+
+  if (!vulns.length) {
+    return (
+      <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          {results.criticalCount > 0 && (
+            <div className="bg-red-50 rounded-lg p-3">
+              <p className="text-xl font-bold text-red-700">{results.criticalCount}</p>
+              <p className="text-xs text-red-600 mt-0.5">Críticas</p>
+            </div>
+          )}
+          {results.highCount > 0 && (
+            <div className="bg-orange-50 rounded-lg p-3">
+              <p className="text-xl font-bold text-orange-700">{results.highCount}</p>
+              <p className="text-xs text-orange-600 mt-0.5">Altas</p>
+            </div>
+          )}
+          {results.mediumCount > 0 && (
+            <div className="bg-yellow-50 rounded-lg p-3">
+              <p className="text-xl font-bold text-yellow-700">{results.mediumCount}</p>
+              <p className="text-xs text-yellow-600 mt-0.5">Médias</p>
+            </div>
+          )}
+          {results.lowCount > 0 && (
+            <div className="bg-blue-50 rounded-lg p-3">
+              <p className="text-xl font-bold text-blue-700">{results.lowCount}</p>
+              <p className="text-xs text-blue-600 mt-0.5">Baixas</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
-      <p className="font-medium text-gray-700 mb-2">Resumo</p>
-      <ul className="space-y-1">
-        {results.criticalCount > 0 && (
-          <li className="flex justify-between">
-            <span className="text-red-600 font-medium">Críticas</span>
-            <span>{results.criticalCount}</span>
-          </li>
-        )}
-        {results.highCount > 0 && (
-          <li className="flex justify-between">
-            <span className="text-orange-600 font-medium">Altas</span>
-            <span>{results.highCount}</span>
-          </li>
-        )}
-        {results.mediumCount > 0 && (
-          <li className="flex justify-between">
-            <span className="text-yellow-600 font-medium">Médias</span>
-            <span>{results.mediumCount}</span>
-          </li>
-        )}
-        {results.lowCount > 0 && (
-          <li className="flex justify-between">
-            <span className="text-blue-600 font-medium">Baixas</span>
-            <span>{results.lowCount}</span>
-          </li>
-        )}
-      </ul>
-      <p className="mt-3 text-xs text-gray-400">
-        Para o detalhe completo de cada CVE, adiciona um router de vulnerabilidades à API.
-      </p>
-    </div>
+    <ul className="space-y-3">
+      {vulns.map((v) => (
+        <li key={v.cveId} className="border border-gray-100 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${severityColor(v.severity)}`}>
+                {severityLabel(v.severity)}
+              </span>
+              <span className="text-sm font-mono font-medium text-gray-800">
+                {v.cveId.startsWith("CVE-") ? (
+                  <a
+                    href={`https://nvd.nist.gov/vuln/detail/${v.cveId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 hover:underline"
+                  >
+                    {v.cveId}
+                  </a>
+                ) : (
+                  v.cveId
+                )}
+              </span>
+              {v.cvssScore > 0 && (
+                <span className="text-xs text-gray-400">CVSS {v.cvssScore.toFixed(1)}</span>
+              )}
+            </div>
+            <span className="text-xs text-gray-400">{v.affectedService}</span>
+          </div>
+          <p className="text-xs text-gray-600 mt-2">{v.description}</p>
+          {v.nis2Articles?.length > 0 && (
+            <p className="text-xs text-gray-400 mt-1">{v.nis2Articles.join(" · ")}</p>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { freeProcedure, proProcedure } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, isIpAddress } from "../services/scan-executor";
-import { createScan, getScanById, getScansByOrgId } from "../db";
+import { createScan, getScanById, getScansByOrgId, getScansByBatchId } from "../db";
 import { checkScanLimit } from "../middlewares/planGuard";
 import { isSafeTarget } from "../middlewares/security";
 
@@ -139,4 +139,128 @@ export const scanRouter = {
     const { getOrgScanStats } = await import("../db");
     return getOrgScanStats(ctx.org.id);
   }),
+
+  /**
+   * Discover subdomains via CT logs + wordlist (Pro/MSSP only).
+   * Verifies root domain ownership before discovery.
+   */
+  discoverSubdomains: proProcedure
+    .input(z.object({ domain: safeTarget }))
+    .mutation(async ({ ctx, input }) => {
+      if (isIpAddress(input.domain)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Descoberta de subdomínios requer um domínio, não um IP.",
+        });
+      }
+      const ownership = await verifyOwnership(input.domain, ctx.org.id);
+      if (!ownership.verified) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Verifica primeiro o ownership do domínio ${input.domain} (DNS TXT: nis2pt-verify=${ctx.org.id}).`,
+        });
+      }
+      const maxResults = ctx.plan === "mssp" ? 100 : 20;
+      const { discoverSubdomains } = await import("../integrations/subdomain-discovery");
+      const subdomains = await discoverSubdomains(input.domain, maxResults);
+      return { domain: input.domain, subdomains };
+    }),
+
+  /**
+   * Start multiple scans in one batch (Pro: up to 10, MSSP: up to 50).
+   * If rootDomain is provided, all targets must be subdomains of it and
+   * ownership is verified on the root only.
+   */
+  startBulk: proProcedure
+    .input(
+      z.object({
+        targets:    z.array(safeTarget).min(1).max(50),
+        mode:       z.enum(["sme", "supply"]).default("sme"),
+        rootDomain: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const maxTargets = ctx.plan === "mssp" ? 50 : 10;
+      if (input.targets.length > maxTargets) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `O teu plano suporta até ${maxTargets} targets por batch.`,
+        });
+      }
+
+      const batchId = crypto.randomUUID();
+      const started: Array<{ target: string; scanId: number }> = [];
+      const failed:  Array<{ target: string; reason: string  }> = [];
+
+      // Verify root domain once for the subdomain-discovery flow
+      let rootVerified = false;
+      if (input.rootDomain) {
+        const rootOk = await verifyOwnership(input.rootDomain, ctx.org.id);
+        rootVerified = rootOk.verified;
+        if (!rootVerified) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Ownership do domínio raiz ${input.rootDomain} não verificado.`,
+          });
+        }
+      }
+
+      for (const target of input.targets) {
+        // Skip per-target verification only for confirmed subdomains of the verified root
+        const isSubOfRoot =
+          rootVerified &&
+          input.rootDomain &&
+          (target === input.rootDomain || target.endsWith(`.${input.rootDomain}`));
+
+        if (!isSubOfRoot) {
+          const ownership = await verifyOwnership(target, ctx.org.id);
+          if (!ownership.verified) {
+            failed.push({
+              target,
+              reason: `Ownership não verificado. Adiciona DNS TXT: nis2pt-verify=${ctx.org.id}`,
+            });
+            continue;
+          }
+        }
+
+        const scan = await createScan({
+          organizationId: ctx.org.id,
+          target,
+          mode: input.mode,
+          status: "pending",
+          batchId,
+        });
+        started.push({ target, scanId: scan.id });
+      }
+
+      if (!started.length) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Nenhum target com ownership verificado. Configura os DNS TXT records.",
+        });
+      }
+
+      // Start scans async with 3 s stagger to avoid Shodan rate limiting
+      started.forEach(({ target, scanId }, i) => {
+        setTimeout(() => {
+          executeAgentlessScan({
+            scanId,
+            organizationId: ctx.org.id,
+            target,
+            mode: input.mode,
+          }).catch((err) => console.error(`[Bulk scan ${scanId}] Error:`, err));
+        }, i * 3_000);
+      });
+
+      return { batchId, started, failed, count: started.length };
+    }),
+
+  /**
+   * Get all scans belonging to a batch
+   */
+  getBatch: freeProcedure
+    .input(z.object({ batchId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      return getScansByBatchId(ctx.org.id, input.batchId);
+    }),
 };

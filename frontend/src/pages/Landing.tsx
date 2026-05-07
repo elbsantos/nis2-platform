@@ -322,12 +322,12 @@ export default function Landing() {
               conformidade completo.
             </p>
             <div className="solution-features">
-              <div className="sf-item">Scanner agentless — sem instalar software na sua rede</div>
+              <div className="sf-item">Scanner agentless — portos, CVEs, TLS, email e headers HTTP</div>
               <div className="sf-item">Score NIS2 0–100 por artigo, com lacunas identificadas</div>
+              <div className="sf-item">Scan em lote — múltiplos domínios e IPs em simultâneo</div>
+              <div className="sf-item">Descoberta automática de subdomínios via CT logs + DNS</div>
               <div className="sf-item">35 documentos editáveis prontos a implementar</div>
               <div className="sf-item">Remediação guiada por IA com plano personalizado</div>
-              <div className="sf-item">Checklist de auto-auditoria para simular vistoria CNCS</div>
-              <div className="sf-item">Acesso vitalício ao curso para toda a equipa de gestão</div>
             </div>
           </div>
 
@@ -377,18 +377,23 @@ export default function Landing() {
         <div className="scanner-grid fade-in">
           <div className="scanner-card">
             <div className="scanner-icon">🔍</div>
-            <h3>Análise de Exposição Digital</h3>
-            <p>Portas abertas, certificados TLS, versões de software e CVEs públicos — exatamente o que um atacante vê sobre a sua empresa, antes de o CNCS ver.</p>
+            <h3>Exposição Digital Completa</h3>
+            <p>Portos abertos, CVEs públicos, certificados TLS, SPF/DKIM/DMARC e headers HTTP (HSTS, CSP, X-Frame-Options) — a superfície de ataque completa, não apenas a rede.</p>
+          </div>
+          <div className="scanner-card">
+            <div className="scanner-icon">🌐</div>
+            <h3>Scan em Lote + Subdomínios</h3>
+            <p>Descubra automaticamente os subdomínios ativos via Certificate Transparency e scane múltiplos targets em paralelo. Pro: 10 targets/batch · MSSP: 50 targets/batch.</p>
           </div>
           <div className="scanner-card">
             <div className="scanner-icon">📊</div>
             <h3>Score NIS2 por Artigo (0–100)</h3>
-            <p>Pontuação por cada requisito do Art. 21.º NIS2, com identificação precisa das lacunas técnicas e priorização automática por nível de risco.</p>
+            <p>Pontuação por cada requisito do Art. 21.º(2) NIS2 — influenciada por portos, CVEs, email e headers. Lacunas identificadas com priorização automática por nível de risco.</p>
           </div>
           <div className="scanner-card">
             <div className="scanner-icon">🤖</div>
             <h3>Remediação Guiada por IA</h3>
-            <p>Plano de remediação personalizado gerado por IA, com passos concretos para cada vulnerabilidade — do patch ao processo documental.</p>
+            <p>Plano de remediação personalizado gerado por IA (Claude), com passos concretos para cada vulnerabilidade — do patch ao processo documental NIS2.</p>
           </div>
         </div>
         <div className="scanner-demo fade-in">
@@ -698,12 +703,12 @@ export default function Landing() {
             </div>
             <ul className="price-features">
               <li className="yes">1 scan NIS2 por mês</li>
-              <li className="yes">Score por artigo (visão geral)</li>
+              <li className="yes">Score por artigo — portos, CVEs, TLS</li>
               <li className="yes">Módulo 1 do curso (4 aulas)</li>
               <li className="yes">10 perguntas do questionário NIS2</li>
-              <li className="no">Remediação guiada por IA</li>
-              <li className="no">Módulo 2 do curso + 35 documentos</li>
-              <li className="no">42 controlos detalhados</li>
+              <li className="no">Scan em lote / descoberta de subdomínios</li>
+              <li className="no">Email (SPF/DKIM/DMARC) + headers HTTP</li>
+              <li className="no">Remediação IA · 35 documentos · 42 controlos</li>
             </ul>
             <Link to="/register" className="price-btn outline">Começar Grátis</Link>
           </div>
@@ -721,12 +726,12 @@ export default function Landing() {
             </div>
             <ul className="price-features">
               <li className="yes">Scans ilimitados</li>
-              <li className="yes">42 controlos NIS2 detalhados</li>
-              <li className="yes">Módulos 1 e 2 completos (7 aulas)</li>
-              <li className="yes">35 documentos editáveis incluídos</li>
+              <li className="yes">Email (SPF/DKIM/DMARC) + headers HTTP</li>
+              <li className="yes">Scan em lote — até 10 targets por batch</li>
+              <li className="yes">Descoberta de subdomínios — até 20</li>
+              <li className="yes">42 controlos NIS2 · 35 documentos editáveis</li>
               <li className="yes">Remediação guiada por IA (Claude)</li>
-              <li className="yes">Certificado de conclusão</li>
-              <li className="yes">Actualizações legislativas incluídas</li>
+              <li className="yes">Módulos 1 e 2 · Certificado · Actualizações</li>
             </ul>
             <Link to="/register?plan=pro" className="price-btn solid">Começar Pro →</Link>
           </div>
@@ -743,11 +748,11 @@ export default function Landing() {
             </div>
             <ul className="price-features">
               <li className="yes">Tudo do Pro — organizações ilimitadas</li>
-              <li className="yes">Dashboard multi-cliente</li>
-              <li className="yes">Relatórios PDF white-label</li>
+              <li className="yes">Scan em lote — até 50 targets por batch</li>
+              <li className="yes">Descoberta de subdomínios — até 100</li>
+              <li className="yes">Dashboard multi-cliente + PDF white-label</li>
               <li className="yes">IA com limite de 200k tokens/mês</li>
-              <li className="yes">Suporte prioritário por email</li>
-              <li className="yes">Certificados para todos os clientes</li>
+              <li className="yes">Suporte prioritário · Onboarding dedicado</li>
             </ul>
             <Link to="/register?plan=mssp" className="price-btn gold-btn">Começar MSSP →</Link>
           </div>
@@ -791,6 +796,10 @@ export default function Landing() {
           <div className="faq-item fade-in">
             <h3>O plano MSSP serve para consultoras?</h3>
             <p>Sim. O plano MSSP permite gerir múltiplas organizações clientes numa única conta, gerar relatórios white-label para cada cliente, e ter a IA com limites superiores para volume de remediações mensais.</p>
+          </div>
+          <div className="faq-item fade-in">
+            <h3>O que é o scan em lote e a descoberta de subdomínios?</h3>
+            <p>O scan em lote permite analisar vários domínios e IPs ao mesmo tempo — ideal para auditorias internas ou para MSSPs que gerem múltiplos clientes. A descoberta de subdomínios encontra automaticamente todos os subdomínios ativos de um domínio via Certificate Transparency e DNS, e inicia o scan de todos em simultâneo. Disponível nos planos Pro e MSSP.</p>
           </div>
         </div>
       </section>

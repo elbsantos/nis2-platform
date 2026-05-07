@@ -15,7 +15,7 @@ import {
   vulnerabilities,
   subscriptions,
 } from "../database/schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, asc, and, gte, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Connection singleton
@@ -113,11 +113,20 @@ export interface CreateScanData {
   target: string;
   mode: "sme" | "supply";
   status: "pending" | "running" | "completed" | "failed";
+  batchId?: string;
 }
 
 export async function createScan(data: CreateScanData) {
   const [row] = await getDb().insert(scans).values(data).$returningId();
   return { id: row.id, ...data };
+}
+
+export async function getScansByBatchId(orgId: number, batchId: string) {
+  return getDb()
+    .select()
+    .from(scans)
+    .where(and(eq(scans.organizationId, orgId), eq(scans.batchId, batchId)))
+    .orderBy(asc(scans.createdAt));
 }
 
 export async function getScanById(scanId: number) {
@@ -140,7 +149,7 @@ export async function updateScanStatus(
   status: "pending" | "running" | "completed" | "failed",
   startedAt?: Date,
   completedAt?: Date,
-  results?: Record<string, number>
+  results?: Record<string, any>
 ) {
   return getDb()
     .update(scans)

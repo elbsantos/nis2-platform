@@ -83,21 +83,17 @@ export const scans = mysqlTable(
     status:         mysqlEnum("status", ["pending", "running", "completed", "failed"])
                       .notNull()
                       .default("pending"),
+    batchId:        varchar("batchId", { length: 36 }),
     startedAt:      timestamp("startedAt"),
     completedAt:    timestamp("completedAt"),
-    results:        json("results").$type<{
-      vulnerabilitiesFound: number;
-      criticalCount: number;
-      highCount: number;
-      mediumCount: number;
-      lowCount: number;
-    }>(),
+    results:        json("results").$type<Record<string, any>>(),
     createdAt:      timestamp("createdAt").notNull().defaultNow(),
     updatedAt:      timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
   },
   (t) => [
     index("idx_org_status").on(t.organizationId, t.status),
     index("idx_org_created").on(t.organizationId, t.createdAt),
+    index("idx_batch").on(t.batchId),
   ]
 );
 
