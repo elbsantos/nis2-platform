@@ -10,6 +10,7 @@ import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
 import type { EmailSecurityResult } from "../integrations/email-security";
 import type { HttpHeadersResult } from "../integrations/http-headers";
+import type { DarkWebResult } from "../integrations/dark-web";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +42,7 @@ export interface AgentlessScanResult {
   overallScore: number;
   emailSecurity?: EmailSecurityResult;
   httpHeaders?: HttpHeadersResult;
+  darkWeb?: DarkWebResult;
   error?: string;
   durationMs: number;
 }
@@ -468,10 +470,64 @@ export async function executeAgentlessScan(
       }
     }
 
-    // ── 7. Calculate NIS2 scores ───────────────────────────────────────────
+    // ── 7. Dark web monitoring — HIBP + DNS blacklists ────────────────────────
+    const darkWeb = await import("../integrations/dark-web").then((m) =>
+      m.checkDarkWeb(options.target, isIpAddress(options.target)).catch(() => null)
+    );
+
+    if (darkWeb) {
+      for (const breach of darkWeb.breaches) {
+        const cvssScore = breach.hasPasswords ? 8.5 : 6.0;
+        const cveId = `NIS2-BREACH-${breach.name.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 20)}`;
+        vulns.push({
+          cveId,
+          cvssScore,
+          severity: cvssScore >= 7 ? "high" : "medium",
+          description: `Credenciais da organização expostas no breach "${breach.name}" — dados: ${breach.dataClasses.join(", ")}.`,
+          affectedService: "credentials",
+          nis2Articles: breach.hasPasswords
+            ? ["Art. 21(2)(i)", "Art. 21(2)(j)"]
+            : ["Art. 21(2)(i)"],
+          remediationHint: `Força o reset de passwords afectadas pelo breach "${breach.name}" e activa MFA em todas as contas.`,
+        });
+        extraDeductions.push({
+          article: "Art. 21(2)(i)",
+          finding: `Breach "${breach.name}": ${breach.dataClasses.join(", ")}`,
+          deduction: breach.hasPasswords ? 20 : 8,
+        });
+        if (breach.hasPasswords) {
+          extraDeductions.push({
+            article: "Art. 21(2)(j)",
+            finding: `Passwords expostas no breach "${breach.name}" — MFA obrigatório`,
+            deduction: 12,
+          });
+        }
+      }
+      for (const bl of darkWeb.blacklists) {
+        if (bl.listed) {
+          const cveId = `NIS2-BLACKLIST-${bl.name.replace(/[^A-Z0-9]/gi, "").toUpperCase()}`;
+          vulns.push({
+            cveId,
+            cvssScore: 7.0,
+            severity: "high",
+            description: bl.detail,
+            affectedService: isIpAddress(options.target) ? "network" : "domain",
+            nis2Articles: ["Art. 21(2)(g)", "Art. 21(2)(j)"],
+            remediationHint: `Investiga o compromisso que colocou o ${isIpAddress(options.target) ? "IP" : "domínio"} na lista negra ${bl.name} e solicita remoção após resolução.`,
+          });
+          extraDeductions.push({
+            article: "Art. 21(2)(g)",
+            finding: `Lista negra ${bl.name}: ${bl.detail}`,
+            deduction: 20,
+          });
+        }
+      }
+    }
+
+    // ── 8. Calculate NIS2 scores ───────────────────────────────────────────
     const { scores, overall } = calculateNIS2Scores(allPorts, vulns, tlsIssues, extraDeductions);
 
-    // ── 8. Mark scan complete ──────────────────────────────────────────────
+    // ── 9. Mark scan complete ──────────────────────────────────────────────
     await updateScanStatus(options.scanId, "completed", undefined, new Date(), {
       nis2Scores: scores,
       overallScore: overall,
@@ -482,7 +538,8 @@ export async function executeAgentlessScan(
       lowCount: vulns.filter((v) => v.severity === "low").length,
       vulnerabilities: vulns,
       emailSecurity: emailSecurity ?? undefined,
-      httpHeaders: httpHeaders ?? undefined,
+      httpHeaders:   httpHeaders   ?? undefined,
+      darkWeb:       darkWeb       ?? undefined,
     });
 
     return {
@@ -495,7 +552,8 @@ export async function executeAgentlessScan(
       nis2Scores: scores,
       overallScore: overall,
       emailSecurity: emailSecurity ?? undefined,
-      httpHeaders: httpHeaders ?? undefined,
+      httpHeaders:   httpHeaders   ?? undefined,
+      darkWeb:       darkWeb       ?? undefined,
       durationMs: Date.now() - startTime,
     };
   } catch (err) {

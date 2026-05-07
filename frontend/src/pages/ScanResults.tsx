@@ -88,6 +88,7 @@ export default function ScanResults() {
             "Análise TLS Censys",
             "Segurança Email",
             "Headers HTTP",
+            "Dark Web & Reputação",
             "Score NIS2",
           ].map((step, i) => (
             <div key={i} className="flex flex-col items-center gap-1">
@@ -162,6 +163,16 @@ export default function ScanResults() {
             <span className="font-mono">{results.httpHeaders.url}</span>
           </p>
           <SecurityChecklist checks={results.httpHeaders.checks} />
+        </section>
+      )}
+
+      {/* Dark web & reputation section */}
+      {results?.darkWeb && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">
+            Dark Web &amp; Reputação
+          </h2>
+          <DarkWebSection darkWeb={results.darkWeb} />
         </section>
       )}
 
@@ -387,6 +398,95 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DarkWebSection — breaches + DNS blacklists
+// ---------------------------------------------------------------------------
+
+interface BreachRecord { name: string; dataClasses: string[]; hasPasswords: boolean; }
+interface BlacklistItem { name: string; listed: boolean; detail: string; }
+interface DarkWeb {
+  hibpEnabled: boolean;
+  breachesFound: number;
+  breaches: BreachRecord[];
+  hasPasswordExposure: boolean;
+  blacklists: BlacklistItem[];
+}
+
+function DarkWebSection({ darkWeb }: { darkWeb: DarkWeb }) {
+  return (
+    <div className="space-y-5">
+      {/* HIBP credential breaches */}
+      {darkWeb.hibpEnabled ? (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Credenciais expostas (Have I Been Pwned)
+          </p>
+          {darkWeb.breachesFound === 0 ? (
+            <div className="flex items-center gap-2 text-sm text-green-700">
+              <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Limpo</span>
+              <span>Nenhum breach de credenciais detectado para este domínio.</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">
+                  {darkWeb.breachesFound} breach{darkWeb.breachesFound !== 1 ? "es" : ""}
+                </span>
+                {darkWeb.hasPasswordExposure && (
+                  <span className="text-xs font-medium text-red-600">inclui passwords expostas — risco crítico</span>
+                )}
+              </div>
+              <ul className="space-y-2">
+                {darkWeb.breaches.map((b) => (
+                  <li key={b.name} className="flex items-start gap-3 border border-gray-100 rounded-lg px-3 py-2">
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full shrink-0 mt-0.5 ${
+                      b.hasPasswords ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                    }`}>
+                      {b.hasPasswords ? "Crítico" : "Alto"}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{b.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{b.dataClasses.join(" · ")}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="text-xs text-gray-400 italic">
+          Verificação HIBP não configurada (HIBP_API_KEY ausente) — contacta o suporte para activar.
+        </div>
+      )}
+
+      {/* DNS Blacklists */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Listas negras DNS (Spamhaus / SpamCop)
+        </p>
+        <ul className="space-y-2">
+          {darkWeb.blacklists.map((bl) => (
+            <li key={bl.name} className="flex items-start gap-3">
+              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full shrink-0 mt-0.5 ${
+                bl.listed
+                  ? "bg-red-100 text-red-700"
+                  : "bg-green-100 text-green-700"
+              }`}>
+                {bl.listed ? "Listado" : "Limpo"}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800">{bl.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{bl.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
