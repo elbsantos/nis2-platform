@@ -704,11 +704,10 @@ export default function Landing() {
             <ul className="price-features">
               <li className="yes">1 scan NIS2 por mês</li>
               <li className="yes">Score por artigo — portos, CVEs, TLS</li>
+              <li className="yes">Email security check (SPF/DKIM/DMARC)</li>
               <li className="yes">Módulo 1 do curso (4 aulas)</li>
               <li className="yes">10 perguntas do questionário NIS2</li>
-              <li className="no">Scan em lote / descoberta de subdomínios</li>
-              <li className="no">Email (SPF/DKIM/DMARC) + headers HTTP</li>
-              <li className="no">Remediação IA · 35 documentos · 42 controlos</li>
+              <li className="yes">5 templates essenciais (subset dos 35)</li>
             </ul>
             <Link to="/register" className="price-btn outline">Começar Grátis</Link>
           </div>
