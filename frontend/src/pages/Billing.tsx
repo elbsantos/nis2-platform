@@ -23,16 +23,17 @@ interface PlanDef {
 const PLANS: PlanDef[] = [
   {
     id:          "free",
-    name:        "Gratuito",
+    name:        "Starter",
     price:       "€0",
     period:      "sempre",
-    description: "Para descobrir o teu nível de exposição NIS2.",
+    description: "Para descobrir a plataforma e fazer o primeiro diagnóstico NIS2.",
     features: [
-      "1 scan de conformidade por mês",
-      "Score NIS2 global",
-      "Relatório básico (PDF executivo)",
-      "5 controlos do questionário (teaser)",
-      "Acesso ao Módulo 1 do curso",
+      "1 scan NIS2/mês (1 domínio principal)",
+      "Score NIS2 por artigo (visão geral)",
+      "Email security check (SPF/DKIM/DMARC)",
+      "Módulo 1 do curso (4 aulas)",
+      "Questionário NIS2 (10 perguntas)",
+      "5 templates essenciais",
     ],
     cta:       "Plano actual",
     highlight: false,
@@ -40,19 +41,19 @@ const PLANS: PlanDef[] = [
   {
     id:          "pro",
     name:        "Pro",
-    price:       "€49",
+    price:       "€89",
     period:      "mês",
     badge:       "Mais popular",
-    description: "Para PMEs que precisam de conformidade NIS2 completa.",
+    description: "Para a empresa inteira. Scanner ilimitado, curso completo e IA de remediação.",
     features: [
-      "Scans ilimitados",
-      "Score NIS2 detalhado por artigo (Art. 21(2) a–j)",
-      "Questionário completo (42 controlos)",
-      "Planos de remediação gerados por IA",
-      "PDF executivo + PDF técnico",
-      "Templates CNCS editáveis (30+ documentos)",
-      "Curso NIS2 completo (Módulos 1 e 2)",
-      "Suporte por email",
+      "Scans ilimitados (fair-use 50/mês)",
+      "Scan em lote — até 15 targets por batch",
+      "Descoberta de subdomínios — até 50",
+      "Headers HTTP, Breach monitoring (HIBP), DNS Blacklists",
+      "42 controlos NIS2 · 35 documentos editáveis",
+      "Módulos 1 e 2 (7 aulas) · Certificado de conclusão",
+      "Remediação IA (Claude) — 75 000 tokens/mês",
+      "Actualizações legislativas incluídas",
     ],
     cta:       "Fazer upgrade para Pro",
     highlight: true,
@@ -60,20 +61,20 @@ const PLANS: PlanDef[] = [
   {
     id:          "mssp",
     name:        "MSSP",
-    price:       "€119",
+    price:       "€199",
     period:      "mês",
-    description: "Para MSPs e consultores que gerem múltiplos clientes.",
+    description: "Para consultoras e MSPs que gerem NIS2 de múltiplos clientes.",
     features: [
-      "Tudo do plano Pro",
-      "Gestão multi-cliente (clientes ilimitados)",
-      "Dashboard consolidado com visão geral",
-      "Relatórios white-label (logótipo do cliente)",
-      "API de resultados (JSON/webhooks)",
-      "Exportação CSV/Excel de dados",
-      "Suporte prioritário em português (PT)",
-      "Onboarding dedicado",
+      "Tudo do Pro",
+      "Até 25 organizações geridas (€8/org adicional)",
+      "Scan em lote — até 50 targets por batch",
+      "Descoberta de subdomínios — até 200",
+      "Dashboard multi-cliente · PDF white-label",
+      "IA — 300 000 tokens/mês",
+      "Onboarding dedicado (1h call)",
+      "Suporte prioritário (resposta < 24h)",
     ],
-    cta:       "Contactar para MSSP",
+    cta:       "Começar MSSP →",
     highlight: false,
   },
 ];
@@ -119,7 +120,7 @@ function SubscriptionCard() {
 
   if (!sub || sub.plan === "free") return null;
 
-  const planLabel = sub.plan === "pro" ? "Pro (€49/mês)" : "MSSP (€119/mês)";
+  const planLabel = sub.plan === "pro" ? "Pro (€89/mês + IVA)" : "MSSP (€199/mês + IVA)";
   const renewDate = sub.currentPeriodEnd
     ? new Date(sub.currentPeriodEnd).toLocaleDateString("pt-PT")
     : null;
@@ -415,6 +416,53 @@ export default function Billing() {
         {PLANS.map((plan) => (
           <PlanCard key={plan.id} plan={plan} currentPlan={currentPlan} />
         ))}
+      </div>
+
+      {/* Enterprise card */}
+      <div className="mt-6 bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-2xl p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="px-2.5 py-0.5 bg-amber-400/20 text-amber-300 text-xs font-semibold rounded-full border border-amber-400/30">
+                Enterprise
+              </span>
+              <span className="text-gray-400 text-sm">A partir de €499/mês</span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Para grandes organizações e organismos públicos</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Solução à medida com número ilimitado de organizações, IA sem limites de tokens, SLA 99,9%, SSO SAML e gestor de conta dedicado.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5">
+              {[
+                "Organizações geridas ilimitadas",
+                "IA sem limites mensais de tokens",
+                "SLA 99,9% com suporte 24/7",
+                "SSO SAML / OIDC",
+                "API access completa",
+                "Gestor de conta dedicado",
+                "Relatórios white-label avançados",
+                "Onboarding e formação in-house",
+                "Contrato anual com desconto",
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-1.5 text-sm text-gray-300">
+                  <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="shrink-0 text-center md:text-right">
+            <a
+              href="mailto:hello@nis2pt.pt?subject=Plano Enterprise NIS2 PT"
+              className="inline-block px-8 py-3 bg-amber-400 text-gray-900 text-sm font-bold rounded-lg hover:bg-amber-300 transition-colors"
+            >
+              Falar Connosco →
+            </a>
+            <p className="text-xs text-gray-500 mt-2">Proposta em 24 horas</p>
+          </div>
+        </div>
       </div>
 
       {/* Trust signals */}

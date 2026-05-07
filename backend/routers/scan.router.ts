@@ -160,7 +160,7 @@ export const scanRouter = {
           message: `Verifica primeiro o ownership do domínio ${input.domain} (DNS TXT: nis2pt-verify=${ctx.org.id}).`,
         });
       }
-      const maxResults = ctx.plan === "mssp" ? 100 : 20;
+      const maxResults = ctx.plan === "mssp" ? 200 : 50;
       const { discoverSubdomains } = await import("../integrations/subdomain-discovery");
       const subdomains = await discoverSubdomains(input.domain, maxResults);
       return { domain: input.domain, subdomains };
@@ -180,7 +180,7 @@ export const scanRouter = {
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const maxTargets = ctx.plan === "mssp" ? 50 : 10;
+      const maxTargets = ctx.plan === "mssp" ? 50 : 15;
       if (input.targets.length > maxTargets) {
         throw new TRPCError({
           code: "FORBIDDEN",

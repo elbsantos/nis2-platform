@@ -5,8 +5,8 @@
  *
  * Plans:
  *   Free  — €0     (no Stripe, just DB flag)
- *   Pro   — €49/mês (STRIPE_PRICE_PRO)
- *   MSSP  — €119/mês (STRIPE_PRICE_MSSP)
+ *   Pro   — €89/mês + IVA (STRIPE_PRICE_PRO)
+ *   MSSP  — €199/mês + IVA (STRIPE_PRICE_MSSP)
  */
 
 import Stripe from "stripe";

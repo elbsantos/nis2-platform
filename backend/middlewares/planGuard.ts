@@ -74,8 +74,8 @@ export function planProcedure(minimumPlan: Plan) {
     if (!hasAccess) {
       const upgradeMessage: Record<Plan, string> = {
         free: "", // never triggered (free is minimum)
-        pro: "Esta funcionalidade requer o plano Pro (€29/mês). Faz upgrade na tua dashboard.",
-        mssp: "Esta funcionalidade é exclusiva do plano MSSP (€199/mês). Contacta-nos para saber mais.",
+        pro: "Esta funcionalidade requer o plano Pro (€89/mês + IVA). Faz upgrade na tua dashboard.",
+        mssp: "Esta funcionalidade é exclusiva do plano MSSP (€199/mês + IVA). Contacta-nos para saber mais.",
       };
 
       throw new TRPCError({

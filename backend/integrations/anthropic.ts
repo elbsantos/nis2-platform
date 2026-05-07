@@ -57,8 +57,8 @@ export interface StreamOptions extends ChatOptions {
 // ---------------------------------------------------------------------------
 
 const TOKEN_LIMITS: Record<string, number> = {
-  pro:  50_000,
-  mssp: 200_000,
+  pro:  75_000,
+  mssp: 300_000,
 };
 
 function tokenKey(orgId: number): string {

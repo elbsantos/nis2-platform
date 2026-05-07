@@ -383,7 +383,7 @@ export default function Landing() {
           <div className="scanner-card">
             <div className="scanner-icon">🌐</div>
             <h3>Scan em Lote + Subdomínios</h3>
-            <p>Descubra automaticamente os subdomínios ativos via Certificate Transparency e scane múltiplos targets em paralelo. Pro: 10 targets/batch · MSSP: 50 targets/batch.</p>
+            <p>Descubra automaticamente os subdomínios ativos via Certificate Transparency e scane múltiplos targets em paralelo. Pro: 15 targets/batch · MSSP: 50 targets/batch.</p>
           </div>
           <div className="scanner-card">
             <div className="scanner-icon">📊</div>
@@ -636,7 +636,7 @@ export default function Landing() {
                 <div className="type">Plano Pro NIS2 PT — por mês</div>
                 <div className="sub">Scanner + Curso + Remediação IA</div>
               </div>
-              <div className="amount">€49</div>
+              <div className="amount">€89</div>
             </div>
             <div className="penalty-note">
               * Valores conforme Arts. 31.º–35.º DL 125/2025. As coimas são calculadas sobre o volume de negócios anual total mundial do exercício anterior, o valor que for mais elevado.
@@ -673,7 +673,7 @@ export default function Landing() {
           <div className="testi-card fade-in">
             <div className="testi-stars">★★★★★</div>
             <p className="testi-text">
-              "Usamos a plataforma para três clientes PME em simultâneo com o plano MSSP. Em vez de gastar €20.000 por cliente num consultor, gastámos €119/mês e os resultados foram equivalentes — com o dossier de conformidade completo."
+              "Usamos a plataforma para três clientes PME em simultâneo com o plano MSSP. Em vez de gastar €20.000 por cliente num consultor, gastámos €199/mês e os resultados foram equivalentes — com o dossier de conformidade completo."
             </p>
             <div className="testi-author">
               <strong>Pedro Rodrigues</strong>
@@ -721,16 +721,16 @@ export default function Landing() {
             <p className="tagline">Para a empresa inteira. Scanner ilimitado, curso completo e IA de remediação.</p>
             <div className="price-amount">
               <span className="currency">€</span>
-              <span className="value">49</span>
-              <div className="period">por mês · Cancele quando quiser</div>
+              <span className="value">89</span>
+              <div className="period">por mês + IVA · Cancele quando quiser</div>
             </div>
             <ul className="price-features">
-              <li className="yes">Scans ilimitados</li>
+              <li className="yes">Scans ilimitados (fair-use 50/mês)</li>
               <li className="yes">Email (SPF/DKIM/DMARC) + headers HTTP</li>
-              <li className="yes">Scan em lote — até 10 targets por batch</li>
-              <li className="yes">Descoberta de subdomínios — até 20</li>
+              <li className="yes">Scan em lote — até 15 targets por batch</li>
+              <li className="yes">Descoberta de subdomínios — até 50</li>
               <li className="yes">42 controlos NIS2 · 35 documentos editáveis</li>
-              <li className="yes">Remediação guiada por IA (Claude)</li>
+              <li className="yes">Remediação guiada por IA — 75 000 tokens/mês</li>
               <li className="yes">Módulos 1 e 2 · Certificado · Actualizações</li>
             </ul>
             <Link to="/register?plan=pro" className="price-btn solid">Começar Pro →</Link>
@@ -743,18 +743,40 @@ export default function Landing() {
             <p className="tagline">Para consultoras e MSPs que gerem NIS2 de múltiplas organizações clientes.</p>
             <div className="price-amount">
               <span className="currency">€</span>
-              <span className="value">119</span>
-              <div className="period">por mês · Multi-organização</div>
+              <span className="value">199</span>
+              <div className="period">por mês + IVA · Multi-organização</div>
             </div>
             <ul className="price-features">
-              <li className="yes">Tudo do Pro — organizações ilimitadas</li>
+              <li className="yes">Tudo do Pro</li>
+              <li className="yes">Até 25 organizações geridas (€8/org adicional)</li>
               <li className="yes">Scan em lote — até 50 targets por batch</li>
-              <li className="yes">Descoberta de subdomínios — até 100</li>
+              <li className="yes">Descoberta de subdomínios — até 200</li>
               <li className="yes">Dashboard multi-cliente + PDF white-label</li>
-              <li className="yes">IA com limite de 200k tokens/mês</li>
-              <li className="yes">Suporte prioritário · Onboarding dedicado</li>
+              <li className="yes">IA — 300 000 tokens/mês</li>
+              <li className="yes">Suporte prioritário · Onboarding dedicado (1h)</li>
             </ul>
             <Link to="/register?plan=mssp" className="price-btn gold-btn">Começar MSSP →</Link>
+          </div>
+
+          {/* Enterprise */}
+          <div className="price-card" style={{ background: "rgba(15,30,56,0.95)", border: "1px solid rgba(212,160,23,0.35)" }}>
+            <div className="price-tier" style={{ color: "#d4a017" }}>Grande Organização</div>
+            <h3 style={{ color: "#ffffff" }}>Enterprise</h3>
+            <p className="tagline" style={{ color: "#94a3b8" }}>Para grandes empresas, organismos públicos e contratos anuais personalizados.</p>
+            <div className="price-amount">
+              <span className="currency" style={{ color: "#d4a017" }}>€</span>
+              <span className="value" style={{ color: "#ffffff", fontSize: "2rem" }}>499</span>
+              <div className="period" style={{ color: "#94a3b8" }}>/ mês + IVA · a partir de</div>
+            </div>
+            <ul className="price-features">
+              <li className="yes">Organizações geridas ilimitadas</li>
+              <li className="yes">IA sem limites mensais de tokens</li>
+              <li className="yes">SLA 99,9% com suporte 24/7</li>
+              <li className="yes">SSO SAML / OIDC</li>
+              <li className="yes">API access completa</li>
+              <li className="yes">Gestor de conta dedicado</li>
+            </ul>
+            <a href="mailto:hello@nis2pt.pt?subject=Plano Enterprise NIS2 PT" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
           </div>
         </div>
 
