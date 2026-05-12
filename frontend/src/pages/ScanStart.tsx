@@ -107,13 +107,14 @@ function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
 
 function SingleScanTab() {
   const navigate = useNavigate();
-  const [domain,       setDomain]       = useState("");
-  const [verifying,    setVerifying]    = useState(false);
-  const [verified,     setVerified]     = useState(false);
-  const [token,        setToken]        = useState("");
-  const [isIp,         setIsIp]         = useState(false);
-  const [wellKnownUrl, setWellKnownUrl] = useState<string | null>(null);
-  const [error,        setError]        = useState("");
+  const [domain,           setDomain]           = useState("");
+  const [normalizedDomain, setNormalizedDomain] = useState("");
+  const [verifying,        setVerifying]        = useState(false);
+  const [verified,         setVerified]         = useState(false);
+  const [token,            setToken]            = useState("");
+  const [isIp,             setIsIp]             = useState(false);
+  const [wellKnownUrl,     setWellKnownUrl]     = useState<string | null>(null);
+  const [error,            setError]            = useState("");
 
   const isIpInput = IPV4_RE.test(domain.trim());
   const verifyMutation = trpc.scan.verifyOwnership.useMutation();
@@ -125,6 +126,8 @@ function SingleScanTab() {
       const r = await verifyMutation.mutateAsync({ domain });
       setVerified(r.verified); setToken(r.token);
       setIsIp(r.isIp); setWellKnownUrl(r.wellKnownUrl ?? null);
+      // Use normalized domain from backend (strips https://, path, port, etc.)
+      setNormalizedDomain(r.dnsName ?? domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0]);
     } catch (err: any) {
       setError(err.message ?? "Erro ao verificar ownership");
     } finally { setVerifying(false); }
@@ -148,7 +151,7 @@ function SingleScanTab() {
           id="domain-single"
           type="text"
           value={domain}
-          onChange={(e) => { setDomain(e.target.value); setVerified(false); setToken(""); setError(""); }}
+          onChange={(e) => { setDomain(e.target.value); setVerified(false); setToken(""); setNormalizedDomain(""); setError(""); }}
           placeholder="exemplo.pt ou 185.1.2.3"
           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
         />
@@ -178,7 +181,7 @@ function SingleScanTab() {
             {verifying ? <><Spinner />A verificar…</> : "Verificar ownership →"}
           </button>
           {token && !verified && (
-            <OwnershipBox token={token} isIp={isIp} domain={domain} wellKnownUrl={wellKnownUrl} />
+            <OwnershipBox token={token} isIp={isIp} domain={normalizedDomain || domain} wellKnownUrl={wellKnownUrl} />
           )}
         </>
       ) : (
@@ -284,12 +287,13 @@ interface DiscoveredSub { name: string; ip?: string; }
 
 function SubdomainScanTab() {
   const navigate = useNavigate();
-  const [domain,     setDomain]     = useState("");
-  const [verified,   setVerified]   = useState(false);
-  const [token,      setToken]      = useState("");
-  const [discovered, setDiscovered] = useState<DiscoveredSub[]>([]);
-  const [selected,   setSelected]   = useState<Set<string>>(new Set());
-  const [error,      setError]      = useState("");
+  const [domain,           setDomain]           = useState("");
+  const [normalizedDomain, setNormalizedDomain] = useState("");
+  const [verified,         setVerified]         = useState(false);
+  const [token,            setToken]            = useState("");
+  const [discovered,       setDiscovered]       = useState<DiscoveredSub[]>([]);
+  const [selected,         setSelected]         = useState<Set<string>>(new Set());
+  const [error,            setError]            = useState("");
 
   const { data: sub } = trpc.billing.getSubscription.useQuery();
   const plan = sub?.plan ?? "free";
@@ -327,6 +331,7 @@ function SubdomainScanTab() {
       const r = await verifyMut.mutateAsync({ domain });
       setToken(r.token);
       setVerified(r.verified);
+      setNormalizedDomain(r.dnsName ?? domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0]);
     } catch (err: any) { setError(err.message ?? "Erro ao verificar"); }
   };
 
@@ -352,7 +357,7 @@ function SubdomainScanTab() {
         </div>
       </div>
 
-      {token && !verified && <OwnershipBox token={token} isIp={false} domain={domain} />}
+      {token && !verified && <OwnershipBox token={token} isIp={false} domain={normalizedDomain || domain} />}
       {verified && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-sm text-green-800">
           <span className="text-green-600">✓</span>
