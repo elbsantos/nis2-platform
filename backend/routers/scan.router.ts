@@ -12,10 +12,22 @@ import { createScan, getScanById, getScansByOrgId, getScansByBatchId } from "../
 import { checkScanLimit } from "../middlewares/planGuard";
 import { isSafeTarget } from "../middlewares/security";
 
-// Zod refinement: reject private/internal targets before any DNS or API call
-const safeTarget = z.string().min(1).refine(isSafeTarget, {
-  message: "Target inválido: apenas domínios públicos são permitidos.",
-});
+// Strip protocol, path, port and whitespace — accept "https://example.com/path" as "example.com"
+function normaliseTarget(raw: string): string {
+  return raw.trim().toLowerCase()
+    .replace(/^https?:\/\//, "")  // remove http:// or https://
+    .split("/")[0]                 // remove path
+    .split("?")[0]                 // remove query string
+    .split("#")[0]                 // remove fragment
+    .replace(/:(\d+)$/, "");       // remove port (:443, :8080, etc.)
+}
+
+// Zod: normalise first, then reject private/internal targets
+const safeTarget = z.string().min(1)
+  .transform(normaliseTarget)
+  .refine(isSafeTarget, {
+    message: "Target inválido: apenas domínios públicos são permitidos.",
+  });
 
 export const scanRouter = {
   /**
