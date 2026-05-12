@@ -8,6 +8,7 @@
 import http from "http";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
+import type { DirectTlsResult } from "../integrations/direct-tls";
 import type { EmailSecurityResult } from "../integrations/email-security";
 import type { HttpHeadersResult } from "../integrations/http-headers";
 import type { DarkWebResult } from "../integrations/dark-web";
@@ -43,6 +44,7 @@ export interface AgentlessScanResult {
   emailSecurity?: EmailSecurityResult;
   httpHeaders?: HttpHeadersResult;
   darkWeb?: DarkWebResult;
+  directTls?: DirectTlsResult;
   error?: string;
   durationMs: number;
 }
@@ -319,10 +321,24 @@ export async function executeAgentlessScan(
       throw new Error(`Verificação de ownership falhou. ${hint}`);
     }
 
-    // ── 2. Shodan lookup ───────────────────────────────────────────────────
-    const { lookupHost: shodanLookup } = await import("../integrations/shodan");
-    const shodanData: ShodanHostResult | null = await shodanLookup(options.target);
+    const isDomain = !isIpAddress(options.target);
 
+    // ── 2. Shodan + Censys + Direct TLS (parallel) ─────────────────────────
+    const [shodanData, censysData, directTls] = await Promise.all([
+      import("../integrations/shodan").then((m) =>
+        m.lookupHost(options.target).catch(() => null)
+      ) as Promise<ShodanHostResult | null>,
+      import("../integrations/censys").then((m) =>
+        m.lookupHost(options.target).catch(() => null)
+      ) as Promise<CensysHostResult | null>,
+      isDomain
+        ? import("../integrations/direct-tls").then((m) =>
+            m.checkDirectTls(options.target).catch(() => null)
+          ) as Promise<DirectTlsResult | null>
+        : Promise.resolve(null),
+    ]);
+
+    // ── 3. Merge port findings ─────────────────────────────────────────────
     const openPorts: PortFinding[] =
       shodanData?.ports?.map((p) => ({
         port: p.port,
@@ -333,13 +349,7 @@ export async function executeAgentlessScan(
         cves: Object.keys(p.vulns ?? {}),
       })) ?? [];
 
-    // ── 3. Censys lookup (TLS analysis) ────────────────────────────────────
-    const { lookupHost: censysLookup } = await import("../integrations/censys");
-    const censysData: CensysHostResult | null = await censysLookup(options.target);
-
-    const tlsIssues: TlsIssueFinding[] = censysData?.tlsIssues ?? [];
-
-    // Add Censys services not in Shodan
+    // Add Censys services not already in Shodan
     const censysPorts: PortFinding[] =
       censysData?.services
         ?.filter((svc) => !openPorts.some((p) => p.port === svc.port))
@@ -350,7 +360,29 @@ export async function executeAgentlessScan(
           cves: [],
         })) ?? [];
 
-    const allPorts = [...openPorts, ...censysPorts];
+    // Add ports confirmed by direct TCP check (80/443) if not already present
+    const directPorts: PortFinding[] = (directTls?.ports ?? [])
+      .filter((dp) => dp.open && !openPorts.some((p) => p.port === dp.port) && !censysPorts.some((p) => p.port === dp.port))
+      .map((dp) => ({
+        port: dp.port,
+        protocol: "tcp" as const,
+        service: dp.service,
+        cves: [],
+      }));
+
+    const allPorts = [...openPorts, ...censysPorts, ...directPorts];
+
+    // ── TLS issues — prefer direct TLS (works through CDN), fall back to Censys
+    const censysTlsIssues: TlsIssueFinding[] = censysData?.tlsIssues ?? [];
+    const directTlsIssues: TlsIssueFinding[] = (directTls?.tlsIssues ?? []).map((i) => ({
+      port: 443,
+      issue: i.issue,
+      severity: i.severity,
+      nis2Article: i.nis2Article,
+    }));
+    // Use direct TLS issues if available (more accurate), else fall back to Censys
+    const tlsIssues: TlsIssueFinding[] =
+      directTlsIssues.length > 0 ? directTlsIssues : censysTlsIssues;
 
     // ── 4. Build vulnerability list ────────────────────────────────────────
     const vulns: VulnFinding[] = [];
@@ -411,8 +443,6 @@ export async function executeAgentlessScan(
     }
 
     // ── 6. Email security + HTTP headers (parallel, domain-only for email) ─
-    const isDomain = !isIpAddress(options.target);
-
     const [emailSecurity, httpHeaders] = await Promise.all([
       isDomain
         ? import("../integrations/email-security").then((m) =>
@@ -537,9 +567,12 @@ export async function executeAgentlessScan(
       mediumCount: vulns.filter((v) => v.severity === "medium").length,
       lowCount: vulns.filter((v) => v.severity === "low").length,
       vulnerabilities: vulns,
+      openPorts: allPorts,
+      tlsIssues,
       emailSecurity: emailSecurity ?? undefined,
       httpHeaders:   httpHeaders   ?? undefined,
       darkWeb:       darkWeb       ?? undefined,
+      directTls:     directTls     ?? undefined,
     });
 
     return {
@@ -554,6 +587,7 @@ export async function executeAgentlessScan(
       emailSecurity: emailSecurity ?? undefined,
       httpHeaders:   httpHeaders   ?? undefined,
       darkWeb:       darkWeb       ?? undefined,
+      directTls:     directTls     ?? undefined,
       durationMs: Date.now() - startTime,
     };
   } catch (err) {

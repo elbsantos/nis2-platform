@@ -144,6 +144,22 @@ export default function ScanResults() {
         )}
       </section>
 
+      {/* TLS & Certificates section */}
+      {results?.directTls && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">TLS &amp; Certificados</h2>
+          <TlsSection directTls={results.directTls} />
+        </section>
+      )}
+
+      {/* Ports & Services section */}
+      {results?.openPorts && results.openPorts.length > 0 && (
+        <section className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Portos &amp; Serviços</h2>
+          <PortsSection ports={results.openPorts} cdn={results.directTls?.cdn} />
+        </section>
+      )}
+
       {/* Email security section */}
       {results?.emailSecurity && (
         <section className="bg-white border border-gray-200 rounded-xl p-6">
@@ -485,6 +501,164 @@ function DarkWebSection({ darkWeb }: { darkWeb: DarkWeb }) {
             </li>
           ))}
         </ul>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TlsSection — direct TLS certificate + CDN detection
+// ---------------------------------------------------------------------------
+
+interface DirectCert {
+  subject: string; issuer: string; validFrom: string; validTo: string;
+  daysUntilExpiry: number; isExpired: boolean; isSelfSigned: boolean;
+  isWildcard: boolean; tlsVersion: string; cipher: string; sans: string[];
+}
+interface DirectTlsData {
+  accessible: boolean;
+  certificate: DirectCert | null;
+  tlsIssues: Array<{ issue: string; severity: string; nis2Article: string }>;
+  ports: Array<{ port: number; open: boolean; service: string }>;
+  cdn: { detected: boolean; provider: string | null; isProtected: boolean };
+}
+
+function TlsSection({ directTls }: { directTls: DirectTlsData }) {
+  const cert = directTls.certificate;
+  const cdn  = directTls.cdn;
+
+  return (
+    <div className="space-y-4">
+      {/* CDN/Proxy detection */}
+      {cdn.detected && (
+        <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <span className="text-blue-500 mt-0.5 shrink-0">🛡️</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-800">
+              Protegido por {cdn.provider}
+            </p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              O servidor está atrás de um CDN/proxy. Portos internos não são expostos directamente — é uma boa prática de segurança.
+              A análise TLS foi feita directamente ao domínio.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Certificate info */}
+      {cert ? (
+        <div className="border border-gray-100 rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Certificado TLS</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {[
+              { label: "Emitido para",   value: cert.subject },
+              { label: "Emissor (CA)",   value: cert.issuer },
+              { label: "Versão TLS",     value: cert.tlsVersion },
+              { label: "Cifra",          value: cert.cipher },
+              { label: "Válido até",
+                value: `${new Date(cert.validTo).toLocaleDateString("pt-PT")} ${
+                  cert.isExpired
+                    ? "— ⚠️ EXPIRADO"
+                    : cert.daysUntilExpiry < 30
+                    ? `— ⚠️ Expira em ${cert.daysUntilExpiry} dias`
+                    : `— ✓ ${cert.daysUntilExpiry} dias restantes`
+                }`,
+                highlight: cert.isExpired ? "text-red-600" : cert.daysUntilExpiry < 30 ? "text-amber-600" : "text-green-700",
+              },
+              { label: "Wildcard",       value: cert.isWildcard ? "Sim" : "Não" },
+              { label: "Auto-assinado",  value: cert.isSelfSigned ? "Sim ⚠️" : "Não ✓" },
+            ].map((row) => (
+              <div key={row.label} className="flex gap-3 px-4 py-2.5">
+                <span className="text-xs text-gray-400 w-32 shrink-0">{row.label}</span>
+                <span className={`text-xs font-mono ${(row as any).highlight ?? "text-gray-800"} break-all`}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
+            {cert.sans.length > 0 && (
+              <div className="flex gap-3 px-4 py-2.5">
+                <span className="text-xs text-gray-400 w-32 shrink-0">SANs</span>
+                <span className="text-xs font-mono text-gray-700 break-all">{cert.sans.slice(0, 6).join(", ")}{cert.sans.length > 6 ? ` (+${cert.sans.length - 6})` : ""}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm text-gray-500 italic">
+          {directTls.accessible ? "Certificado não obtido." : "Servidor HTTPS não acessível."}
+        </div>
+      )}
+
+      {/* TLS issues */}
+      {directTls.tlsIssues.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Problemas TLS detectados</p>
+          <ul className="space-y-2">
+            {directTls.tlsIssues.map((issue, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full shrink-0 mt-0.5 ${
+                  issue.severity === "critical" ? "bg-red-100 text-red-700"
+                  : issue.severity === "high"   ? "bg-orange-100 text-orange-700"
+                  : "bg-amber-100 text-amber-700"
+                }`}>
+                  {issue.severity === "critical" ? "Crítico" : issue.severity === "high" ? "Alto" : "Aviso"}
+                </span>
+                <div>
+                  <p className="text-sm text-gray-700">{issue.issue}</p>
+                  <p className="text-xs text-gray-400">{issue.nis2Article}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* No issues = pass */}
+      {cert && directTls.tlsIssues.length === 0 && (
+        <div className="flex items-center gap-2 text-sm text-green-700">
+          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Pass</span>
+          <span>TLS configurado correctamente. Sem problemas detectados.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PortsSection — open ports list (80/443 from direct check + Shodan extras)
+// ---------------------------------------------------------------------------
+
+interface PortEntry { port: number; protocol: string; service: string; product?: string; version?: string; cves?: string[]; }
+
+function PortsSection({ ports, cdn }: { ports: PortEntry[]; cdn?: { detected: boolean; provider: string | null } }) {
+  return (
+    <div className="space-y-3">
+      {cdn?.detected && (
+        <p className="text-xs text-gray-400 italic">
+          Domínio atrás de {cdn.provider} — apenas portos 80/443 expostos publicamente. Portos internos não são visíveis.
+        </p>
+      )}
+      <div className="border border-gray-100 rounded-lg overflow-hidden">
+        <div className="grid grid-cols-4 bg-gray-50 px-4 py-2 border-b border-gray-100">
+          {["Porto", "Protocolo", "Serviço", "CVEs"].map((h) => (
+            <p key={h} className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</p>
+          ))}
+        </div>
+        {ports.map((p) => (
+          <div key={p.port} className="grid grid-cols-4 px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+            <span className="text-sm font-mono font-semibold text-gray-900">{p.port}</span>
+            <span className="text-xs text-gray-500 uppercase">{p.protocol ?? "tcp"}</span>
+            <span className="text-xs text-gray-700">{p.product ? `${p.service} (${p.product}${p.version ? " " + p.version : ""})` : p.service}</span>
+            <span className="text-xs">
+              {p.cves && p.cves.length > 0
+                ? <span className="text-red-600 font-medium">{p.cves.length} CVE{p.cves.length > 1 ? "s" : ""}</span>
+                : <span className="text-green-600">—</span>
+              }
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
