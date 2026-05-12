@@ -56,6 +56,7 @@ export const ENV = {
   stripeWebhookSecret: optional("STRIPE_WEBHOOK_SECRET"),
   stripePricePro: optional("STRIPE_PRICE_PRO"),
   stripePriceMssp: optional("STRIPE_PRICE_MSSP"),
+  stripePriceEnterprise: optional("STRIPE_PRICE_ENTERPRISE"),
 
   // ── Resend (email) ────────────────────────────────────────────────────────
   resendApiKey: optional("RESEND_API_KEY"),

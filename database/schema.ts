@@ -55,7 +55,7 @@ export const subscriptions = mysqlTable(
   {
     id:               int("id").autoincrement().primaryKey(),
     organizationId:   int("organizationId").notNull(),
-    plan:             mysqlEnum("plan", ["free", "pro", "mssp"]).notNull().default("free"),
+    plan:             mysqlEnum("plan", ["free", "pro", "mssp", "enterprise"]).notNull().default("free"),
     stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
     stripeSubId:      varchar("stripeSubId", { length: 255 }),
     currentPeriodEnd: timestamp("currentPeriodEnd"),

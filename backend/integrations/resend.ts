@@ -187,10 +187,10 @@ export async function sendRemediationReady(opts: {
 export async function sendUpgradeConfirmed(opts: {
   to: string;
   name: string;
-  plan: "pro" | "mssp";
+  plan: "pro" | "mssp" | "enterprise";
   dashboardUrl: string;
 }): Promise<void> {
-  const planLabel = opts.plan === "pro" ? "Pro (€29/mês)" : "MSSP (€199/mês)";
+  const planLabel = opts.plan === "pro" ? "Pro (€89/mês)" : opts.plan === "mssp" ? "MSSP (€199/mês)" : "Enterprise (€499/mês)";
 
   await send({
     to: opts.to,

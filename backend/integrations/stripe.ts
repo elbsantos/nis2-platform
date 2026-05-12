@@ -4,9 +4,10 @@
  * Stripe billing integration for NIS2 Plataforma PT.
  *
  * Plans:
- *   Free  — €0     (no Stripe, just DB flag)
- *   Pro   — €89/mês + IVA (STRIPE_PRICE_PRO)
- *   MSSP  — €199/mês + IVA (STRIPE_PRICE_MSSP)
+ *   Free       — €0          (no Stripe, just DB flag)
+ *   Pro        — €89/mês + IVA  (STRIPE_PRICE_PRO)
+ *   MSSP       — €199/mês + IVA (STRIPE_PRICE_MSSP)
+ *   Enterprise — €499/mês + IVA (STRIPE_PRICE_ENTERPRISE)
  */
 
 import Stripe from "stripe";
@@ -30,7 +31,7 @@ export function getStripe(): Stripe {
 // Types
 // ---------------------------------------------------------------------------
 
-export type Plan = "free" | "pro" | "mssp";
+export type Plan = "free" | "pro" | "mssp" | "enterprise";
 
 export interface CheckoutResult {
   url: string;
@@ -79,7 +80,7 @@ export async function createCheckoutSession(opts: {
   orgId: number;
   email: string;
   orgName: string;
-  plan: "pro" | "mssp";
+  plan: "pro" | "mssp" | "enterprise";
   successUrl: string;
   cancelUrl: string;
 }): Promise<CheckoutResult> {
@@ -88,7 +89,9 @@ export async function createCheckoutSession(opts: {
   const priceId =
     opts.plan === "pro"
       ? process.env.STRIPE_PRICE_PRO
-      : process.env.STRIPE_PRICE_MSSP;
+      : opts.plan === "mssp"
+      ? process.env.STRIPE_PRICE_MSSP
+      : process.env.STRIPE_PRICE_ENTERPRISE;
 
   if (!priceId) {
     throw new Error(`[Stripe] Price ID for plan "${opts.plan}" is not configured`);
@@ -160,7 +163,7 @@ export function extractPlanFromSubscription(
   subscription: Stripe.Subscription
 ): Plan {
   const plan = subscription.metadata?.plan as Plan | undefined;
-  if (plan === "pro" || plan === "mssp") return plan;
+  if (plan === "pro" || plan === "mssp" || plan === "enterprise") return plan;
   return "free";
 }
 

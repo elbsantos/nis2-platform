@@ -132,7 +132,7 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
     await sendUpgradeConfirmed({
       to: user.email,
       name: user.name ?? "utilizador",
-      plan: plan as "pro" | "mssp",
+      plan: plan as "pro" | "mssp" | "enterprise",
       dashboardUrl: `${process.env.APP_URL ?? "https://nis2pt.pt"}/dashboard`,
     }).catch((e) => console.error("[Webhook] Email send failed:", e));
   }

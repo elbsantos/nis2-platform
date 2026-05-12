@@ -239,7 +239,7 @@ export async function getSubscriptionByOrgId(orgId: number) {
 
 export async function upsertSubscription(data: {
   organizationId: number;
-  plan: "free" | "pro" | "mssp";
+  plan: "free" | "pro" | "mssp" | "enterprise";
   stripeCustomerId: string | null;
   stripeSubId: string | null;
   currentPeriodEnd: Date | null;

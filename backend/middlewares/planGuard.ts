@@ -26,6 +26,7 @@ const PLAN_RANK: Record<Plan, number> = {
   free: 0,
   pro: 1,
   mssp: 2,
+  enterprise: 3,
 };
 
 // ---------------------------------------------------------------------------
@@ -76,6 +77,7 @@ export function planProcedure(minimumPlan: Plan) {
         free: "", // never triggered (free is minimum)
         pro: "Esta funcionalidade requer o plano Pro (€89/mês + IVA). Faz upgrade na tua dashboard.",
         mssp: "Esta funcionalidade é exclusiva do plano MSSP (€199/mês + IVA). Contacta-nos para saber mais.",
+        enterprise: "Esta funcionalidade é exclusiva do plano Enterprise. Contacta hello@nis2pt.pt para saber mais.",
       };
 
       throw new TRPCError({
@@ -107,6 +109,9 @@ export const proProcedure = planProcedure("pro");
 
 /** MSSP only */
 export const msspProcedure = planProcedure("mssp");
+
+/** Enterprise only */
+export const enterpriseProcedure = planProcedure("enterprise");
 
 // ---------------------------------------------------------------------------
 // Helper: check if org is at scan limit (free tier: 1 scan/month)

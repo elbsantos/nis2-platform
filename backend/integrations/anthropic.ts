@@ -59,6 +59,7 @@ export interface StreamOptions extends ChatOptions {
 const TOKEN_LIMITS: Record<string, number> = {
   pro:  75_000,
   mssp: 300_000,
+  // enterprise: sem limite — não está neste mapa intencionalmente
 };
 
 function tokenKey(orgId: number): string {
