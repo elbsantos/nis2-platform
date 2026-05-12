@@ -425,82 +425,88 @@ const CAPABILITIES = [
     title: "Portos & Serviços",
     desc: "Portos TCP/UDP abertos, serviços expostos, banners de versão",
     tag: "Shodan",
-    tagColor: "bg-red-100 text-red-700",
+    tagColor: "bg-red-900/50 text-red-300 border border-red-800/40",
   },
   {
     icon: "🐛",
     title: "Vulnerabilidades (CVE)",
     desc: "CVEs públicos associados a versões de software detectadas",
     tag: "NVD + Shodan",
-    tagColor: "bg-orange-100 text-orange-700",
+    tagColor: "bg-orange-900/50 text-orange-300 border border-orange-800/40",
   },
   {
     icon: "🔒",
     title: "TLS & Certificados",
     desc: "Expiração, algoritmos fracos, self-signed, protocolos obsoletos (SSLv3, TLS 1.0)",
     tag: "Censys",
-    tagColor: "bg-blue-100 text-blue-700",
+    tagColor: "bg-blue-900/50 text-blue-300 border border-blue-800/40",
   },
   {
     icon: "📧",
     title: "Segurança de Email",
     desc: "SPF, DKIM (10 selectores), DMARC — conformidade Art. 21(2)(j)",
     tag: "DNS",
-    tagColor: "bg-purple-100 text-purple-700",
+    tagColor: "bg-purple-900/50 text-purple-300 border border-purple-800/40",
   },
   {
     icon: "🛡️",
     title: "Headers de Segurança HTTP",
     desc: "HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy",
     tag: "HTTP",
-    tagColor: "bg-indigo-100 text-indigo-700",
+    tagColor: "bg-indigo-900/50 text-indigo-300 border border-indigo-800/40",
   },
   {
     icon: "🌑",
     title: "Dark Web & Reputação",
     desc: "Breaches de credenciais (HIBP), blacklists DNS (Spamhaus, SpamCop)",
     tag: "HIBP + DNS",
-    tagColor: "bg-gray-200 text-gray-700",
+    tagColor: "bg-slate-700/60 text-slate-300 border border-slate-600/40",
   },
 ];
 
 function CapabilitiesPanel() {
   return (
-    <div className="bg-gray-950 rounded-2xl p-6 h-full flex flex-col">
+    <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700/60 h-full flex flex-col">
       <div className="mb-5">
-        <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1">O que o scanner analisa</p>
-        <h3 className="text-white text-lg font-bold">6 camadas de análise NIS2</h3>
-        <p className="text-gray-400 text-sm mt-1">Mapeadas ao Art. 21 da Directiva NIS2 (EU 2022/2555)</p>
+        <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1.5">O que o scanner analisa</p>
+        <h3 className="text-white text-xl font-bold mb-1">6 camadas de análise NIS2</h3>
+        <p className="text-slate-400 text-sm">Mapeadas ao Art. 21 da Directiva NIS2 (EU 2022/2555)</p>
       </div>
 
-      <div className="space-y-3 flex-1">
+      <div className="space-y-2.5 flex-1">
         {CAPABILITIES.map((c) => (
-          <div key={c.title} className="flex items-start gap-3 p-3 bg-gray-900 rounded-xl border border-gray-800 hover:border-gray-700 transition-colors">
+          <div
+            key={c.title}
+            className="flex items-start gap-3.5 p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-800 transition-all"
+          >
             <div className="text-xl shrink-0 mt-0.5">{c.icon}</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                 <span className="text-sm font-semibold text-white">{c.title}</span>
                 <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${c.tagColor}`}>{c.tag}</span>
               </div>
-              <p className="text-xs text-gray-400 leading-relaxed">{c.desc}</p>
+              <p className="text-xs text-slate-400 leading-relaxed">{c.desc}</p>
             </div>
-            <div className="shrink-0 mt-1">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
+            <div className="shrink-0 mt-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-5 pt-4 border-t border-gray-800">
-        <div className="grid grid-cols-3 gap-3 text-center">
+      <div className="mt-5 pt-4 border-t border-slate-700/50">
+        <div className="grid grid-cols-3 gap-2 text-center">
           {[
             { value: "Art. 21", label: "NIS2 focus" },
             { value: "< 5min",  label: "Tempo médio" },
             { value: "100%",    label: "Agentless" },
           ].map((s) => (
-            <div key={s.label}>
-              <p className="text-white font-bold text-base">{s.value}</p>
-              <p className="text-gray-500 text-xs">{s.label}</p>
+            <div key={s.label} className="bg-slate-800/50 rounded-lg py-2.5 px-2">
+              <p className="text-white font-bold text-sm">{s.value}</p>
+              <p className="text-slate-500 text-xs mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -517,42 +523,73 @@ export default function ScanStart() {
   const [tab, setTab] = useState<Tab>("único");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero header */}
-      <div className="bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">🔍</div>
-            <div>
-              <h1 className="text-xl font-bold text-white leading-tight">Scanner NIS2</h1>
-              <p className="text-blue-300 text-xs font-medium">Agentless · Sem instalação · Resultado em minutos</p>
-            </div>
+    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #0f172a 0%, #0c1a3a 50%, #0f172a 100%)" }}>
+
+      {/* ── Hero ── */}
+      <div className="relative overflow-hidden">
+        {/* Decorative glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto px-6 pt-14 pb-10 text-center">
+          {/* Status badge */}
+          <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold px-4 py-1.5 rounded-full mb-8 tracking-wide">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            Sistema online · Análise em tempo real
           </div>
-          <p className="text-gray-400 text-sm max-w-xl">
-            Analisa a superfície de ataque e conformidade NIS2 do teu domínio ou IP. Mapeamento automático ao Art. 21.º da Directiva NIS2.
+
+          {/* Title */}
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-5 leading-tight tracking-tight">
+            Scanner de Conformidade{" "}
+            <span className="text-blue-400">NIS2</span>
+          </h1>
+
+          <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
+            Analisa a superfície de ataque do teu domínio ou IP em 6 camadas —{" "}
+            <span className="text-slate-300">sem instalar software</span>. Mapeamento automático ao Art.&nbsp;21.º da Directiva NIS2 (EU&nbsp;2022/2555).
           </p>
+
+          {/* Stats row */}
+          <div className="flex justify-center gap-8 sm:gap-16">
+            {[
+              { value: "6",       label: "Camadas de análise" },
+              { value: "< 5min",  label: "Tempo médio" },
+              { value: "Art. 21", label: "NIS2 EU 2022/2555" },
+              { value: "100%",    label: "Agentless" },
+            ].map((s) => (
+              <div key={s.label} className="text-center">
+                <p className="text-2xl font-bold text-white">{s.value}</p>
+                <p className="text-slate-500 text-xs mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Divider glow */}
+        <div className="h-px bg-gradient-to-r from-transparent via-blue-700/30 to-transparent" />
       </div>
 
-      {/* Main content — two columns */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* ── Main content — two columns ── */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 pb-14">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
           {/* Left — form panel */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/50 p-6">
               <TabBar active={tab} setTab={setTab} />
               {tab === "único"       && <SingleScanTab />}
               {tab === "lote"        && <BulkScanTab />}
               {tab === "subdomínios" && <SubdomainScanTab />}
             </div>
 
-            {/* Info note */}
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
-              <span className="text-blue-500 text-base shrink-0 mt-0.5">ℹ️</span>
+            {/* Info note — dark themed */}
+            <div className="p-4 bg-blue-950/60 border border-blue-700/30 rounded-xl flex items-start gap-3">
+              <span className="text-blue-400 text-sm shrink-0 mt-0.5 font-bold">ℹ</span>
               <div>
-                <p className="text-xs font-semibold text-blue-800 mb-0.5">Verificação de ownership</p>
-                <p className="text-xs text-blue-600 leading-relaxed">
+                <p className="text-xs font-semibold text-blue-300 mb-0.5">Verificação de ownership</p>
+                <p className="text-xs text-blue-400/80 leading-relaxed">
                   Antes de iniciar o scan, verificamos que és o proprietário do target via DNS TXT record ou ficheiro HTTP. Isto protege terceiros de scans não autorizados.
                 </p>
               </div>
