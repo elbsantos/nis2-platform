@@ -11,8 +11,7 @@
 
 import { getRedisClient } from "../middlewares/rateLimit";
 
-const CENSYS_API_ID = process.env.CENSYS_API_ID ?? "";
-const CENSYS_API_SECRET = process.env.CENSYS_API_SECRET ?? "";
+const CENSYS_API_KEY = process.env.CENSYS_API_KEY ?? "";
 const CENSYS_BASE = "https://search.censys.io/api/v2";
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
 
@@ -58,10 +57,7 @@ export interface TlsIssue {
 // ---------------------------------------------------------------------------
 
 function authHeader(): string {
-  const encoded = Buffer.from(`${CENSYS_API_ID}:${CENSYS_API_SECRET}`).toString(
-    "base64"
-  );
-  return `Basic ${encoded}`;
+  return `Bearer ${CENSYS_API_KEY}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,8 +144,8 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
 export async function lookupHost(
   target: string
 ): Promise<CensysHostResult | null> {
-  if (!CENSYS_API_ID || !CENSYS_API_SECRET) {
-    console.warn("[Censys] No credentials — skipping Censys lookup");
+  if (!CENSYS_API_KEY) {
+    console.warn("[Censys] CENSYS_API_KEY não configurado — análise TLS desactivada");
     return null;
   }
 

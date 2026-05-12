@@ -45,8 +45,7 @@ export const ENV = {
   shodanApiKey: optional("SHODAN_API_KEY"), // empty = use free InternetDB
 
   // ── Censys ────────────────────────────────────────────────────────────────
-  censysApiId: optional("CENSYS_API_ID"),
-  censysApiSecret: optional("CENSYS_API_SECRET"),
+  censysApiKey: optional("CENSYS_API_KEY"), // Personal Access Token
 
   // ── Anthropic ─────────────────────────────────────────────────────────────
   anthropicApiKey: optional("ANTHROPIC_API_KEY"),
@@ -73,7 +72,7 @@ export const ENV = {
 
 const OPTIONAL_BUT_WARN = [
   ["SHODAN_API_KEY", "Scanner usará InternetDB (gratuito, menos detalhe)"],
-  ["CENSYS_API_ID", "Análise TLS/certificados desactivada"],
+  ["CENSYS_API_KEY", "Análise TLS/certificados desactivada"],
   ["ANTHROPIC_API_KEY", "Questionário IA e remediação desactivados"],
   ["STRIPE_SECRET_KEY", "Billing desactivado — todos os utilizadores em Free"],
   ["RESEND_API_KEY", "Emails transaccionais desactivados"],
