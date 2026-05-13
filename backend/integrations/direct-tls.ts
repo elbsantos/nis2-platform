@@ -57,10 +57,40 @@ export interface DirectTlsResult {
 }
 
 // ---------------------------------------------------------------------------
+// Common ports to scan on every target
+// ---------------------------------------------------------------------------
+
+const COMMON_PORTS: Array<{ port: number; service: string }> = [
+  { port: 21,    service: "FTP" },
+  { port: 22,    service: "SSH" },
+  { port: 23,    service: "Telnet" },
+  { port: 25,    service: "SMTP" },
+  { port: 53,    service: "DNS" },
+  { port: 80,    service: "HTTP" },
+  { port: 110,   service: "POP3" },
+  { port: 143,   service: "IMAP" },
+  { port: 443,   service: "HTTPS" },
+  { port: 445,   service: "SMB" },
+  { port: 587,   service: "SMTP/TLS" },
+  { port: 993,   service: "IMAPS" },
+  { port: 995,   service: "POP3S" },
+  { port: 1433,  service: "MSSQL" },
+  { port: 3306,  service: "MySQL" },
+  { port: 3389,  service: "RDP" },
+  { port: 5432,  service: "PostgreSQL" },
+  { port: 5900,  service: "VNC" },
+  { port: 6379,  service: "Redis" },
+  { port: 8080,  service: "HTTP-Alt" },
+  { port: 8443,  service: "HTTPS-Alt" },
+  { port: 9929,  service: "nping-echo" },
+  { port: 27017, service: "MongoDB" },
+];
+
+// ---------------------------------------------------------------------------
 // Port check via TCP
 // ---------------------------------------------------------------------------
 
-function checkPortOpen(host: string, port: number, timeoutMs = 5_000): Promise<boolean> {
+function checkPortOpen(host: string, port: number, timeoutMs = 3_000): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(timeoutMs);
@@ -233,16 +263,18 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
 // ---------------------------------------------------------------------------
 
 export async function checkDirectTls(domain: string): Promise<DirectTlsResult> {
-  const [port80Open, port443Open, cdnInfo] = await Promise.all([
-    checkPortOpen(domain, 80),
-    checkPortOpen(domain, 443),
+  // Scan all common ports + CDN detection in parallel
+  const [portResults, cdnInfo] = await Promise.all([
+    Promise.all(
+      COMMON_PORTS.map(({ port, service }) =>
+        checkPortOpen(domain, port).then((open): DirectPortResult => ({ port, open, service }))
+      )
+    ),
     detectCdn(domain),
   ]);
 
-  const portResults: DirectPortResult[] = [
-    { port: 80,  open: port80Open,  service: "HTTP" },
-    { port: 443, open: port443Open, service: "HTTPS" },
-  ];
+  const openPorts = portResults.filter((p) => p.open);
+  const port443Open = portResults.find((p) => p.port === 443)?.open ?? false;
 
   if (!port443Open) {
     return {
@@ -255,19 +287,13 @@ export async function checkDirectTls(domain: string): Promise<DirectTlsResult> {
           nis2Article: "Art. 21(2)(h)",
         },
       ],
-      ports: portResults,
+      ports: openPorts,
       cdn: cdnInfo,
     };
   }
 
   const tlsResult = await tlsHandshake(domain);
-  tlsResult.ports = portResults;
+  tlsResult.ports = openPorts;
   tlsResult.cdn = cdnInfo;
-
-  // HTTPS only without redirect warning
-  if (port80Open && port443Open && tlsResult.accessible) {
-    // We trust HSTS check covers redirect — no extra deduction here
-  }
-
   return tlsResult;
 }

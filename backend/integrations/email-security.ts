@@ -8,6 +8,20 @@
 import { resolveTxt } from "dns/promises";
 import { CHECK_CIS } from "../utils/cis-mapping";
 
+// SPF and DMARC live on the apex/organisational domain, never on subdomains.
+// scanme.nmap.org → nmap.org   |   sub.example.co.uk → example.co.uk
+function getApexDomain(domain: string): string {
+  const parts = domain.split(".");
+  if (parts.length <= 2) return domain;
+  // Known second-level TLDs: co.uk, com.br, org.pt, net.au, …
+  const sld = parts[parts.length - 2];
+  const secondLevelTlds = ["co", "com", "org", "net", "gov", "edu", "ac", "ne"];
+  if (sld.length <= 3 && secondLevelTlds.includes(sld)) {
+    return parts.slice(-3).join(".");
+  }
+  return parts.slice(-2).join(".");
+}
+
 export interface EmailSecurityCheck {
   name: string;
   status: "pass" | "warn" | "fail";
@@ -22,14 +36,16 @@ export interface EmailSecurityResult {
 }
 
 async function checkSPF(domain: string): Promise<EmailSecurityCheck> {
+  const apex = getApexDomain(domain);
+  const apexNote = apex !== domain ? ` (verificado em ${apex})` : "";
   try {
-    const records = await resolveTxt(domain);
+    const records = await resolveTxt(apex);
     const spf = records.flat().find((r) => r.startsWith("v=spf1"));
     if (!spf) {
       return {
         name: "SPF",
         status: "fail",
-        detail: "Sem registo SPF — qualquer servidor pode enviar email em nome do domínio.",
+        detail: `Sem registo SPF${apexNote} — qualquer servidor pode enviar email em nome do domínio.`,
         nis2Article: "Art. 21(2)(j)",
       };
     }
@@ -38,35 +54,37 @@ async function checkSPF(domain: string): Promise<EmailSecurityCheck> {
       return {
         name: "SPF",
         status: "warn",
-        detail: `SPF permissivo (${mode}) — permite spoofing de email.`,
+        detail: `SPF permissivo (${mode})${apexNote} — permite spoofing de email.`,
         nis2Article: "Art. 21(2)(j)",
       };
     }
     return {
       name: "SPF",
       status: "pass",
-      detail: `SPF configurado correctamente (${spf.substring(0, 70).trimEnd()}…).`,
+      detail: `SPF configurado correctamente${apexNote} (${spf.substring(0, 60).trimEnd()}…).`,
       nis2Article: "Art. 21(2)(j)",
     };
   } catch {
     return {
       name: "SPF",
       status: "fail",
-      detail: "Erro ao resolver DNS TXT — sem registo SPF ou domínio não responde.",
+      detail: `Sem registo SPF${apexNote} ou domínio não responde.`,
       nis2Article: "Art. 21(2)(j)",
     };
   }
 }
 
 async function checkDMARC(domain: string): Promise<EmailSecurityCheck> {
+  const apex = getApexDomain(domain);
+  const apexNote = apex !== domain ? ` (verificado em ${apex})` : "";
   try {
-    const records = await resolveTxt(`_dmarc.${domain}`);
+    const records = await resolveTxt(`_dmarc.${apex}`);
     const dmarc = records.flat().find((r) => r.startsWith("v=DMARC1"));
     if (!dmarc) {
       return {
         name: "DMARC",
         status: "fail",
-        detail: "Sem registo DMARC — phishing em nome do domínio não é bloqueado.",
+        detail: `Sem registo DMARC${apexNote} — phishing em nome do domínio não é bloqueado.`,
         nis2Article: "Art. 21(2)(j)",
       };
     }
@@ -74,7 +92,7 @@ async function checkDMARC(domain: string): Promise<EmailSecurityCheck> {
       return {
         name: "DMARC",
         status: "warn",
-        detail: "DMARC em modo monitor (p=none) — emails maliciosos são reportados mas não bloqueados.",
+        detail: `DMARC em modo monitor (p=none)${apexNote} — emails maliciosos são reportados mas não bloqueados.`,
         nis2Article: "Art. 21(2)(j)",
       };
     }
@@ -82,14 +100,14 @@ async function checkDMARC(domain: string): Promise<EmailSecurityCheck> {
     return {
       name: "DMARC",
       status: "pass",
-      detail: `DMARC configurado com política ${policy} — phishing bloqueado.`,
+      detail: `DMARC com política ${policy}${apexNote} — phishing bloqueado.`,
       nis2Article: "Art. 21(2)(j)",
     };
   } catch {
     return {
       name: "DMARC",
       status: "fail",
-      detail: `Sem registo DMARC (_dmarc.${domain}) — protecção anti-phishing inexistente.`,
+      detail: `Sem registo DMARC (_dmarc.${apex})${apexNote} — protecção anti-phishing inexistente.`,
       nis2Article: "Art. 21(2)(j)",
     };
   }
