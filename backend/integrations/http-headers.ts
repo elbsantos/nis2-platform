@@ -28,13 +28,28 @@ export interface HttpHeadersResult {
   url: string;
 }
 
-function fetchHeaders(url: string): Promise<IncomingHttpHeaders> {
+function fetchHeaders(url: string, redirectsLeft = 3): Promise<IncomingHttpHeaders> {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith("https") ? https : http;
-    const req = mod.get(url, { timeout: 8000 }, (res) => {
-      res.destroy();
-      resolve(res.headers);
-    });
+    const req = mod.get(
+      url,
+      {
+        timeout: 8000,
+        headers: { "User-Agent": "Mozilla/5.0 NIS2-Scanner/1.0 (+https://nis2.pt)" },
+        rejectUnauthorized: false,
+      },
+      (res) => {
+        const location = res.headers["location"];
+        if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) && location && redirectsLeft > 0) {
+          res.destroy();
+          const next = location.startsWith("http") ? location : new URL(location, url).href;
+          fetchHeaders(next, redirectsLeft - 1).then(resolve).catch(reject);
+          return;
+        }
+        res.destroy();
+        resolve(res.headers);
+      }
+    );
     req.on("error", reject);
     req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
   });
@@ -176,11 +191,11 @@ function checkReferrerPolicy(headers: IncomingHttpHeaders): HttpHeaderCheck {
 }
 
 const UNREACHABLE_CHECKS: HttpHeaderCheck[] = [
-  { name: "HSTS",                  status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["HSTS"] ?? [] },
-  { name: "CSP",                   status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["CSP"] ?? [] },
-  { name: "X-Frame-Options",       status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Frame-Options"] ?? [] },
-  { name: "X-Content-Type-Options",status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Content-Type-Options"] ?? [] },
-  { name: "Referrer-Policy",       status: "warn", detail: "Site inacessível.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["Referrer-Policy"] ?? [] },
+  { name: "HSTS",                  status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["HSTS"] ?? [], iso27001Controls: CHECK_ISO27001["HSTS"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["HSTS"] ?? ["NIST PR.PS-01"] },
+  { name: "CSP",                   status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["CSP"] ?? [], iso27001Controls: CHECK_ISO27001["CSP"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["CSP"] ?? ["NIST PR.PS-01"] },
+  { name: "X-Frame-Options",       status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Frame-Options"] ?? [], iso27001Controls: CHECK_ISO27001["X-Frame-Options"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["X-Frame-Options"] ?? ["NIST PR.PS-01"] },
+  { name: "X-Content-Type-Options",status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Content-Type-Options"] ?? [], iso27001Controls: CHECK_ISO27001["X-Content-Type-Options"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["X-Content-Type-Options"] ?? ["NIST PR.PS-01"] },
+  { name: "Referrer-Policy",       status: "warn", detail: "Site inacessível.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["Referrer-Policy"] ?? [], iso27001Controls: CHECK_ISO27001["Referrer-Policy"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["Referrer-Policy"] ?? ["NIST PR.PS-01"] },
 ];
 
 export async function checkHttpHeaders(target: string): Promise<HttpHeadersResult> {
