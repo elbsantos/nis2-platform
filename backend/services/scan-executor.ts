@@ -179,10 +179,29 @@ function fetchWellKnownToken(ip: string): Promise<string | null> {
   });
 }
 
+// Public test targets authorised by their owners for security scanning
+const PUBLIC_TEST_TARGETS = new Set([
+  "scanme.nmap.org",
+  "testphp.vulnweb.com",
+  "testasp.vulnweb.com",
+  "testaspnet.vulnweb.com",
+  "demo.testfire.net",
+  "badssl.com",
+  "http.badssl.com",
+  "expired.badssl.com",
+  "wrong.host.badssl.com",
+  "self-signed.badssl.com",
+]);
+
 export async function verifyOwnership(
   target: string,
   orgId: number
 ): Promise<{ verified: boolean; method?: string }> {
+  // Public test domains skip ownership verification
+  if (PUBLIC_TEST_TARGETS.has(target)) {
+    return { verified: true, method: "public-test-target" };
+  }
+
   const token = `nis2pt-verify=${orgId}`;
 
   if (isIpAddress(target)) {
