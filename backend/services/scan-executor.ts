@@ -473,6 +473,45 @@ export async function executeAgentlessScan(
       });
     }
 
+    // ── 5b. SSH version check — quando porto 22 está aberto ───────────────
+    const sshOpen = allPorts.some((p) => p.port === 22);
+    if (sshOpen) {
+      const sshTarget = shodanData?.ip ?? options.target;
+      const sshResult = await import("../integrations/ssh-check")
+        .then((m) => m.checkSsh(sshTarget))
+        .catch(() => null);
+
+      if (sshResult) {
+        for (const sv of sshResult.vulns) {
+          const affectedService = `SSH (${sshResult.software})`;
+          vulns.push({
+            cveId:            sv.cveId,
+            cvssScore:        sv.cvssScore,
+            severity:         sv.severity,
+            description:      sv.description,
+            affectedService,
+            nis2Articles:     sv.nis2Articles,
+            cisControls:      sv.cisControls,
+            iso27001Controls: sv.iso27001Controls,
+            nistCsfControls:  sv.nistCsfControls,
+            remediationHint:  sv.remediationHint,
+          });
+
+          await createVulnerability({
+            scanId:           options.scanId,
+            organizationId:   options.organizationId,
+            cveId:            sv.cveId,
+            severity:         sv.severity,
+            cvssScore:        sv.cvssScore,
+            description:      sv.description,
+            affectedComponent: affectedService,
+            port:             sshResult.port,
+            remediation:      sv.remediationHint,
+          }).catch((e) => console.error(`[Scanner] DB persist SSH ${sv.cveId}:`, e));
+        }
+      }
+    }
+
     // ── 6. Email security + HTTP headers (parallel, domain-only for email) ─
     const [emailSecurity, httpHeaders] = await Promise.all([
       isDomain

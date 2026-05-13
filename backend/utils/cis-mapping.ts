@@ -63,6 +63,7 @@ const VULN_PREFIX_TO_CIS: Array<[string, number[]]> = [
   ["NIS2-HEADER-REFERRERPOLICY",   [3]],
   ["NIS2-HEADER",                  [16]],
   ["NIS2-TLS",                     [3, 12]],
+  ["NIS2-SSH",                     [4, 5, 7]],
   ["NIS2-BREACH",                  [5, 6]],
   ["NIS2-BLACKLIST",               [13]],
 ];
