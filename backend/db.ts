@@ -18,22 +18,40 @@ import {
 import { eq, desc, asc, and, gte, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
-// Connection singleton
+// Connection pool — resilient singleton that resets on fatal errors
 // ---------------------------------------------------------------------------
 
-let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _db:   ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _pool: mysql.Pool | null = null;
+
+function createPool(): mysql.Pool {
+  const pool = mysql.createPool({
+    uri: process.env.DATABASE_URL ?? "mysql://root:root@localhost:3306/nis2db",
+    waitForConnections: true,
+    connectionLimit: 5,
+    connectTimeout:  15_000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+  });
+
+  // Reset singleton when pool hits a fatal error (e.g. MySQL restart on Railway).
+  // Next call to getDb() will create a fresh pool automatically.
+  pool.on("error", (err: any) => {
+    if (err.fatal) {
+      console.error("[DB] Fatal pool error — resetting pool:", err.code);
+      _pool = null;
+      _db   = null;
+    }
+  });
+
+  return pool;
+}
 
 export function getDb() {
-  if (!_db) {
-    const pool = mysql.createPool({
-      uri: process.env.DATABASE_URL ?? "mysql://root:root@localhost:3306/nis2db",
-      waitForConnections: true,
-      connectionLimit: 10,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10000,
-      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-    });
-    _db = drizzle(pool, { schema, mode: "default" }) as unknown as ReturnType<typeof drizzle<typeof schema>>;
+  if (!_db || !_pool) {
+    _pool = createPool();
+    _db   = drizzle(_pool, { schema, mode: "default" }) as unknown as ReturnType<typeof drizzle<typeof schema>>;
   }
   return _db!;
 }

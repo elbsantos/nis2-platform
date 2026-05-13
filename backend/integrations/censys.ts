@@ -171,6 +171,12 @@ export async function lookupHost(
       return { ip: target, services: [], tlsIssues: [] };
     }
 
+    // 401/403 = chave inválida ou sem acesso — fallback silencioso para directTls
+    if (res.status === 401 || res.status === 403) {
+      console.warn(`[Censys] Credenciais inválidas (${res.status}) — a usar directTls como fallback`);
+      return null;
+    }
+
     if (!res.ok) throw new Error(`Censys ${res.status}: ${await res.text()}`);
 
     const data = await res.json() as any;
