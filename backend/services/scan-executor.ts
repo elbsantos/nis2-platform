@@ -585,6 +585,8 @@ export async function executeAgentlessScan(
             affectedService: isIpAddress(options.target) ? "network" : "domain",
             nis2Articles: ["Art. 21(2)(g)", "Art. 21(2)(j)"],
             cisControls: getCisControls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
+            iso27001Controls: getIso27001Controls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
+            nistCsfControls: getNistCsfControls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
             remediationHint: `Investiga o compromisso que colocou o ${isIpAddress(options.target) ? "IP" : "domínio"} na lista negra ${bl.name} e solicita remoção após resolução.`,
           });
           extraDeductions.push({

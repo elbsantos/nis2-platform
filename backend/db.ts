@@ -37,7 +37,7 @@ function createPool(): mysql.Pool {
 
   // Reset singleton when pool hits a fatal error (e.g. MySQL restart on Railway).
   // Next call to getDb() will create a fresh pool automatically.
-  pool.on("error", (err: any) => {
+  (pool as any).on("error", (err: any) => {
     if (err.fatal) {
       console.error("[DB] Fatal pool error — resetting pool:", err.code);
       _pool = null;
