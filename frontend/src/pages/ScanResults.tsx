@@ -278,6 +278,20 @@ interface SecurityCheck {
   status: "pass" | "warn" | "fail";
   detail: string;
   nis2Article: string;
+  cisControls?: string[];
+}
+
+function CisTags({ controls }: { controls?: string[] }) {
+  if (!controls?.length) return null;
+  return (
+    <>
+      {controls.map((c) => (
+        <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+          {c}
+        </span>
+      ))}
+    </>
+  );
 }
 
 function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
@@ -294,12 +308,13 @@ function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
       {checks.map((c) => (
         <li key={c.name} className="flex items-start gap-3">
           <div className="mt-0.5 shrink-0">{badge(c.status)}</div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-800">
-              {c.name}
-              <span className="ml-2 text-xs font-normal text-gray-400">{c.nis2Article}</span>
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">{c.detail}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
+              <p className="text-sm font-medium text-gray-800">{c.name}</p>
+              <span className="text-xs text-gray-400">{c.nis2Article}</span>
+              <CisTags controls={c.cisControls} />
+            </div>
+            <p className="text-xs text-gray-500">{c.detail}</p>
           </div>
         </li>
       ))}
@@ -318,6 +333,7 @@ interface VulnSummary {
   description: string;
   affectedService: string;
   nis2Articles: string[];
+  cisControls?: string[];
 }
 
 function severityColor(s: string) {
@@ -408,8 +424,15 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
             <span className="text-xs text-gray-400">{v.affectedService}</span>
           </div>
           <p className="text-xs text-gray-600 mt-2">{v.description}</p>
-          {v.nis2Articles?.length > 0 && (
-            <p className="text-xs text-gray-400 mt-1">{v.nis2Articles.join(" · ")}</p>
+          {(v.nis2Articles?.length > 0 || v.cisControls?.length > 0) && (
+            <div className="flex items-center flex-wrap gap-1.5 mt-2">
+              {v.nis2Articles?.map((a) => (
+                <span key={a} className="text-xs text-gray-400">{a}</span>
+              ))}
+              {v.cisControls?.map((c) => (
+                <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">{c}</span>
+              ))}
+            </div>
           )}
         </li>
       ))}

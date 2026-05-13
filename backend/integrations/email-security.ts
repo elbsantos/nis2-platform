@@ -6,12 +6,14 @@
  */
 
 import { resolveTxt } from "dns/promises";
+import { CHECK_CIS } from "../utils/cis-mapping";
 
 export interface EmailSecurityCheck {
   name: string;
   status: "pass" | "warn" | "fail";
   detail: string;
   nis2Article: string;
+  cisControls?: string[];
 }
 
 export interface EmailSecurityResult {
@@ -130,7 +132,10 @@ export async function checkEmailSecurity(domain: string): Promise<EmailSecurityR
     checkDKIM(domain),
   ]);
 
-  const checks = [spf, dmarc, dkim];
+  const checks = [spf, dmarc, dkim].map((c) => ({
+    ...c,
+    cisControls: CHECK_CIS[c.name] ?? ["CIS 9"],
+  }));
 
   let deduction = 0;
   for (const check of checks) {

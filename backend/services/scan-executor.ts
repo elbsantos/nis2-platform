@@ -12,6 +12,7 @@ import type { DirectTlsResult } from "../integrations/direct-tls";
 import type { EmailSecurityResult } from "../integrations/email-security";
 import type { HttpHeadersResult } from "../integrations/http-headers";
 import type { DarkWebResult } from "../integrations/dark-web";
+import { getCisControls } from "../utils/cis-mapping";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +66,7 @@ export interface VulnFinding {
   description: string;
   affectedService: string;
   nis2Articles: string[];
+  cisControls: string[];
   remediationHint: string;
 }
 
@@ -408,6 +410,7 @@ export async function executeAgentlessScan(
           description,
           affectedService: portFinding.service,
           nis2Articles,
+          cisControls: getCisControls(cveId, nis2Articles, description),
           remediationHint: `Actualiza o serviço ${portFinding.service} para eliminar ${cveId}.`,
         };
 
@@ -438,6 +441,7 @@ export async function executeAgentlessScan(
         description: "Serviço HTTP sem HTTPS — dados transmitidos em claro",
         affectedService: "http",
         nis2Articles: ["Art. 21(2)(h)"],
+        cisControls: getCisControls("NIS2-TLS-001", ["Art. 21(2)(h)"]),
         remediationHint: "Instala certificado TLS (Let's Encrypt gratuito) e redireciona HTTP → HTTPS.",
       });
     }
@@ -469,6 +473,7 @@ export async function executeAgentlessScan(
             description: check.detail,
             affectedService: "email",
             nis2Articles: [check.nis2Article],
+            cisControls: check.cisControls ?? getCisControls(cveId, [check.nis2Article]),
             remediationHint: `Configura ${check.name} no DNS do domínio ${options.target}.`,
           });
           extraDeductions.push({ article: check.nis2Article, finding: `${check.name}: ${check.detail}`, deduction: 20 });
@@ -491,6 +496,7 @@ export async function executeAgentlessScan(
             description: check.detail,
             affectedService: "http",
             nis2Articles: [check.nis2Article],
+            cisControls: check.cisControls ?? getCisControls(cveId, [check.nis2Article]),
             remediationHint: `Adiciona o header ${check.name} na configuração do servidor web.`,
           });
           extraDeductions.push({ article: check.nis2Article, finding: `${check.name}: ${check.detail}`, deduction: 12 });
@@ -509,15 +515,17 @@ export async function executeAgentlessScan(
       for (const breach of darkWeb.breaches) {
         const cvssScore = breach.hasPasswords ? 8.5 : 6.0;
         const cveId = `NIS2-BREACH-${breach.name.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 20)}`;
+        const breachNis2 = breach.hasPasswords
+          ? ["Art. 21(2)(i)", "Art. 21(2)(j)"]
+          : ["Art. 21(2)(i)"];
         vulns.push({
           cveId,
           cvssScore,
           severity: cvssScore >= 7 ? "high" : "medium",
           description: `Credenciais da organização expostas no breach "${breach.name}" — dados: ${breach.dataClasses.join(", ")}.`,
           affectedService: "credentials",
-          nis2Articles: breach.hasPasswords
-            ? ["Art. 21(2)(i)", "Art. 21(2)(j)"]
-            : ["Art. 21(2)(i)"],
+          nis2Articles: breachNis2,
+          cisControls: getCisControls(cveId, breachNis2),
           remediationHint: `Força o reset de passwords afectadas pelo breach "${breach.name}" e activa MFA em todas as contas.`,
         });
         extraDeductions.push({
@@ -543,6 +551,7 @@ export async function executeAgentlessScan(
             description: bl.detail,
             affectedService: isIpAddress(options.target) ? "network" : "domain",
             nis2Articles: ["Art. 21(2)(g)", "Art. 21(2)(j)"],
+            cisControls: getCisControls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
             remediationHint: `Investiga o compromisso que colocou o ${isIpAddress(options.target) ? "IP" : "domínio"} na lista negra ${bl.name} e solicita remoção após resolução.`,
           });
           extraDeductions.push({

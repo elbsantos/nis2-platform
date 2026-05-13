@@ -9,12 +9,14 @@
 import https from "https";
 import http from "http";
 import type { IncomingHttpHeaders } from "http";
+import { CHECK_CIS } from "../utils/cis-mapping";
 
 export interface HttpHeaderCheck {
   name: string;
   status: "pass" | "warn" | "fail";
   detail: string;
   nis2Article: string;
+  cisControls?: string[];
 }
 
 export interface HttpHeadersResult {
@@ -171,11 +173,11 @@ function checkReferrerPolicy(headers: IncomingHttpHeaders): HttpHeaderCheck {
 }
 
 const UNREACHABLE_CHECKS: HttpHeaderCheck[] = [
-  { name: "HSTS", status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(h)" },
-  { name: "CSP",  status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(e)" },
-  { name: "X-Frame-Options",      status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)" },
-  { name: "X-Content-Type-Options", status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)" },
-  { name: "Referrer-Policy", status: "warn", detail: "Site inacessível.", nis2Article: "Art. 21(2)(h)" },
+  { name: "HSTS",                  status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["HSTS"] ?? [] },
+  { name: "CSP",                   status: "fail", detail: "Site inacessível — não foi possível verificar headers HTTP.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["CSP"] ?? [] },
+  { name: "X-Frame-Options",       status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Frame-Options"] ?? [] },
+  { name: "X-Content-Type-Options",status: "fail", detail: "Site inacessível.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Content-Type-Options"] ?? [] },
+  { name: "Referrer-Policy",       status: "warn", detail: "Site inacessível.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["Referrer-Policy"] ?? [] },
 ];
 
 export async function checkHttpHeaders(target: string): Promise<HttpHeadersResult> {
@@ -204,7 +206,7 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
     checkXFrame(headers),
     checkXContentType(headers),
     checkReferrerPolicy(headers),
-  ];
+  ].map((c) => ({ ...c, cisControls: CHECK_CIS[c.name] ?? ["CIS 16"] }));
 
   let deduction = 0;
   for (const check of checks) {
