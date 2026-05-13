@@ -13,6 +13,7 @@ import { registerWebhookRoutes } from "../middlewares/webhookHandler";
 import { registerDocsHandler } from "../middlewares/docs.handler";
 import { securityHeaders, corsHeaders } from "../middlewares/security";
 import { logEnvStatus } from "./env";
+import { runStartupMigrations } from "./startup-migrations";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -31,6 +32,11 @@ async function findAvailablePort(start = 3000): Promise<number> {
 
 async function startServer() {
   logEnvStatus();
+
+  // ── 0. Schema migrations — corre antes de qualquer query ───────────────
+  await runStartupMigrations().catch((err) =>
+    console.error("[Migrations] Erro nas migrações de arranque:", err)
+  );
 
   const app = express();
   const server = createServer(app);
