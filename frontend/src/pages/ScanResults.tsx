@@ -279,16 +279,22 @@ interface SecurityCheck {
   detail: string;
   nis2Article: string;
   cisControls?: string[];
+  iso27001Controls?: string[];
+  nistCsfControls?: string[];
 }
 
-function CisTags({ controls }: { controls?: string[] }) {
-  if (!controls?.length) return null;
+function FrameworkTags({ cis, iso, nist }: { cis?: string[]; iso?: string[]; nist?: string[] }) {
+  if (!cis?.length && !iso?.length && !nist?.length) return null;
   return (
     <>
-      {controls.map((c) => (
-        <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
-          {c}
-        </span>
+      {cis?.map((c) => (
+        <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">{c}</span>
+      ))}
+      {iso?.map((c) => (
+        <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-50 text-blue-700 border border-blue-200">{c}</span>
+      ))}
+      {nist?.map((c) => (
+        <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-teal-50 text-teal-700 border border-teal-200">{c}</span>
       ))}
     </>
   );
@@ -312,7 +318,7 @@ function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
             <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
               <p className="text-sm font-medium text-gray-800">{c.name}</p>
               <span className="text-xs text-gray-400">{c.nis2Article}</span>
-              <CisTags controls={c.cisControls} />
+              <FrameworkTags cis={c.cisControls} iso={c.iso27001Controls} nist={c.nistCsfControls} />
             </div>
             <p className="text-xs text-gray-500">{c.detail}</p>
           </div>
@@ -334,6 +340,8 @@ interface VulnSummary {
   affectedService: string;
   nis2Articles: string[];
   cisControls?: string[];
+  iso27001Controls?: string[];
+  nistCsfControls?: string[];
 }
 
 function severityColor(s: string) {
@@ -424,14 +432,12 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
             <span className="text-xs text-gray-400">{v.affectedService}</span>
           </div>
           <p className="text-xs text-gray-600 mt-2">{v.description}</p>
-          {(v.nis2Articles?.length > 0 || v.cisControls?.length > 0) && (
+          {(v.nis2Articles?.length > 0 || v.cisControls?.length > 0 || v.iso27001Controls?.length > 0 || v.nistCsfControls?.length > 0) && (
             <div className="flex items-center flex-wrap gap-1.5 mt-2">
               {v.nis2Articles?.map((a) => (
                 <span key={a} className="text-xs text-gray-400">{a}</span>
               ))}
-              {v.cisControls?.map((c) => (
-                <span key={c} className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">{c}</span>
-              ))}
+              <FrameworkTags cis={v.cisControls} iso={v.iso27001Controls} nist={v.nistCsfControls} />
             </div>
           )}
         </li>

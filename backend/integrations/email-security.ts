@@ -7,6 +7,7 @@
 
 import { resolveTxt } from "dns/promises";
 import { CHECK_CIS } from "../utils/cis-mapping";
+import { CHECK_ISO27001, CHECK_NIST } from "../utils/framework-mapping";
 
 // SPF and DMARC live on the apex/organisational domain, never on subdomains.
 // scanme.nmap.org → nmap.org   |   sub.example.co.uk → example.co.uk
@@ -28,6 +29,8 @@ export interface EmailSecurityCheck {
   detail: string;
   nis2Article: string;
   cisControls?: string[];
+  iso27001Controls?: string[];
+  nistCsfControls?: string[];
 }
 
 export interface EmailSecurityResult {
@@ -152,7 +155,9 @@ export async function checkEmailSecurity(domain: string): Promise<EmailSecurityR
 
   const checks = [spf, dmarc, dkim].map((c) => ({
     ...c,
-    cisControls: CHECK_CIS[c.name] ?? ["CIS 9"],
+    cisControls:      CHECK_CIS[c.name]      ?? ["CIS 9"],
+    iso27001Controls: CHECK_ISO27001[c.name] ?? ["ISO A.8.21"],
+    nistCsfControls:  CHECK_NIST[c.name]     ?? ["NIST PR.DS-02"],
   }));
 
   let deduction = 0;

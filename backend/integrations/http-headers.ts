@@ -10,6 +10,7 @@ import https from "https";
 import http from "http";
 import type { IncomingHttpHeaders } from "http";
 import { CHECK_CIS } from "../utils/cis-mapping";
+import { CHECK_ISO27001, CHECK_NIST } from "../utils/framework-mapping";
 
 export interface HttpHeaderCheck {
   name: string;
@@ -17,6 +18,8 @@ export interface HttpHeaderCheck {
   detail: string;
   nis2Article: string;
   cisControls?: string[];
+  iso27001Controls?: string[];
+  nistCsfControls?: string[];
 }
 
 export interface HttpHeadersResult {
@@ -206,7 +209,12 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
     checkXFrame(headers),
     checkXContentType(headers),
     checkReferrerPolicy(headers),
-  ].map((c) => ({ ...c, cisControls: CHECK_CIS[c.name] ?? ["CIS 16"] }));
+  ].map((c) => ({
+    ...c,
+    cisControls:      CHECK_CIS[c.name]      ?? ["CIS 16"],
+    iso27001Controls: CHECK_ISO27001[c.name] ?? ["ISO A.8.26"],
+    nistCsfControls:  CHECK_NIST[c.name]     ?? ["NIST PR.PS-01"],
+  }));
 
   let deduction = 0;
   for (const check of checks) {
