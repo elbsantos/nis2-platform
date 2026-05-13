@@ -122,6 +122,12 @@ async function apiLookup(ip: string): Promise<ShodanHostResult> {
     return { ip, hostnames: [], tags: [], ports: [], cpes: [], vulns: [] };
   }
 
+  // 401/403 = key exists but no paid membership — silently fall back to InternetDB
+  if (res.status === 401 || res.status === 403) {
+    console.warn(`[Shodan] API key sem membership (${res.status}) — usando InternetDB gratuito`);
+    return internetDbLookup(ip);
+  }
+
   if (!res.ok) throw new Error(`Shodan API ${res.status}: ${await res.text()}`);
 
   const data = await res.json() as any;

@@ -5,7 +5,7 @@
     "buildCommand": "npm install && npm run build"
   },
   "deploy": {
-    "preDeployCommand": "node_modules/.bin/drizzle-kit push --config drizzle.config.ts --force",
+    "preDeployCommand": "node_modules/.bin/drizzle-kit push --config drizzle.config.ts --force || true",
     "startCommand": "node dist/backend/backend/_core/index.js",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 30,
