@@ -29,6 +29,9 @@ export function getDb() {
       uri: process.env.DATABASE_URL ?? "mysql://root:root@localhost:3306/nis2db",
       waitForConnections: true,
       connectionLimit: 10,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     });
     _db = drizzle(pool, { schema, mode: "default" }) as unknown as ReturnType<typeof drizzle<typeof schema>>;
   }
