@@ -51,7 +51,7 @@ function keyGenerator(req: Request): string {
 }
 
 // ---------------------------------------------------------------------------
-// Build store — Redis when available, memory fallback for dev/test
+// Build store — Redis when available, memory fallback otherwise
 // ---------------------------------------------------------------------------
 async function buildStore() {
   if (process.env.NODE_ENV !== "production") return undefined; // dev/test: memory store
@@ -59,7 +59,17 @@ async function buildStore() {
   try {
     const client = await getRedisClient();
     return new RedisStore({
-      sendCommand: (...args: string[]) => client.sendCommand(args),
+      // Wrap sendCommand so a disconnected Redis never crashes the middleware.
+      // When Redis is down we return 1 (first hit in window) — effectively
+      // disabling rate limiting rather than taking the API offline.
+      sendCommand: async (...args: string[]) => {
+        try {
+          if (!client.isOpen) return 1;
+          return await client.sendCommand(args);
+        } catch {
+          return 1; // fail-open: allow request, don't crash
+        }
+      },
       prefix: "rl:",
     });
   } catch {
@@ -99,6 +109,7 @@ export async function createApiLimiter() {
     legacyHeaders: false,
     keyGenerator,
     store,
+    passOnStoreError: true,
     skip: (req) =>
       req.path === "/health" || req.path.startsWith("/api/trpc/system."),
     handler: (req, res, next) =>
@@ -126,6 +137,7 @@ export async function createAuthLimiter() {
     legacyHeaders: false,
     keyGenerator,
     store,
+    passOnStoreError: true,
     handler: (req, res, next) =>
       tooManyRequestsHandler(
         req,
@@ -155,6 +167,7 @@ export async function createScanLimiter(plan: "free" | "pro" | "mssp" = "free") 
     legacyHeaders: false,
     keyGenerator,
     store,
+    passOnStoreError: true,
     handler: (req, res, next) =>
       tooManyRequestsHandler(
         req,
