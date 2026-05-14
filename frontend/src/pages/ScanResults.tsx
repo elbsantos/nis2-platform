@@ -115,7 +115,7 @@ export default function ScanResults() {
 
   return (
     <div className="min-h-screen bg-[#0f1e38]">
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+      <div className="max-w-[100rem] mx-auto px-8 py-8 space-y-8">
 
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">

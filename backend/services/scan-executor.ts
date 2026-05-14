@@ -416,12 +416,11 @@ export async function executeAgentlessScan(
       for (const cveId of portFinding.cves) {
         const shodanPort = shodanData?.ports?.find((p) => p.port === portFinding.port);
         const cvssScore: number = shodanPort?.vulns?.[cveId]?.cvss ?? 5.0;
-        const description =
-          shodanPort?.vulns?.[cveId]?.summary ??
-          `Vulnerabilidade ${cveId} no porto ${portFinding.port}`;
-
         const severity = (s: number) =>
           s >= 9 ? "critical" : s >= 7 ? "high" : s >= 4 ? "medium" : "low";
+        const sevPT = (s: number) =>
+          s >= 9 ? "crítica" : s >= 7 ? "alta" : s >= 4 ? "média" : "baixa";
+        const description = `Vulnerabilidade ${cveId} detectada no serviço ${portFinding.service} (porto ${portFinding.port}). Gravidade ${sevPT(cvssScore)} com pontuação CVSS ${cvssScore.toFixed(1)}. Actualiza o serviço para corrigir esta exposição.`;
 
         const nis2Articles = mapCveToNIS2Articles(cveId, description);
 
