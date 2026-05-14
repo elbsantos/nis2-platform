@@ -690,7 +690,7 @@ export default function Landing() {
           <h2>Escolha o plano para a sua empresa</h2>
           <p>Todos os planos pagos incluem acesso ao curso, documentos editáveis e actualizações legislativas.</p>
         </div>
-        <div className="pricing-grid fade-in">
+        <div className="pricing-grid fade-in" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
           {/* Free */}
           <div className="price-card">
             <div className="price-tier">Gratuito</div>

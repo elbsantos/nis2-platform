@@ -411,57 +411,46 @@ export default function Billing() {
       {/* Active subscription summary */}
       <SubscriptionCard />
 
-      {/* Plan comparison grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+      {/* Plan comparison grid — 4 colunas */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "1.25rem", alignItems: "start" }}>
         {PLANS.map((plan) => (
           <PlanCard key={plan.id} plan={plan} currentPlan={currentPlan} />
         ))}
-      </div>
-
-      {/* Enterprise card */}
-      <div className="mt-6 bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-2xl p-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="px-2.5 py-0.5 bg-amber-400/20 text-amber-300 text-xs font-semibold rounded-full border border-amber-400/30">
-                Enterprise
-              </span>
-              <span className="text-gray-400 text-sm">A partir de €499/mês</span>
+        {/* Enterprise card */}
+        <div className="relative flex flex-col bg-gray-900 border border-amber-500/40 rounded-2xl p-6">
+          <div className="mb-4">
+            <span className="px-2.5 py-0.5 bg-amber-400/20 text-amber-300 text-xs font-semibold rounded-full border border-amber-400/30">
+              Enterprise
+            </span>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-3xl font-bold text-white">€499</span>
+              <span className="text-sm text-gray-400">/ mês</span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Para grandes organizações e organismos públicos</h3>
-            <p className="text-gray-400 text-sm mb-4">
-              Solução à medida com número ilimitado de organizações, IA sem limites de tokens, SLA 99,9%, SSO SAML e gestor de conta dedicado.
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5">
-              {[
-                "Organizações geridas ilimitadas",
-                "IA sem limites mensais de tokens",
-                "SLA 99,9% com suporte 24/7",
-                "SSO SAML / OIDC",
-                "API access completa",
-                "Gestor de conta dedicado",
-                "Relatórios white-label avançados",
-                "Onboarding e formação in-house",
-                "Contrato anual com desconto",
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-1.5 text-sm text-gray-300">
-                  <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {f}
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-gray-400 mt-1">Grandes organizações e organismos públicos.</p>
           </div>
-          <div className="shrink-0 text-center md:text-right">
-            <a
-              href="mailto:hello@nis2pt.pt?subject=Plano Enterprise NIS2 PT"
-              className="inline-block px-8 py-3 bg-amber-400 text-gray-900 text-sm font-bold rounded-lg hover:bg-amber-300 transition-colors"
-            >
-              Falar Connosco →
-            </a>
-            <p className="text-xs text-gray-500 mt-2">Proposta em 24 horas</p>
-          </div>
+          <ul className="space-y-2 flex-1 mb-6">
+            {[
+              "Organizações ilimitadas",
+              "IA sem limites de tokens",
+              "SLA 99,9% · suporte 24/7",
+              "SSO SAML / OIDC",
+              "API access completa",
+              "Gestor de conta dedicado",
+            ].map((f) => (
+              <li key={f} className="flex items-start gap-2 text-sm text-gray-300">
+                <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+          <a
+            href="mailto:hello@cisplan.pt?subject=Plano Enterprise"
+            className="w-full py-2.5 rounded-lg text-sm font-bold text-center bg-amber-400 text-gray-900 hover:bg-amber-300 transition-colors block"
+          >
+            Falar Connosco →
+          </a>
         </div>
       </div>
 
