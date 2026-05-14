@@ -2,7 +2,7 @@
  * backend/_core/startup-migrations.ts
  *
  * Migrações de schema executadas no arranque do servidor.
- * Usa ALTER TABLE ... ADD COLUMN IF NOT EXISTS para ser idempotente —
+ * Usa ALTER TABLE ... ADD COLUMN para ser idempotente —
  * colunas já existentes são ignoradas sem erro.
  *
  * Por que aqui e não no drizzle-kit push?
@@ -23,17 +23,17 @@ const MIGRATIONS: Migration[] = [
   // users — openId para futura autenticação OAuth
   {
     name: "users.openId",
-    sql:  "ALTER TABLE users ADD COLUMN IF NOT EXISTS openId VARCHAR(255) NULL",
+    sql:  "ALTER TABLE users ADD COLUMN openId VARCHAR(255) NULL",
   },
   // organizations — size foi adicionado depois da criação inicial
   {
     name: "organizations.size",
-    sql:  "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS size ENUM('10-50','50-250','250+') NULL",
+    sql:  "ALTER TABLE organizations ADD COLUMN size ENUM('10-50','50-250','250+') NULL",
   },
   // scans — batchId para scans em lote (supply chain)
   {
     name: "scans.batchId",
-    sql:  "ALTER TABLE scans ADD COLUMN IF NOT EXISTS batchId VARCHAR(36) NULL",
+    sql:  "ALTER TABLE scans ADD COLUMN batchId VARCHAR(36) NULL",
   },
 ];
 
