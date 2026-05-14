@@ -111,6 +111,7 @@ export default function ScanResults() {
   const results   = scan.results as any;
   const vulnCount = results?.vulnerabilitiesFound ?? 0;
   const critical  = results?.criticalCount ?? 0;
+  const high      = results?.highCount ?? 0;
 
   return (
     <div className="min-h-screen bg-[#0f1e38]">
@@ -133,10 +134,11 @@ export default function ScanResults() {
           </div>
         </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* Summary cards — 4 colunas alinhadas com os cards de vulnerabilidades */}
+        <div className="grid grid-cols-4 gap-4">
           <SummaryCard label="Vulnerabilidades" value={String(vulnCount)} accent={vulnCount > 0} />
           <SummaryCard label="Críticas" value={String(critical)} accent={critical > 0} danger />
+          <SummaryCard label="Altas" value={String(high)} accent={high > 0} warn />
           <SummaryCard label="Duração" value={scan.completedAt ? elapsedLabel(scan.startedAt, scan.completedAt) : "—"} />
         </div>
 
@@ -242,15 +244,17 @@ function Spinner({ size = "md" }: { size?: "md" | "lg" }) {
 }
 
 function SummaryCard({
-  label, value, accent = false, danger = false,
+  label, value, accent = false, danger = false, warn = false,
 }: {
-  label: string; value: string; accent?: boolean; danger?: boolean;
+  label: string; value: string; accent?: boolean; danger?: boolean; warn?: boolean;
 }) {
+  const color = danger && accent ? "text-red-400"
+    : warn && accent ? "text-orange-400"
+    : accent ? "text-amber-400"
+    : "text-white";
   return (
     <div className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-5 text-center">
-      <p className={`text-4xl font-bold ${danger && accent ? "text-red-400" : accent ? "text-amber-400" : "text-white"}`}>
-        {value}
-      </p>
+      <p className={`text-4xl font-bold ${color}`}>{value}</p>
       <p className="text-lg text-slate-400 mt-1">{label}</p>
     </div>
   );
@@ -302,7 +306,7 @@ function FrameworkTags({ cis, iso, nist }: { cis?: string[]; iso?: string[]; nis
 function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
   const badge = (status: "pass" | "warn" | "fail") => {
     if (status === "pass")
-      return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">Pass</span>;
+      return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">OK</span>;
     if (status === "warn")
       return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-amber-900/40 text-amber-400 border border-amber-700">Aviso</span>;
     return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-red-900/40 text-red-400 border border-red-700">Falha</span>;
@@ -407,7 +411,7 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
   }
 
   return (
-    <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {vulns.map((v) => (
         <li key={v.cveId} className={`border rounded-xl p-5 flex flex-col gap-3 ${severityColor(v.severity)}`}>
           <div className="flex items-center gap-2 flex-wrap">
@@ -472,8 +476,8 @@ function DarkWebSection({ darkWeb }: { darkWeb: DarkWeb }) {
           </p>
           {darkWeb.breachesFound === 0 ? (
             <div className="flex items-center gap-3 text-xl text-green-400">
-              <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">Limpo</span>
-              <span>Nenhum breach de credenciais detectado para este domínio.</span>
+              <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">Sem fugas</span>
+              <span>Nenhuma fuga de credenciais detectada para este domínio.</span>
             </div>
           ) : (
             <>
@@ -643,7 +647,7 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
 
       {cert && directTls.tlsIssues.length === 0 && (
         <div className="flex items-center gap-3 text-xl text-green-400">
-          <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">Pass</span>
+          <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">OK</span>
           <span>TLS configurado correctamente. Sem problemas detectados.</span>
         </div>
       )}
