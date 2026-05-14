@@ -351,7 +351,7 @@ export default function Landing() {
                 <span className="lesson-pill">Aula 2.3 · Auditorias CNCS</span>
               </div>
             </div>
-            <div className="module-card" style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}>
+            <div className="module-card full-width" style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}>
               <div className="module-tag" style={{ color: "#d4a017" }}>Incluído · 35 Documentos</div>
               <h3 style={{ color: "#ffffff" }}>Dossier de Conformidade Completo</h3>
               <div className="module-lessons">

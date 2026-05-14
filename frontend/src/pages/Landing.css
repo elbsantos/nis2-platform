@@ -386,40 +386,44 @@
   background-position: center;
 }
 .lp-page .modules-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 .lp-page .module-card {
   background: var(--lp-navy2);
   border: 1px solid #1e3a5f;
-  padding: 24px 28px;
+  padding: 26px 28px;
   transition: border-color 0.2s;
+}
+.lp-page .module-card.full-width {
+  grid-column: 1 / -1;
 }
 .lp-page .module-card:hover { border-color: var(--lp-gold); }
 .lp-page .module-tag {
-  font-size: 0.88rem;
-  letter-spacing: 0.14em;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--lp-gold2);
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-family: 'Source Sans 3', sans-serif;
 }
 .lp-page .module-card h3 {
   color: var(--lp-white);
-  font-size: 1.2rem;
-  margin-bottom: 10px;
+  font-size: 1.25rem;
+  margin-bottom: 14px;
   font-family: 'Source Sans 3', sans-serif;
   font-weight: 700;
+  line-height: 1.3;
 }
 .lp-page .module-lessons { display: flex; flex-wrap: wrap; gap: 6px; }
 .lp-page .lesson-pill {
   background: rgba(255,255,255,0.05);
   border: 1px solid #1e3a5f;
-  color: #64748b;
-  font-size: 0.9rem;
-  padding: 4px 12px;
+  color: #94a3b8;
+  font-size: 0.97rem;
+  padding: 5px 13px;
   font-family: 'Source Sans 3', sans-serif;
 }
 
