@@ -907,7 +907,7 @@
   background: #0a0f1e;
 }
 .lp-page .price-card { background: var(--lp-navy2); padding: 44px 36px; position: relative; }
-.lp-page .price-card.featured { background: var(--lp-navy3); border: 2px solid var(--lp-gold); margin: -12px 0; }
+.lp-page .price-card.featured { background: var(--lp-navy3); border: 2px solid var(--lp-gold); }
 .lp-page .price-badge {
   position: absolute;
   top: -14px; left: 50%;

@@ -385,7 +385,7 @@ export default function Billing() {
   }, [toast]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
+    <div className="max-w-7xl mx-auto px-4 py-10">
       {/* Toast */}
       {toast && (
         <div
@@ -411,7 +411,7 @@ export default function Billing() {
       <SubscriptionCard />
 
       {/* Plan comparison grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
         {PLANS.map((plan) => (
           <PlanCard key={plan.id} plan={plan} currentPlan={currentPlan} />
         ))}
