@@ -180,7 +180,7 @@
   color: var(--lp-gold3);
 }
 .lp-page .hero-subtitle {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   color: #94a3b8;
   margin-bottom: 32px;
   line-height: 1.75;
@@ -244,14 +244,14 @@
 .lp-page .law-text strong {
   display: block;
   color: var(--lp-white);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 3px;
 }
 .lp-page .law-text span {
   color: #64748b;
-  font-size: 0.92rem;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.55;
 }
 
 /* ── SECTION LABEL ──────────────────────────────────────────────────── */
@@ -312,14 +312,14 @@
   margin-bottom: 16px;
 }
 .lp-page .problem-card h3 {
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   color: var(--lp-navy);
   margin-bottom: 10px;
   font-family: 'Source Sans 3', sans-serif;
   font-weight: 700;
 }
 .lp-page .problem-card p {
-  font-size: 0.97rem;
+  font-size: 1.1rem;
   color: var(--lp-grey);
   line-height: 1.75;
 }
@@ -372,7 +372,7 @@
   align-items: center;
   gap: 12px;
   color: #e2e8f0;
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 .lp-page .sf-item::before {
   content: '';
@@ -398,7 +398,7 @@
 }
 .lp-page .module-card:hover { border-color: var(--lp-gold); }
 .lp-page .module-tag {
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--lp-gold2);
@@ -408,7 +408,7 @@
 }
 .lp-page .module-card h3 {
   color: var(--lp-white);
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   margin-bottom: 10px;
   font-family: 'Source Sans 3', sans-serif;
   font-weight: 700;
@@ -418,8 +418,8 @@
   background: rgba(255,255,255,0.05);
   border: 1px solid #1e3a5f;
   color: #64748b;
-  font-size: 0.82rem;
-  padding: 3px 10px;
+  font-size: 0.9rem;
+  padding: 4px 12px;
   font-family: 'Source Sans 3', sans-serif;
 }
 
@@ -458,13 +458,13 @@
 .lp-page .scanner-icon { font-size: 2rem; margin-bottom: 16px; }
 .lp-page .scanner-card h3 {
   font-family: 'Source Sans 3', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--lp-navy);
   margin-bottom: 8px;
 }
 .lp-page .scanner-card p {
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   color: var(--lp-grey);
   line-height: 1.75;
 }
@@ -480,11 +480,11 @@
 .lp-page .scanner-demo-text strong {
   display: block;
   color: var(--lp-white);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 700;
   margin-bottom: 6px;
 }
-.lp-page .scanner-demo-text p { color: #64748b; font-size: 0.95rem; line-height: 1.6; }
+.lp-page .scanner-demo-text p { color: #64748b; font-size: 1.05rem; line-height: 1.6; }
 .lp-page .scanner-score-row {
   display: flex;
   gap: 12px;
@@ -652,13 +652,13 @@
 .lp-page .lesson-info { flex: 1; }
 .lp-page .lesson-info strong {
   display: block;
-  font-size: 1rem;
+  font-size: 1.1rem;
   color: var(--lp-navy);
   font-weight: 700;
   margin-bottom: 3px;
   font-family: 'Source Sans 3', sans-serif;
 }
-.lp-page .lesson-info span { font-size: 0.88rem; color: var(--lp-grey); }
+.lp-page .lesson-info span { font-size: 0.97rem; color: var(--lp-grey); }
 .lp-page .lesson-meta { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .lp-page .lesson-duration {
   font-family: 'JetBrains Mono', monospace;
@@ -721,13 +721,13 @@
 }
 .lp-page .lesson-video:hover .mini-play { transform: scale(1.1); }
 .lp-page .lesson-desc { display: flex; flex-direction: column; gap: 10px; }
-.lp-page .lesson-desc p { font-size: 0.95rem; color: var(--lp-grey); line-height: 1.75; }
+.lp-page .lesson-desc p { font-size: 1.05rem; color: var(--lp-grey); line-height: 1.75; }
 .lp-page .lesson-materials { display: flex; flex-direction: column; gap: 5px; }
 .lp-page .lm-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.88rem;
+  font-size: 0.97rem;
   color: var(--lp-grey);
 }
 .lp-page .lm-icon {
@@ -775,19 +775,19 @@
 .lp-page .mat-icon { font-size: 1.8rem; margin-bottom: 14px; }
 .lp-page .mat-category h3 {
   font-family: 'Source Sans 3', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--lp-navy);
   margin-bottom: 6px;
 }
-.lp-page .mat-count { font-size: 0.83rem; color: var(--lp-grey); margin-bottom: 18px; }
+.lp-page .mat-count { font-size: 0.95rem; color: var(--lp-grey); margin-bottom: 18px; }
 .lp-page .mat-list { list-style: none; display: flex; flex-direction: column; gap: 7px; padding: 0; margin: 0; }
 .lp-page .mat-list li {
-  font-size: 0.92rem;
+  font-size: 1.05rem;
   color: var(--lp-grey);
   padding-left: 14px;
   position: relative;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 .lp-page .mat-list li::before { content: '–'; position: absolute; left: 0; color: var(--lp-lightgrey); }
 .lp-page .materials-total {
@@ -826,7 +826,7 @@
   font-size: clamp(1.8rem, 3vw, 2.4rem);
   margin-bottom: 24px;
 }
-.lp-page .penalties-left p { color: #64748b; font-size: 1rem; line-height: 1.8; }
+.lp-page .penalties-left p { color: #64748b; font-size: 1.1rem; line-height: 1.8; }
 .lp-page .penalty-cards { display: flex; flex-direction: column; gap: 14px; }
 .lp-page .penalty-item {
   background: rgba(155,0,0,0.1);
@@ -837,8 +837,8 @@
   align-items: center;
   gap: 20px;
 }
-.lp-page .penalty-item .type { color: #94a3b8; font-size: 0.93rem; }
-.lp-page .penalty-item .sub { color: #64748b; font-size: 0.87rem; margin-top: 2px; }
+.lp-page .penalty-item .type { color: #94a3b8; font-size: 1.05rem; }
+.lp-page .penalty-item .sub { color: #64748b; font-size: 0.97rem; margin-top: 2px; }
 .lp-page .penalty-item .amount {
   font-family: 'Playfair Display', serif;
   color: #ff5252;
@@ -878,16 +878,16 @@
   line-height: 1;
 }
 .lp-page .testi-text {
-  font-size: 1rem;
+  font-size: 1.1rem;
   color: var(--lp-grey);
   line-height: 1.8;
   margin-bottom: 24px;
   position: relative;
   z-index: 1;
 }
-.lp-page .testi-author strong { display: block; font-size: 0.97rem; color: var(--lp-navy); font-weight: 700; }
-.lp-page .testi-author span { font-size: 0.85rem; color: var(--lp-grey); }
-.lp-page .testi-stars { color: var(--lp-gold2); font-size: 0.95rem; margin-bottom: 16px; }
+.lp-page .testi-author strong { display: block; font-size: 1.05rem; color: var(--lp-navy); font-weight: 700; }
+.lp-page .testi-author span { font-size: 0.95rem; color: var(--lp-grey); }
+.lp-page .testi-stars { color: var(--lp-gold2); font-size: 1rem; margin-bottom: 16px; }
 
 /* ── PRICING ─────────────────────────────────────────────────────────── */
 .lp-page .pricing { background: var(--lp-navy); padding: 100px 6%; }
@@ -954,7 +954,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   color: #94a3b8;
   line-height: 1.55;
 }
@@ -1013,12 +1013,12 @@
 .lp-page .faq-item:nth-child(even) { border-right: none; }
 .lp-page .faq-item h3 {
   font-family: 'Source Sans 3', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--lp-navy);
   margin-bottom: 10px;
 }
-.lp-page .faq-item p { font-size: 0.97rem; color: var(--lp-grey); line-height: 1.75; }
+.lp-page .faq-item p { font-size: 1.08rem; color: var(--lp-grey); line-height: 1.75; }
 
 /* ── FINAL CTA ───────────────────────────────────────────────────────── */
 .lp-page .final-cta {
