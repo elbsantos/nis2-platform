@@ -274,7 +274,7 @@ function drawHeader(doc: PDFKit.PDFDocument, title: string, orgName: string): vo
 
   // Logo / title area
   doc.fontSize(18).fillColor(C.brand).font("Helvetica-Bold")
-     .text("NIS2 Plataforma PT", 50, 25);
+     .text("CISPLAN", 50, 25);
   doc.fontSize(9).fillColor(C.muted).font("Helvetica")
      .text(orgName, 50, 48);
 
@@ -296,7 +296,7 @@ function drawFooter(doc: PDFKit.PDFDocument): void {
   const pageCount = (doc as any)._pageBuffer?.length ?? 1;
   doc.fontSize(8).fillColor(C.muted).font("Helvetica")
      .text(
-       `NIS2 Plataforma PT · Relatório gerado em ${new Date().toLocaleDateString("pt-PT")} · Página 1 de ${pageCount}`,
+       `CISPLAN · Relatório gerado em ${new Date().toLocaleDateString("pt-PT")} · Página 1 de ${pageCount}`,
        50, 800, { align: "center", width: 495 }
      );
 }
