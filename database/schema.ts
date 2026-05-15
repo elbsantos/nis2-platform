@@ -39,7 +39,6 @@ export const users = mysqlTable(
     passwordHash:   varchar("passwordHash", { length: 255 }),
     role:           mysqlEnum("role", ["admin", "member"]).notNull().default("member"),
     organizationId: int("organizationId"),
-    openId:         varchar("openId", { length: 255 }),
     createdAt:      timestamp("createdAt").notNull().defaultNow(),
     updatedAt:      timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
   },

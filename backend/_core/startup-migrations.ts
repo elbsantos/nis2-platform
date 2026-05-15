@@ -20,11 +20,6 @@ interface Migration {
 }
 
 const MIGRATIONS: Migration[] = [
-  // users — openId para futura autenticação OAuth
-  {
-    name: "users.openId",
-    sql:  "ALTER TABLE users ADD COLUMN openId VARCHAR(255) NULL",
-  },
   // organizations — size foi adicionado depois da criação inicial
   {
     name: "organizations.size",
