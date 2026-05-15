@@ -128,7 +128,7 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       : 0;
 
     // ── Header ──
-    drawHeader(doc, "Relatório Executivo NIS2", org?.name ?? "Organização");
+    drawHeader(doc, "Relatório Executivo NIS2", scan?.target ?? "—");
 
     // ── Score circle ──
     const cx = 100, cy = doc.y + 60;
@@ -197,7 +197,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       : 0;
 
     // ── Header ──
-    drawHeader(doc, "Relatório Técnico NIS2", org?.name ?? "Organização");
+    drawHeader(doc, "Relatório Técnico NIS2", scan?.target ?? "—");
 
     // ── Metadata ──
     doc.fontSize(9).fillColor(C.muted).font("Helvetica");
@@ -268,7 +268,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
 // Layout helpers
 // ---------------------------------------------------------------------------
 
-function drawHeader(doc: PDFKit.PDFDocument, title: string, orgName: string): void {
+function drawHeader(doc: PDFKit.PDFDocument, title: string, target: string): void {
   // Blue top bar
   doc.rect(0, 0, 595, 6).fillColor(C.brand).fill();
 
@@ -276,7 +276,7 @@ function drawHeader(doc: PDFKit.PDFDocument, title: string, orgName: string): vo
   doc.fontSize(18).fillColor(C.brand).font("Helvetica-Bold")
      .text("CISPLAN", 50, 25);
   doc.fontSize(9).fillColor(C.muted).font("Helvetica")
-     .text(orgName, 50, 48);
+     .text(target, 50, 48);
 
   doc.fontSize(14).fillColor(C.text).font("Helvetica-Bold")
      .text(title, 50, 70);
