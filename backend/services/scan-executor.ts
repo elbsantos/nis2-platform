@@ -362,7 +362,31 @@ export async function executeAgentlessScan(
         : Promise.resolve(null),
     ]);
 
-    // ── 3. Merge port findings ─────────────────────────────────────────────
+    // ── 3. Detect shared/anycast infrastructure ────────────────────────────
+    // Railway, Vercel, Netlify, Cloudflare et al. use anycast IPs shared across
+    // tenants — Shodan sees all 200+ ports of the platform, not the app's ports.
+    const SHARED_INFRA_PROVIDERS = [
+      "railway", "vercel", "netlify", "cloudflare", "fastly", "akamai",
+      "digitalocean", "render", "fly.io", "heroku", "azurewebsites",
+    ];
+    const SHARED_INFRA_TAGS = ["cloud", "hosting", "cdn", "proxy", "anycast"];
+    const shodanPortCount  = shodanData?.ports?.length ?? 0;
+    const shodanTags       = (shodanData?.tags ?? []).map(t => t.toLowerCase());
+    const shodanHostnames  = (shodanData?.hostnames ?? []).map(h => h.toLowerCase());
+    const isSharedInfra = isDomain && (
+      shodanPortCount > 40 ||
+      shodanTags.some(t => SHARED_INFRA_TAGS.includes(t)) ||
+      shodanHostnames.some(h => SHARED_INFRA_PROVIDERS.some(p => h.includes(p)))
+    );
+
+    if (isSharedInfra) {
+      const providerHint = shodanHostnames.find(h => SHARED_INFRA_PROVIDERS.some(p => h.includes(p))) ?? "infraestrutura cloud partilhada";
+      console.log(`[Scanner] ${options.target} → IP partilhado (${providerHint}, ${shodanPortCount} portos) — portos Shodan ignorados para CVEs`);
+    }
+
+    // ── Merge port findings ────────────────────────────────────────────────
+    // If shared infra detected, strip CVEs from Shodan ports (they belong to
+    // the platform, not the target app). Keep ports for informational display.
     const openPorts: PortFinding[] =
       shodanData?.ports?.map((p) => ({
         port: p.port,
@@ -370,7 +394,7 @@ export async function executeAgentlessScan(
         service: p.product ?? p._shodan?.module ?? "unknown",
         product: p.product,
         version: p.version,
-        cves: Object.keys(p.vulns ?? {}),
+        cves: isSharedInfra ? [] : Object.keys(p.vulns ?? {}),
       })) ?? [];
 
     // Add Censys services not already in Shodan
@@ -411,11 +435,25 @@ export async function executeAgentlessScan(
     // ── 4. Build vulnerability list ────────────────────────────────────────
     const vulns: VulnFinding[] = [];
     const { createVulnerability } = await import("../db");
+    const currentYear = new Date().getFullYear();
 
     for (const portFinding of openPorts) {
       for (const cveId of portFinding.cves) {
+        // Filter out CVEs with future year — reserved IDs not yet officially published
+        const cveYearMatch = cveId.match(/^CVE-(\d{4})-/);
+        if (cveYearMatch && parseInt(cveYearMatch[1]) > currentYear) {
+          console.log(`[Scanner] Skipping future CVE ${cveId} (year > ${currentYear})`);
+          continue;
+        }
+
         const shodanPort = shodanData?.ports?.find((p) => p.port === portFinding.port);
         const cvssScore: number = shodanPort?.vulns?.[cveId]?.cvss ?? 5.0;
+
+        // Skip CVEs with no CVSS score (unscored = not yet officially published)
+        if (cvssScore === 0) {
+          console.log(`[Scanner] Skipping unscored CVE ${cveId}`);
+          continue;
+        }
         const severity = (s: number) =>
           s >= 9 ? "critical" : s >= 7 ? "high" : s >= 4 ? "medium" : "low";
         const sevPT = (s: number) =>
@@ -643,6 +681,7 @@ export async function executeAgentlessScan(
     await updateScanStatus(options.scanId, "completed", undefined, new Date(), {
       nis2Scores: scores,
       overallScore: overall,
+      isSharedInfra,                                          // flag para UI/PDF
       vulnerabilitiesFound: vulns.length,
       criticalCount: vulns.filter((v) => v.severity === "critical").length,
       highCount: vulns.filter((v) => v.severity === "high").length,
