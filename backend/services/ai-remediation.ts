@@ -167,7 +167,31 @@ export async function generateRemediationForScan(
   const existing = await getRemediationItemsByScanId(scanId);
   if (existing.length > 0) return existing.length;
 
-  const vulns = await getVulnerabilitiesByScanId(scanId);
+  // Try vulnerabilities table first; fall back to scan.results JSON for synthetic vulns
+  // (email/HTTP/TLS/dark-web findings are stored only in scan.results, not in the table)
+  const tableVulns = await getVulnerabilitiesByScanId(scanId);
+  const vulns: Array<{
+    id: number;
+    cveId: string;
+    severity: string;
+    cvssScore: string;
+    description: string;
+    affectedComponent: string;
+    port?: number | null;
+    remediation?: string | null;
+  }> = tableVulns.length > 0
+    ? tableVulns
+    : ((scan.results as any)?.vulnerabilities ?? []).map((v: any, i: number) => ({
+        id: -(i + 1),
+        cveId:             v.cveId,
+        severity:          v.severity,
+        cvssScore:         String(v.cvssScore ?? 5),
+        description:       v.description,
+        affectedComponent: v.affectedService ?? "unknown",
+        port:              null,
+        remediation:       v.remediationHint ?? null,
+      }));
+
   if (vulns.length === 0) return 0;
 
   const orgContext = {
