@@ -128,7 +128,7 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       : 0;
 
     // ── Header ──
-    drawHeader(doc, "Relatório Executivo NIS2", scan?.target ?? "—");
+    drawHeader(doc, "Relatório Executivo NIS2");
 
     // ── Score circle ──
     const cx = 100, cy = doc.y + 60;
@@ -197,7 +197,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       : 0;
 
     // ── Header ──
-    drawHeader(doc, "Relatório Técnico NIS2", scan?.target ?? "—");
+    drawHeader(doc, "Relatório Técnico NIS2");
 
     // ── Metadata ──
     doc.fontSize(9).fillColor(C.muted).font("Helvetica");
@@ -217,24 +217,29 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     // ── Scores por artigo ──
     if (nis2Scores.length > 0) {
       drawSectionTitle(doc, "Score NIS2 por Artigo (Art. 21(2))");
+      const BAR_X = 50, BAR_MAX = 190, TEXT_X = 255, TEXT_W = 290;
       nis2Scores.forEach((s) => {
-        const barWidth = Math.max(1, Math.round((s.score / 100) * 250));
-        doc.rect(doc.x, doc.y, barWidth, 8).fillColor(scoreColor(s.score)).fill();
-        doc.rect(doc.x + barWidth, doc.y - 8, 250 - barWidth, 8).fillColor(C.border).fill();
-        doc.fontSize(9).fillColor(C.text).font("Helvetica-Bold")
-           .text(`${s.article} — ${s.score}/100`, doc.x + 260, doc.y - 8);
-        doc.fontSize(8).fillColor(C.muted).font("Helvetica")
-           .text(s.title, doc.x + 260, doc.y);
-        doc.moveDown(1.2);
-        // Findings
-        if (s.findings?.length > 0) {
-          s.findings.slice(0, 3).forEach((f) => {
-            doc.fontSize(8).fillColor(C.muted).text(`  • ${f}`);
-          });
-          doc.moveDown(0.4);
-        }
+        if (doc.y > 700) doc.addPage();
+        const rowY = doc.y;
+        const fillW = Math.max(2, Math.round((s.score / 100) * BAR_MAX));
+        // Bar background + fill
+        doc.rect(BAR_X, rowY, BAR_MAX, 7).fillColor(C.border).fill();
+        doc.rect(BAR_X, rowY, fillW, 7).fillColor(scoreColor(s.score)).fill();
+        // Article label + score
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
+           .text(`${s.article} — ${s.score}/100`, TEXT_X, rowY - 1, { width: TEXT_W });
+        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+           .text(s.title, TEXT_X, rowY + 10, { width: TEXT_W });
+        // Advance cursor past bar row
+        doc.y = rowY + 24;
+        // Findings (only failures worth showing)
+        const fails = (s.findings ?? []).filter(Boolean).slice(0, 2);
+        fails.forEach((f) => {
+          doc.fontSize(7.5).fillColor(C.muted).text(`  • ${f}`, BAR_X, doc.y, { width: 495 });
+        });
+        if (fails.length) doc.moveDown(0.3);
       });
-      doc.moveDown(0.5);
+      doc.moveDown(0.8);
     }
 
     // ── Vulnerabilities ──
@@ -268,22 +273,20 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
 // Layout helpers
 // ---------------------------------------------------------------------------
 
-function drawHeader(doc: PDFKit.PDFDocument, title: string, target: string): void {
+function drawHeader(doc: PDFKit.PDFDocument, title: string): void {
   // Blue top bar
   doc.rect(0, 0, 595, 6).fillColor(C.brand).fill();
 
-  // Logo / title area
+  // Brand name only — target appears in the body
   doc.fontSize(18).fillColor(C.brand).font("Helvetica-Bold")
      .text("CISPLAN", 50, 25);
-  doc.fontSize(9).fillColor(C.muted).font("Helvetica")
-     .text(target, 50, 48);
 
   doc.fontSize(14).fillColor(C.text).font("Helvetica-Bold")
-     .text(title, 50, 70);
+     .text(title, 50, 55);
 
   // Horizontal rule
-  doc.moveTo(50, 95).lineTo(545, 95).strokeColor(C.border).lineWidth(1).stroke();
-  doc.moveDown(2);
+  doc.moveTo(50, 80).lineTo(545, 80).strokeColor(C.border).lineWidth(1).stroke();
+  doc.moveDown(1.5);
 }
 
 function drawSectionTitle(doc: PDFKit.PDFDocument, title: string): void {
@@ -293,11 +296,12 @@ function drawSectionTitle(doc: PDFKit.PDFDocument, title: string): void {
 }
 
 function drawFooter(doc: PDFKit.PDFDocument): void {
-  const pageCount = (doc as any)._pageBuffer?.length ?? 1;
+  // y=755 keeps the footer within the A4 content area (page height 842 - margin 50 = 792)
+  // avoids PDFKit auto-adding a new page when y > bottom margin
   doc.fontSize(8).fillColor(C.muted).font("Helvetica")
      .text(
-       `CISPLAN · Relatório gerado em ${new Date().toLocaleDateString("pt-PT")} · Página 1 de ${pageCount}`,
-       50, 800, { align: "center", width: 495 }
+       `CISPLAN · Relatório gerado em ${new Date().toLocaleDateString("pt-PT")}`,
+       50, 755, { align: "center", width: 495 }
      );
 }
 
