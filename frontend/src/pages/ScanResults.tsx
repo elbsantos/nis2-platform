@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import Nis2ScoreChart from "../components/Nis2ScoreChart";
@@ -260,15 +261,45 @@ function SummaryCard({
   );
 }
 
-function PdfButton({ scanId, type, label }: { scanId: number; type: string; label: string }) {
+function PdfButton({ scanId, type, label }: { scanId: number; type: "executive" | "technical"; label: string }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const generate = trpc.report.generate.useQuery(
+    { scanId, type },
+    { enabled: false, retry: false }
+  );
+
+  async function handleClick() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generate.refetch();
+      if (!result.data) throw new Error("Sem dados");
+      const { pdfBase64, filename } = result.data;
+      const bytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
+      const blob  = new Blob([bytes], { type: "application/pdf" });
+      const url   = URL.createObjectURL(blob);
+      const a     = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao gerar PDF");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <a
-      href={`/api/trpc/report.generate?input=${encodeURIComponent(JSON.stringify({ scanId, type }))}`}
-      className="px-4 py-2 bg-red-700 text-white text-lg font-medium rounded-md hover:bg-red-800 transition-colors"
-      title={label}
-    >
-      ↓ {label}
-    </a>
+    <div className="flex flex-col items-start gap-1">
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className="px-4 py-2 bg-red-700 text-white text-lg font-medium rounded-md hover:bg-red-800 transition-colors disabled:opacity-50"
+      >
+        {loading ? "A gerar…" : `↓ ${label}`}
+      </button>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+    </div>
   );
 }
 

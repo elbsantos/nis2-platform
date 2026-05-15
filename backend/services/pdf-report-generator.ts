@@ -58,9 +58,21 @@ export async function generateReport(options: {
   organizationId: number;
   type: "executive" | "technical";
 }): Promise<string> {
-  const [scan, vulns, org] = await Promise.all([
+  const buffer = await generateReportBuffer(options);
+  return uploadToStorage(buffer, options.organizationId, options.scanId, options.type);
+}
+
+/**
+ * Generate the PDF and return its raw Buffer (no S3 upload).
+ * Used by the tRPC router to return base64 for direct browser download.
+ */
+export async function generateReportBuffer(options: {
+  scanId: number;
+  organizationId: number;
+  type: "executive" | "technical";
+}): Promise<Buffer> {
+  const [scan, org] = await Promise.all([
     getScanById(options.scanId),
-    getVulnerabilitiesByScanId(options.scanId),
     getOrganizationById(options.organizationId),
   ]);
 
@@ -69,11 +81,27 @@ export async function generateReport(options: {
     throw new Error("Sem permissão para aceder a este scan");
   }
 
-  const buffer = options.type === "executive"
-    ? await buildExecutiveReport(scan, vulns, org)
-    : await buildTechnicalReport(scan, vulns, org);
+  // Use vulnerabilities from scan.results JSON as fallback (same as ai-remediation)
+  const tableVulns = await getVulnerabilitiesByScanId(options.scanId);
+  const vulns = tableVulns.length > 0
+    ? tableVulns
+    : ((scan.results as any)?.vulnerabilities ?? []).map((v: any, i: number) => ({
+        id: -(i + 1),
+        scanId: options.scanId,
+        organizationId: options.organizationId,
+        cveId:             v.cveId,
+        severity:          v.severity,
+        cvssScore:         String(v.cvssScore ?? 5),
+        description:       v.description,
+        affectedComponent: v.affectedService ?? "unknown",
+        port:              null,
+        remediation:       v.remediationHint ?? null,
+        createdAt:         new Date(),
+      }));
 
-  return uploadToStorage(buffer, options.organizationId, options.scanId, options.type);
+  return options.type === "executive"
+    ? buildExecutiveReport(scan, vulns as any, org)
+    : buildTechnicalReport(scan, vulns as any, org);
 }
 
 // ---------------------------------------------------------------------------
