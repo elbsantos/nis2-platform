@@ -6,10 +6,9 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { freeProcedure, proProcedure } from "../middlewares/planGuard";
+import { freeProcedure } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, isIpAddress } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId, getScansByBatchId } from "../db";
-import { checkScanLimit } from "../middlewares/planGuard";
 import { isSafeTarget } from "../middlewares/security";
 
 // Strip protocol, path, port and whitespace — accept "https://example.com/path" as "example.com"
@@ -62,14 +61,7 @@ export const scanRouter = {
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Check scan limit
-      const limitCheck = await checkScanLimit(ctx.org.id, ctx.plan);
-      if (!limitCheck.allowed) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: limitCheck.reason ?? "Scan limit reached",
-        });
-      }
+      // Scan limit check disabled for validation/testing phase
 
       // Verify ownership
       const ownership = await verifyOwnership(input.target, ctx.org.id);
@@ -147,7 +139,7 @@ export const scanRouter = {
   /**
    * Get scan statistics (Pro only)
    */
-  stats: proProcedure.query(async ({ ctx }) => {
+  stats: freeProcedure.query(async ({ ctx }) => {
     const { getOrgScanStats } = await import("../db");
     return getOrgScanStats(ctx.org.id);
   }),
@@ -156,7 +148,7 @@ export const scanRouter = {
    * Discover subdomains via CT logs + wordlist (Pro/MSSP only).
    * Verifies root domain ownership before discovery.
    */
-  discoverSubdomains: proProcedure
+  discoverSubdomains: freeProcedure
     .input(z.object({ domain: safeTarget }))
     .mutation(async ({ ctx, input }) => {
       if (isIpAddress(input.domain)) {
@@ -183,7 +175,7 @@ export const scanRouter = {
    * If rootDomain is provided, all targets must be subdomains of it and
    * ownership is verified on the root only.
    */
-  startBulk: proProcedure
+  startBulk: freeProcedure
     .input(
       z.object({
         targets:    z.array(safeTarget).min(1).max(50),

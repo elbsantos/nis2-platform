@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
-import { freeProcedure, proProcedure } from "../middlewares/planGuard";
+import { freeProcedure } from "../middlewares/planGuard";
 import {
   getRemediationItemsByOrgId,
   updateRemediationStatus,
@@ -32,7 +32,7 @@ export const remediationRouter = router({
   /**
    * Generate AI remediation plans for all vulnerabilities in a scan (pro/mssp)
    */
-  generate: proProcedure
+  generate: freeProcedure
     .input(z.object({ scanId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const scan = await getScanById(input.scanId);

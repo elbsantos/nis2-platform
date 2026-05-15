@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
-import { freeProcedure, proProcedure } from "../middlewares/planGuard";
+import { freeProcedure } from "../middlewares/planGuard";
 import {
   createQuestionnaireSession,
   getQuestionnaireSessionById,
@@ -132,7 +132,7 @@ export const questionnaireRouter = router({
   /**
    * AI explanation of a control (pro/mssp only)
    */
-  explainControl: proProcedure
+  explainControl: freeProcedure
     .input(z.object({ controlId: z.string().max(20) }))
     .query(async ({ ctx, input }) => {
       const control = NIS2_CONTROLS.find((c) => c.id === input.controlId);
