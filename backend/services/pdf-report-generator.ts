@@ -53,16 +53,16 @@ const PAGE_W = 595, PAGE_H = 842, MARGIN = 50, CONTENT_W = PAGE_W - MARGIN * 2;
 // ---------------------------------------------------------------------------
 
 const NIS2_ARTICLES: Record<string, { short: string; desc: string }> = {
-  "Art. 21(2)(a)": { short: "Políticas de Risco",         desc: "Políticas de análise de risco e segurança dos sistemas de informação" },
-  "Art. 21(2)(b)": { short: "Gestão de Incidentes",        desc: "Detecção, resposta e notificação de incidentes de segurança" },
-  "Art. 21(2)(c)": { short: "Continuidade de Negócio",     desc: "Backups, recuperação de desastres e gestão de crises" },
-  "Art. 21(2)(d)": { short: "Cadeia de Abastecimento",     desc: "Segurança nos fornecedores e parceiros tecnológicos" },
-  "Art. 21(2)(e)": { short: "Desenvolvimento Seguro",       desc: "Segurança na aquisição, desenvolvimento e manutenção de sistemas" },
-  "Art. 21(2)(f)": { short: "Avaliação de Eficácia",        desc: "Avaliação e monitorização contínua das medidas de cibersegurança" },
-  "Art. 21(2)(g)": { short: "Ciberhigiene e Formação",      desc: "Formação de colaboradores e práticas básicas de ciberhigiene" },
-  "Art. 21(2)(h)": { short: "Criptografia",                 desc: "Encriptação de dados em trânsito e em repouso" },
-  "Art. 21(2)(i)": { short: "Controlo de Acessos",          desc: "Segurança dos recursos humanos e gestão de identidades" },
-  "Art. 21(2)(j)": { short: "Autenticação Multifator",      desc: "MFA obrigatório e comunicações seguras internas" },
+  "Art. 21(2)(a)": { short: "Políticas de Risco",              desc: "Políticas de análise de risco e segurança dos sistemas de informação" },
+  "Art. 21(2)(b)": { short: "Gestão de Incidentes",             desc: "Deteção, resposta e notificação de incidentes de segurança" },
+  "Art. 21(2)(c)": { short: "Continuidade de Negócio",          desc: "Cópias de segurança (backups), recuperação de desastres e gestão de crises" },
+  "Art. 21(2)(d)": { short: "Cadeia de Abastecimento",          desc: "Segurança nos fornecedores e parceiros tecnológicos" },
+  "Art. 21(2)(e)": { short: "Desenvolvimento Seguro",            desc: "Segurança na aquisição, desenvolvimento e manutenção de sistemas" },
+  "Art. 21(2)(f)": { short: "Avaliação de Eficácia",             desc: "Avaliação e monitorização contínua das medidas de cibersegurança" },
+  "Art. 21(2)(g)": { short: "Ciberhigiene e Formação",           desc: "Práticas básicas de ciberhigiene e formação de colaboradores" },
+  "Art. 21(2)(h)": { short: "Criptografia e Encriptação",        desc: "Encriptação de dados em trânsito e em repouso" },
+  "Art. 21(2)(i)": { short: "Controlo de Acessos",               desc: "Segurança dos recursos humanos e gestão de identidades" },
+  "Art. 21(2)(j)": { short: "Autenticação e Identidade",         desc: "Autenticação forte, segurança nos canais de comunicação e validação de identidade institucional" },
 };
 
 // ---------------------------------------------------------------------------
@@ -303,6 +303,61 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
 }
 
 // ---------------------------------------------------------------------------
+// Finding enrichment: translates raw scanner output into plain-language
+// business impact descriptions, with severity classification.
+// ---------------------------------------------------------------------------
+
+function enrichFinding(raw: string): { critical: boolean; text: string } {
+  const r = raw.toLowerCase();
+
+  if (/dmarc/i.test(raw))
+    return { critical: true,  text: "Ausência de Registo DMARC: Falha grave na identidade do email do domínio. Permite que atacantes enviem mensagens falsas em nome da sua empresa (phishing/spoofing)." };
+  if (/spf/i.test(raw))
+    return { critical: true,  text: "Ausência de Registo SPF: Sem esta validação no DNS, qualquer servidor na Internet pode fazer-se passar pelo seu domínio institucional." };
+  if (/dkim/i.test(raw))
+    return { critical: true,  text: "Ausência de Assinatura DKIM: Emails enviados pelo domínio não têm assinatura digital criptográfica, facilitando a falsificação de mensagens." };
+
+  if (/27017|mongodb/i.test(raw))
+    return { critical: true,  text: "Porta 27017 Exposta (Base de Dados MongoDB): O serviço de base de dados está acessível publicamente, aumentando drasticamente a superfície de ataque." };
+  if (/3306|mysql/i.test(raw))
+    return { critical: true,  text: "Porta 3306 Exposta (Base de Dados MySQL): O serviço de base de dados está exposto à Internet — deve ser restrito a ligações internas." };
+  if (/5432|postgres/i.test(raw))
+    return { critical: true,  text: "Porta 5432 Exposta (Base de Dados PostgreSQL): O serviço de base de dados está exposto à Internet — deve ser restrito a ligações internas." };
+  if (/6379|redis/i.test(raw))
+    return { critical: true,  text: "Porta 6379 Exposta (Redis): Serviço de cache em memória acessível publicamente — alvo frequente de ataques de ransomware." };
+  if (/1433|mssql|sql.server/i.test(raw))
+    return { critical: true,  text: "Porta 1433 Exposta (SQL Server): Base de dados Microsoft exposta à Internet — restrinja o acesso por firewall." };
+
+  if (/porta.*22|22.*ssh|ssh/i.test(r) || /port.*22/i.test(r))
+    return { critical: false, text: "Porta 22 Exposta (Acesso Remoto SSH): O painel de administração remota do servidor está acessível publicamente. Restrinja o acesso por IP ou exija VPN corporativa." };
+  if (/porta.*80|port.*80|http\b.*aberto|http\b.*open/i.test(r))
+    return { critical: false, text: "Porta 80 Aberta (HTTP Inseguro): O servidor web aceita ligações sem encriptação (texto limpo). Configure o redirecionamento automático obrigatório para HTTPS (porta 443)." };
+  if (/3389|rdp|remote.desktop/i.test(raw))
+    return { critical: true,  text: "Porta 3389 Exposta (Acesso Remoto Windows/RDP): Painel de controlo remoto exposto — alvo preferencial de ataques de força bruta e ransomware." };
+  if (/21\b|ftp/i.test(r))
+    return { critical: false, text: "Porta 21 Aberta (FTP): Protocolo de transferência de ficheiros sem encriptação exposto. Substitua por SFTP (porta 22) ou FTPS." };
+  if (/23\b|telnet/i.test(r))
+    return { critical: true,  text: "Porta 23 Aberta (Telnet): Protocolo obsoleto e sem encriptação — substitua imediatamente por SSH." };
+
+  if (/csp|content.security/i.test(raw))
+    return { critical: false, text: "Política de Segurança de Conteúdo (CSP) Permissiva: A política HTTP detetada permite execução de scripts inseguros (unsafe-inline/unsafe-eval), vulnerabilizando a aplicação a ataques de injeção de código." };
+  if (/hsts|strict.transport/i.test(raw))
+    return { critical: false, text: "HSTS Ausente ou Insuficiente: Sem esta política, os browsers podem aceder ao site por HTTP não encriptado, expondo utilizadores a ataques de interceção (man-in-the-middle)." };
+  if (/x.frame|clickjack/i.test(raw))
+    return { critical: false, text: "Proteção contra Clickjacking Ausente (X-Frame-Options): O site pode ser embutido em páginas maliciosas para enganar utilizadores a clicarem em elementos ocultos." };
+  if (/x.content.type|mime.sniff/i.test(raw))
+    return { critical: false, text: "X-Content-Type-Options Ausente: O browser pode interpretar ficheiros com um tipo de conteúdo incorreto, abrindo vetores de ataque." };
+  if (/referrer.policy/i.test(raw))
+    return { critical: false, text: "Referrer-Policy Ausente ou Permissiva: O URL completo das páginas pode ser partilhado com sites de terceiros, expondo dados de navegação." };
+  if (/tls|ssl|certificado|certif/i.test(r))
+    return { critical: false, text: "Problema de Certificado TLS/SSL: " + raw };
+
+  // Fallback — return original with classification based on keywords
+  const isCritical = /crítico|critical|grave|high|critical/i.test(raw);
+  return { critical: isCritical, text: raw };
+}
+
+// ---------------------------------------------------------------------------
 // DNS record examples for email-related vulnerabilities
 // Gives the user the exact TXT record to copy into their DNS provider.
 // ---------------------------------------------------------------------------
@@ -394,7 +449,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       // Summary line
       doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
          .text(
-           `${openPorts.length} porto(s) analisado(s) · ${cleanCount} sem CVEs conhecidas (ocultados) · ${exposedPorts.length} com vulnerabilidades listados abaixo.`,
+           `${openPorts.length} porta(s) analisada(s) · ${cleanCount} sem CVEs conhecidas (ocultadas) · ${exposedPorts.length} com vulnerabilidades listadas abaixo.`,
            MARGIN, y + 1, { width: CONTENT_W }
          );
       y += 16;
@@ -431,7 +486,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     } else if (openPorts.length > 0) {
       doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
       doc.fontSize(9).font("Helvetica").fillColor(C.success)
-         .text(`✓ ${openPorts.length} porto(s) analisado(s) — nenhum com CVEs conhecidas.`, MARGIN + 10, y + 10);
+         .text(`✓ ${openPorts.length} porta(s) analisada(s) — nenhuma com CVEs conhecidas.`, MARGIN + 10, y + 10);
       y += 30;
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
@@ -539,16 +594,26 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     // Intro text
     doc.fontSize(8).font("Helvetica").fillColor(C.muted)
        .text(
-         "Avaliação baseada nos serviços expostos, vulnerabilidades detectadas e configurações de segurança analisadas. " +
-         "Cada artigo reflecte um domínio de conformidade da Directiva NIS2 (transposta pelo DL 125/2025).",
+         "Avaliação automatizada baseada nos serviços expostos, vulnerabilidades detetadas e configurações de segurança analisadas. " +
+         "Cada artigo reflete um domínio de conformidade da Diretiva NIS2, transposta em Portugal pelo Decreto-Lei n.º 125/2025.",
          MARGIN, y, { width: CONTENT_W }
        );
     y += 28;
 
     let techPage = 4;
+    const FIND_W = CONTENT_W - 52;
     nis2Scores.forEach((s) => {
-      const hasFail = s.findings?.filter(Boolean).length > 0;
-      const rowH = hasFail ? 52 + Math.min(s.findings.length, 3) * 11 : 40;
+      const rawFindings = s.findings?.filter(Boolean) ?? [];
+      const hasFail = rawFindings.length > 0;
+
+      // Pre-compute enriched findings and their heights for accurate layout
+      const enriched = rawFindings.slice(0, 4).map(enrichFinding);
+      const findingHeights = enriched.map(ef =>
+        doc.fontSize(7.5).font("Helvetica").heightOfString(ef.text, { width: FIND_W }) + 6
+      );
+      const totalFindH = findingHeights.reduce((a, b) => a + b, 0);
+      const rowH = 34 + (hasFail ? totalFindH + 4 : 14);
+
       if (y + rowH > 750) {
         drawRunningFooter(doc, techPage++);
         doc.addPage({ size: "A4", margin: 0 });
@@ -565,29 +630,34 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white)
          .text(String(s.score), MARGIN + 4, y + 11, { width: 24, align: "center" });
 
-      // Article + title
+      // Article + short title
       doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
          .text(s.article, MARGIN + 38, y + 2, { width: 100 });
       doc.fontSize(8).font("Helvetica").fillColor(C.muted)
          .text(artInfo?.short ?? "", MARGIN + 38, y + 14, { width: 140 });
 
-      // Bar
+      // Progress bar
       doc.rect(MARGIN + 185, y + 10, BAR_MAX, 8).fillColor(C.border).fill();
       doc.rect(MARGIN + 185, y + 10, barFill, 8).fillColor(col).fill();
 
-      // Description
+      // Scope description
       doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
-         .text(artInfo?.desc ?? s.title, MARGIN + 360, y + 2, { width: CONTENT_W - 315 });
+         .text("Âmbito: " + (artInfo?.desc ?? s.title), MARGIN + 360, y + 2, { width: CONTENT_W - 315 });
 
-      // Findings
+      // Findings with colored square indicators
       if (hasFail) {
-        s.findings.filter(Boolean).slice(0, 3).forEach((f, fi) => {
-          doc.fontSize(7.5).fillColor(C.danger)
-             .text(`• ${truncate(f, 88)}`, MARGIN + 38, y + 28 + fi * 11, { width: CONTENT_W - 38 });
+        let fy = y + 30;
+        enriched.forEach((ef, fi) => {
+          const fColor = ef.critical ? C.danger : C.warning;
+          doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(fColor).fill();
+          doc.fontSize(7.5).font("Helvetica").fillColor(ef.critical ? C.danger : C.text)
+             .text(ef.text, MARGIN + 48, fy, { width: FIND_W });
+          fy += findingHeights[fi];
         });
       } else {
-        doc.fontSize(7.5).fillColor(C.success)
-           .text("✓ Sem problemas detetados neste domínio", MARGIN + 38, y + 28, { width: CONTENT_W - 38 });
+        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.success).fill();
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.success)
+           .text("Sem problemas detetados neste domínio.", MARGIN + 48, y + 30, { width: FIND_W });
       }
 
       doc.moveTo(MARGIN, y + rowH - 2).lineTo(PAGE_W - MARGIN, y + rowH - 2)
@@ -736,34 +806,61 @@ function drawScoreCircle(doc: PDFKit.PDFDocument, score: number, x: number, y: n
 }
 
 function drawMethodologySection(doc: PDFKit.PDFDocument, y: number): number {
-  y = drawSectionTitle(doc, "Metodologia & Limitações", y);
-  const text =
-    "Este relatório foi gerado por análise sem agentes (agentless) utilizando as seguintes fontes de dados: " +
-    "Shodan Internet Intelligence (portos, serviços, CVEs), Censys (confirmação de serviços), " +
-    "HIBP — Have I Been Pwned (breaches de credenciais), verificação directa TLS/SSL (portos 443/8443), " +
-    "DNS lookup (SPF, DMARC, DKIM) e análise de HTTP Security Headers.\n\n" +
-    "Limitações: A análise sem agentes não acede a sistemas internos, bases de dados, aplicações autenticadas ou redes privadas. " +
-    "Vulnerabilidades internas, configurações de firewall interna e controlos organizacionais (políticas, formação, backups) " +
-    "não são avaliados automaticamente — para esses controlos utilizar o Questionário NIS2 (42 controlos) integrado na plataforma. " +
-    "Os scores são calculados com base em heurísticas de risco e devem ser complementados com uma auditoria presencial.";
+  y = drawSectionTitle(doc, "Metodologia & Limitações Técnicas", y);
 
-  doc.rect(MARGIN, y, CONTENT_W, 8).fillColor(C.bg).fill();
-  doc.rect(MARGIN, y, 3, 8).fillColor(C.warning).fill();
+  const intro =
+    "Este relatório foi gerado através de uma análise sem agentes (agentless scan), " +
+    "recorrendo exclusivamente a fontes de dados externas e técnicas de inteligência de fontes abertas (OSINT). " +
+    "As auditorias basearam-se nas seguintes plataformas e protocolos:";
+
   doc.fontSize(8).font("Helvetica").fillColor(C.text)
-     .text(text, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
-  const textHeight = doc.heightOfString(text, { width: CONTENT_W, lineGap: 2 });
-  return y + textHeight + 18;
+     .text(intro, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
+  y += doc.heightOfString(intro, { width: CONTENT_W, lineGap: 2 }) + 8;
+
+  const categories: Array<{ label: string; detail: string }> = [
+    { label: "Mapeamento de Perímetro",      detail: "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) através de plataformas de inteligência de Internet (Shodan e Censys)." },
+    { label: "Segurança de Identidade",      detail: "Verificação de fugas de credenciais corporativas associadas ao domínio na base de dados Have I Been Pwned (HIBP)." },
+    { label: "Encriptação em Trânsito",      detail: "Avaliação direta dos certificados digitais e cifras TLS/SSL nas portas normalizadas de segurança (ex.: 443, 8443)." },
+    { label: "Validação de Email e DNS",     detail: "Análise das configurações DNS públicas do domínio (registos SPF, DMARC e DKIM) e verificação dos cabeçalhos de segurança HTTP." },
+  ];
+
+  categories.forEach((cat) => {
+    doc.rect(MARGIN, y, 3, 12).fillColor(C.brand).fill();
+    doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
+       .text(cat.label + ": ", MARGIN + 8, y, { continued: true, width: CONTENT_W - 8 });
+    doc.font("Helvetica").fillColor(C.muted)
+       .text(cat.detail, { width: CONTENT_W - 8 });
+    y += doc.heightOfString(cat.detail, { width: CONTENT_W - 8 }) + 8;
+  });
+
+  y += 4;
+  const limitTitle = "Limitações do Diagnóstico Exterior:";
+  doc.fontSize(8).font("Helvetica-Bold").fillColor(C.warning).text(limitTitle, MARGIN, y);
+  y += 14;
+
+  const limits =
+    "Por ser uma análise estritamente externa (do ponto de vista do atacante), este teste não acede a sistemas internos, " +
+    "bases de dados protegidas, aplicações autenticadas ou redes privadas (VPNs/LANs). Consequentemente, vulnerabilidades " +
+    "internas, regras de firewalls locais e controlos organizacionais (políticas escritas, planos de formação ou rotinas de " +
+    "cópias de segurança) não são avaliados automaticamente. Para auditar estes controlos específicos da NIS2, a organização " +
+    "deve preencher o Questionário de Autoavaliação NIS2 (42 controlos) disponível no painel da plataforma. " +
+    "Os resultados aqui apresentados baseiam-se em heurísticas de risco e devem ser validados por técnicos de sistemas.";
+
+  doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+     .text(limits, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
+  y += doc.heightOfString(limits, { width: CONTENT_W, lineGap: 2 }) + 18;
+  return y;
 }
 
 function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
   y = drawSectionTitle(doc, "Referências Oficiais & Disclaimer", y);
 
   const refs = [
-    ["Directiva NIS2",         "Directiva (UE) 2022/2555 do Parlamento Europeu e do Conselho, de 14 de Dezembro de 2022"],
-    ["Transposição PT",        "Decreto-Lei n.º 125/2025 — Transposição da NIS2 para o ordenamento jurídico português"],
-    ["CNCS",                   "Centro Nacional de Cibersegurança — cncs.gov.pt — Autoridade nacional competente NIS2"],
-    ["ENISA",                  "European Union Agency for Cybersecurity — enisa.europa.eu — Guidelines NIS2"],
-    ["Notificação CNCS",       "Obrigação de notificação de incidentes graves ao CNCS em 24h (alerta) / 72h (relatório inicial)"],
+    ["Diretiva NIS2",          "Diretiva (UE) 2022/2555 do Parlamento Europeu e do Conselho, de 14 de dezembro de 2022, relativa a medidas destinadas a garantir um elevado nível comum de cibersegurança na União Europeia."],
+    ["Transposição Nacional",  "Decreto-Lei n.º 125/2025 — Diploma que transpõe a Diretiva NIS2 para o ordenamento jurídico português e estabelece o regime jurídico da segurança ciberespacial."],
+    ["Autoridade Nacional",    "CNCS (Centro Nacional de Cibersegurança) — Autoridade nacional competente para supervisão, regulamentação e aplicação das obrigações NIS2 em Portugal (cncs.gov.pt)."],
+    ["Agência Europeia",       "ENISA (European Union Agency for Cybersecurity) — Entidade responsável pelas orientações técnicas e boas práticas europeias (enisa.europa.eu)."],
+    ["Obrigação de Notificação", "Em conformidade com o DL n.º 125/2025, qualquer incidente com impacto significativo deve ser notificado ao CNCS no prazo de 24 horas (alerta inicial) e detalhado em relatório completo em 72 horas."],
   ];
 
   refs.forEach(([label, val], i) => {
