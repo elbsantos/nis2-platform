@@ -123,6 +123,69 @@ function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
 }
 
 // ---------------------------------------------------------------------------
+// Email vulnerability context builder
+// Injects the exact DNS record + provider-specific steps into the prompt
+// so the AI generates actionable guidance for non-technical users.
+// ---------------------------------------------------------------------------
+
+function buildEmailContext(cveId: string, component: string, domain: string): string | null {
+  const id = (cveId + " " + component).toLowerCase();
+  const d  = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim() || "seudominio.pt";
+
+  if (/spf/i.test(id)) {
+    return `
+CONTEXTO TÉCNICO OBRIGATÓRIO — Problema de SPF:
+Esta correção é feita exclusivamente no painel DNS do fornecedor de domínio (browser, qualquer SO).
+NÃO uses secções ### Windows / ### Linux.
+
+Inclui obrigatoriamente nos passos:
+- Registo DNS TXT exato a publicar no domínio raiz ("@") de ${d}:
+    v=spf1 mx ~all
+  (Se o email é gerido pelo Google Workspace: v=spf1 include:_spf.google.com ~all)
+  (Se é Microsoft 365: v=spf1 include:spf.protection.outlook.com ~all)
+- Passos para Cloudflare: Dashboard → domínio → DNS → "Add record" → Tipo: TXT → Nome: @ → Conteúdo: [valor acima] → Guardar
+- Passos para GoDaddy / PTdomains: Painel → DNS → "Add" → Tipo: TXT → Host: @ → Valor: [valor acima] → TTL: 1 hora → Guardar
+- Verificação: https://mxtoolbox.com/spf ou "dig TXT ${d}" na linha de comandos
+- Prazo de propagação: entre 5 minutos e 48 horas`;
+  }
+
+  if (/dmarc/i.test(id)) {
+    return `
+CONTEXTO TÉCNICO OBRIGATÓRIO — Problema de DMARC:
+Esta correção é feita exclusivamente no painel DNS do fornecedor de domínio (browser, qualquer SO).
+NÃO uses secções ### Windows / ### Linux.
+
+Inclui obrigatoriamente nos passos:
+- Registo DNS TXT exato a publicar em "_dmarc.${d}":
+    v=DMARC1; p=quarantine; rua=mailto:dmarc@${d}; pct=100
+- Explicação simples dos valores:
+    p=none → só monitorização (recomendado no início)
+    p=quarantine → emails suspeitos vão para spam
+    p=reject → bloqueia emails não autorizados completamente
+    rua → endereço onde recebes relatórios diários
+- Passos para Cloudflare: DNS → "Add record" → Tipo: TXT → Nome: _dmarc → Conteúdo: [valor acima] → Guardar
+- Passos para GoDaddy / PTdomains: DNS → "Add" → Tipo: TXT → Host: _dmarc → Valor: [valor acima] → Guardar
+- Verificação: https://mxtoolbox.com/dmarc ou "dig TXT _dmarc.${d}"`;
+  }
+
+  if (/dkim/i.test(id)) {
+    return `
+CONTEXTO TÉCNICO OBRIGATÓRIO — Problema de DKIM:
+O DKIM exige dois passos: ativar no servidor de email E publicar a chave no DNS.
+NÃO uses secções ### Windows / ### Linux (é feito em painéis web).
+
+Inclui obrigatoriamente nos passos:
+- Google Workspace: Admin Console → Apps → Google Workspace → Gmail → "Authenticate email" → Gerar chave → copiar o registo TXT fornecido
+- Microsoft 365: Portal de Administração → Exchange → Proteção → DKIM → ativar para o domínio → copiar o registo CNAME fornecido
+- Após ativar: publicar o seletor DNS TXT fornecido pelo teu servidor de email em: default._domainkey.${d}
+- Cloudflare: DNS → "Add record" → Tipo: TXT → Nome: default._domainkey → Conteúdo: [valor copiado do servidor de email]
+- Verificação: https://mxtoolbox.com/dkim`;
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Single vulnerability plan
 // ---------------------------------------------------------------------------
 
@@ -137,8 +200,10 @@ async function generatePlanForVuln(
     port?: number | null;
     remediation?: string | null;
   },
-  orgContext: { name: string; sector?: string | null; size?: string | null; orgId?: number; plan?: string }
+  orgContext: { name: string; sector?: string | null; size?: string | null; orgId?: number; plan?: string; target?: string }
 ): Promise<ParsedPlan> {
+  const emailCtx = buildEmailContext(vuln.cveId, vuln.affectedComponent, orgContext.target ?? "");
+
   const prompt = `Gera um plano de remediação para a seguinte vulnerabilidade detetada numa PME portuguesa:
 
 **CVE:** ${vuln.cveId}
@@ -151,14 +216,15 @@ ${vuln.remediation ? `**Remediação sugerida pelo scanner:** ${vuln.remediation
 - Nome: ${orgContext.name}
 - Sector: ${orgContext.sector ?? "não especificado"}
 - Dimensão: ${orgContext.size ?? "PME"}
+${emailCtx ? emailCtx : ""}
 
 Segue rigorosamente este formato:
-1. Uma ou duas frases explicando o risco concreto para esta empresa
-2. Passos de correção separados por SO (usa ### Windows e ### Linux / Ubuntu / Debian quando os passos diferem — máx. 6 por SO, sem repetições entre secções)
+1. Uma ou duas frases explicando o risco concreto para esta empresa (linguagem simples, sem jargão)
+2. Passos de correção numerados e concretos${emailCtx ? " (sem separação por SO — seguir as instruções do contexto acima)" : " separados por SO (usa ### Windows e ### Linux / Ubuntu / Debian quando os passos diferem — máx. 6 por SO, sem repetições entre secções)"}
 3. Indica "Esforço: Baixo/Médio/Alto"
 4. Indica os artigos NIS2 relevantes (ex.: Art. 21(2)(e))
 
-IMPORTANTE: Completa sempre cada frase. Não cortes passos a meio.`;
+IMPORTANTE: Completa sempre cada frase. Não cortes passos a meio. O público-alvo são gestores de PME sem conhecimento técnico.`;
 
   const raw = await chat({
     system:      SYSTEM_PROMPTS.remediationPlanner,
@@ -228,6 +294,7 @@ export async function generateRemediationForScan(
     size:   org?.size,
     orgId:  organizationId,
     plan,
+    target: scan.target ?? "",
   };
 
   // Process sequentially to avoid rate limiting
