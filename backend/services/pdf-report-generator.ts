@@ -303,6 +303,37 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
 }
 
 // ---------------------------------------------------------------------------
+// DNS record examples for email-related vulnerabilities
+// Gives the user the exact TXT record to copy into their DNS provider.
+// ---------------------------------------------------------------------------
+
+function getDnsExample(cveId: string, component: string, target: string): string | null {
+  const id = (cveId + " " + component).toLowerCase();
+  const domain = target.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+
+  if (/spf/i.test(id)) {
+    return (
+      `Registo TXT a publicar no domínio raiz ("@") em ${domain}:\n` +
+      `  v=spf1 mx ~all\n` +
+      `  (Substitui "mx" pelos servidores de email do teu fornecedor, ex: include:_spf.google.com)`
+    );
+  }
+  if (/dmarc/i.test(id)) {
+    return (
+      `Registo TXT a publicar em _dmarc.${domain}:\n` +
+      `  v=DMARC1; p=quarantine; rua=mailto:dmarc@${domain}; pct=100`
+    );
+  }
+  if (/dkim/i.test(id)) {
+    return (
+      `Registo TXT a publicar em default._domainkey.${domain}:\n` +
+      `  Obtém o valor da chave pública DKIM no painel do teu servidor/fornecedor de email (ex: Google Workspace, Microsoft 365)`
+    );
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // TECHNICAL REPORT
 // ---------------------------------------------------------------------------
 
@@ -337,7 +368,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     const metaRows = [
       ["Alvo",          scan?.target ?? "—"],
       ["Modo de scan",  scan?.mode === "sme" ? "PME / Entidade Importante" : "Cadeia de Abastecimento"],
-      ["Estado",        scan?.status ?? "—"],
+      ["Estado",        ({ completed: "Concluído", running: "Em execução", pending: "Na fila", failed: "Falhou" } as Record<string, string>)[scan?.status ?? ""] ?? scan?.status ?? "—"],
       ["Início",        fmtFull(scan?.startedAt)],
       ["Conclusão",     fmtFull(scan?.completedAt)],
       ["Score global",  `${overall}/100 — ${scoreLabel(overall)}`],
@@ -354,19 +385,29 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     });
     y += 14;
 
-    // Ports & Services
-    y = drawSectionTitle(doc, "Portos & Serviços Expostos", y);
-    if (openPorts.length > 0) {
-      // Header
+    // Ports & Services — only list ports with known CVEs; clean ports are noise for PMEs
+    const exposedPorts = openPorts.filter(p => (p.cves ?? []).length > 0);
+    const cleanCount   = openPorts.length - exposedPorts.length;
+
+    y = drawSectionTitle(doc, "Portos com Vulnerabilidades Conhecidas", y);
+    if (exposedPorts.length > 0) {
+      // Summary line
+      doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+         .text(
+           `${openPorts.length} porto(s) analisado(s) · ${cleanCount} sem CVEs conhecidas (ocultados) · ${exposedPorts.length} com vulnerabilidades listados abaixo.`,
+           MARGIN, y + 1, { width: CONTENT_W }
+         );
+      y += 16;
+      // Table header
       doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(C.navy).fill();
       doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white);
-      doc.text("Porto",       MARGIN + 6,   y + 5, { width: 50 });
-      doc.text("Protocolo",   MARGIN + 60,  y + 5, { width: 60 });
-      doc.text("Serviço",     MARGIN + 125, y + 5, { width: 100 });
+      doc.text("Porto",            MARGIN + 6,   y + 5, { width: 50 });
+      doc.text("Protocolo",        MARGIN + 60,  y + 5, { width: 60 });
+      doc.text("Serviço",          MARGIN + 125, y + 5, { width: 100 });
       doc.text("Produto / Versão", MARGIN + 230, y + 5, { width: 160 });
-      doc.text("CVEs",        MARGIN + 395, y + 5, { width: 60, align: "center" });
+      doc.text("CVEs",             MARGIN + 395, y + 5, { width: 60, align: "center" });
       y += 18;
-      openPorts.slice(0, 20).forEach((p, i) => {
+      exposedPorts.slice(0, 20).forEach((p, i) => {
         if (y > 730) { doc.addPage({ size: "A4", margin: 0 }); drawRunningHeader(doc, scan?.target ?? "—", "Técnico"); y = 90; }
         const rowBg = i % 2 === 0 ? C.bg : C.white;
         doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
@@ -376,26 +417,26 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
            .text(p.protocol.toUpperCase(), MARGIN + 60, y + 5, { width: 60 });
         doc.fillColor(C.text).text(p.service, MARGIN + 125, y + 5, { width: 100 });
         doc.fillColor(C.muted).text(truncate(`${p.product ?? ""} ${p.version ?? ""}`.trim() || "—", 35), MARGIN + 230, y + 5, { width: 160 });
-        const cveCount = (p.cves ?? []).length;
-        if (cveCount > 0) {
-          doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
-          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
-             .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
-        } else {
-          doc.fontSize(8).font("Helvetica").fillColor(C.success)
-             .text("Limpo", MARGIN + 398, y + 5, { width: 48, align: "center" });
-        }
+        const cveCount = p.cves.length;
+        doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
+        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
+           .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
         y += 18;
       });
-      if (openPorts.length > 20) {
+      if (exposedPorts.length > 20) {
         doc.fontSize(8).font("Helvetica").fillColor(C.muted)
-           .text(`+ ${openPorts.length - 20} porto(s) adicional(is) — ver scan completo na plataforma.`, MARGIN, y + 4);
+           .text(`+ ${exposedPorts.length - 20} porto(s) com CVEs adicionais — ver detalhe completo na plataforma.`, MARGIN, y + 4);
         y += 18;
       }
+    } else if (openPorts.length > 0) {
+      doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
+      doc.fontSize(9).font("Helvetica").fillColor(C.success)
+         .text(`✓ ${openPorts.length} porto(s) analisado(s) — nenhum com CVEs conhecidas.`, MARGIN + 10, y + 10);
+      y += 30;
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
       doc.fontSize(9).font("Helvetica").fillColor(C.success)
-         .text("✓ Nenhum porto exposto detectado nas fontes consultadas.", MARGIN + 10, y + 10);
+         .text("✓ Nenhum porto exposto detetado nas fontes consultadas.", MARGIN + 10, y + 10);
       y += 30;
     }
     y += 6;
@@ -410,36 +451,76 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     if (vulns.length > 0) {
       const sorted = [...vulns].sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
       let pageNum = 3;
+      const TEXT_W = CONTENT_W - 20; // width available for description/remediation text
+
       sorted.forEach((v) => {
-        const cvss = parseFloat(v.cvssScore);
-        const linesNeeded = v.remediation ? 52 : 38;
-        if (y + linesNeeded > 760) {
+        // Calculate actual heights dynamically to prevent overlap
+        const descText  = v.description ?? "";
+        const remText   = v.remediation ? `↳ ${v.remediation}` : "";
+        const dnsExample = getDnsExample(v.cveId, v.affectedComponent, scan?.target ?? "");
+        const descH = doc.fontSize(8).font("Helvetica").heightOfString(descText, { width: TEXT_W });
+        const remH  = remText
+          ? doc.fontSize(8).font("Helvetica").heightOfString(remText, { width: TEXT_W }) + 4
+          : 0;
+        const dnsH  = dnsExample
+          ? doc.fontSize(7.5).font("Helvetica").heightOfString(dnsExample, { width: TEXT_W - 12 }) + 18
+          : 0;
+        const HEADER_H = 20; // CVE ID row
+        const PADDING  = 14; // top + bottom breathing room
+        const rowH = HEADER_H + descH + remH + dnsH + PADDING;
+
+        if (y + rowH > 760) {
           drawRunningFooter(doc, pageNum++);
           doc.addPage({ size: "A4", margin: 0 });
           drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
           y = 90;
         }
         const sColor = severityColor(v.severity);
-        // Left accent bar
-        doc.rect(MARGIN, y, 4, linesNeeded - 6).fillColor(sColor).fill();
-        // CVE ID + severity badge
+
+        // Left accent bar (full card height)
+        doc.rect(MARGIN, y, 4, rowH - 4).fillColor(sColor).fill();
+
+        // CVE ID line
         doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
-           .text(v.cveId, MARGIN + 12, y + 2, { continued: true, width: 180 });
-        doc.font("Helvetica").fillColor(C.muted)
-           .text(`  ·  CVSS ${v.cvssScore}  ·  ${v.affectedComponent}${v.port ? ` :${v.port}` : ""}`, { width: 220 });
-        doc.rect(MARGIN + 415, y, 80, 14).fillColor(sColor).fill();
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
-           .text(severityLabel(v.severity).toUpperCase(), MARGIN + 415, y + 3, { width: 80, align: "center" });
-        // Description
+           .text(v.cveId, MARGIN + 12, y + 4, { width: 200 });
         doc.fontSize(8).font("Helvetica").fillColor(C.muted)
-           .text(v.description ?? "", MARGIN + 12, y + 16, { width: CONTENT_W - 16 });
-        if (v.remediation) {
-          doc.fontSize(8).fillColor(C.brand)
-             .text(`↳ ${v.remediation}`, MARGIN + 12, y + 28, { width: CONTENT_W - 16 });
+           .text(
+             `CVSS ${v.cvssScore}  ·  ${v.affectedComponent}${v.port ? ` :${v.port}` : ""}`,
+             MARGIN + 215, y + 5, { width: 185 }
+           );
+
+        // Severity badge (top-right)
+        doc.rect(MARGIN + 415, y + 2, 80, 14).fillColor(sColor).fill();
+        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
+           .text(severityLabel(v.severity).toUpperCase(), MARGIN + 415, y + 5, { width: 80, align: "center" });
+
+        // Description — placed right below header row
+        const descY = y + HEADER_H;
+        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+           .text(descText, MARGIN + 12, descY, { width: TEXT_W });
+
+        // Remediation hint — placed below description
+        if (remText) {
+          const remY = descY + descH + 4;
+          doc.fontSize(8).font("Helvetica").fillColor(C.brand)
+             .text(remText, MARGIN + 12, remY, { width: TEXT_W });
         }
-        doc.moveTo(MARGIN, y + linesNeeded - 2).lineTo(PAGE_W - MARGIN, y + linesNeeded - 2)
+
+        // DNS record example box — concrete TXT record to copy/paste
+        if (dnsExample) {
+          const dnsY = descY + descH + remH + (remText ? 4 : 0) + 4;
+          doc.rect(MARGIN + 12, dnsY, TEXT_W, dnsH - 4).fillColor(C.bg).fill();
+          doc.rect(MARGIN + 12, dnsY, 3, dnsH - 4).fillColor(C.warning).fill();
+          doc.fontSize(7).font("Helvetica-Bold").fillColor(C.muted)
+             .text("Registo DNS (copiar para o seu fornecedor de domínio):", MARGIN + 20, dnsY + 4, { width: TEXT_W - 12 });
+          doc.fontSize(7.5).font("Helvetica").fillColor(C.navy)
+             .text(dnsExample, MARGIN + 20, dnsY + 14, { width: TEXT_W - 12 });
+        }
+
+        // Separator line
+        doc.moveTo(MARGIN, y + rowH - 2).lineTo(PAGE_W - MARGIN, y + rowH - 2)
            .strokeColor(C.border).lineWidth(0.4).stroke();
-        y += linesNeeded;
+        y += rowH;
       });
       drawRunningFooter(doc, 3);
     } else {
@@ -506,7 +587,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
         });
       } else {
         doc.fontSize(7.5).fillColor(C.success)
-           .text("✓ Sem issues detectados neste domínio", MARGIN + 38, y + 28, { width: CONTENT_W - 38 });
+           .text("✓ Sem problemas detetados neste domínio", MARGIN + 38, y + 28, { width: CONTENT_W - 38 });
       }
 
       doc.moveTo(MARGIN, y + rowH - 2).lineTo(PAGE_W - MARGIN, y + rowH - 2)
@@ -657,11 +738,11 @@ function drawScoreCircle(doc: PDFKit.PDFDocument, score: number, x: number, y: n
 function drawMethodologySection(doc: PDFKit.PDFDocument, y: number): number {
   y = drawSectionTitle(doc, "Metodologia & Limitações", y);
   const text =
-    "Este relatório foi gerado por scan agentless (sem agente instalado) utilizando as seguintes fontes de dados: " +
+    "Este relatório foi gerado por análise sem agentes (agentless) utilizando as seguintes fontes de dados: " +
     "Shodan Internet Intelligence (portos, serviços, CVEs), Censys (confirmação de serviços), " +
     "HIBP — Have I Been Pwned (breaches de credenciais), verificação directa TLS/SSL (portos 443/8443), " +
     "DNS lookup (SPF, DMARC, DKIM) e análise de HTTP Security Headers.\n\n" +
-    "Limitações: O scan agentless não acede a sistemas internos, bases de dados, aplicações autenticadas ou redes privadas. " +
+    "Limitações: A análise sem agentes não acede a sistemas internos, bases de dados, aplicações autenticadas ou redes privadas. " +
     "Vulnerabilidades internas, configurações de firewall interna e controlos organizacionais (políticas, formação, backups) " +
     "não são avaliados automaticamente — para esses controlos utilizar o Questionário NIS2 (42 controlos) integrado na plataforma. " +
     "Os scores são calculados com base em heurísticas de risco e devem ser complementados com uma auditoria presencial.";
