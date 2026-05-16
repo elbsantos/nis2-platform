@@ -340,16 +340,27 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
           >
             ← Artigo anterior
           </button>
-          <button
-            onClick={() => {
-              const idx = articles.indexOf(activeArticle);
-              if (idx < articles.length - 1) setActiveArticle(articles[idx + 1]);
-            }}
-            disabled={articles.indexOf(activeArticle) === articles.length - 1}
-            className="px-4 py-2 text-sm bg-blue-700 text-white rounded-md hover:bg-blue-800 disabled:opacity-40"
-          >
-            Artigo seguinte →
-          </button>
+          {articles.indexOf(activeArticle) < articles.length - 1 ? (
+            <button
+              onClick={() => {
+                const idx = articles.indexOf(activeArticle);
+                setActiveArticle(articles[idx + 1]);
+              }}
+              className="px-4 py-2 text-sm bg-blue-700 text-white rounded-md hover:bg-blue-800"
+            >
+              Artigo seguinte →
+            </button>
+          ) : (
+            !isCompleted && (
+              <button
+                onClick={handleComplete}
+                disabled={totalAnswered < 1 || completeMut.isPending}
+                className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-40"
+              >
+                {completeMut.isPending ? "A concluir…" : "Concluir avaliação ✓"}
+              </button>
+            )
+          )}
         </div>
       </main>
     </div>
