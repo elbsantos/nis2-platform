@@ -47,12 +47,12 @@ function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
   let currentPlatform = "all";
 
   for (const line of lines) {
-    // OS section headers: ### Windows, ### Linux / Ubuntu / Debian, etc.
-    if (/^#{1,3}\s*windows/i.test(line)) {
+    // OS section headers: ### Opção A/B, ### Windows, ### Linux / Ubuntu / Debian, etc.
+    if (/^#{1,3}.*(opção\s+b|windows)/i.test(line)) {
       currentPlatform = "windows";
       continue;
     }
-    if (/^#{1,3}\s*(linux|ubuntu|debian)/i.test(line)) {
+    if (/^#{1,3}.*(opção\s+a|linux|ubuntu|debian)/i.test(line)) {
       currentPlatform = "linux";
       continue;
     }
