@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 
 type Status = "todo" | "in_progress" | "done" | "wont_fix";
+type OsTab = "all" | "windows" | "linux";
 
 const STATUS_LABEL: Record<Status, string> = {
   todo:        "Por fazer",
@@ -33,11 +34,35 @@ const PLATFORM_ICONS: Record<string, string> = {
   all:     "🔧",
 };
 
+const OS_TAB_LABELS: Record<OsTab, string> = {
+  all:     "Todos",
+  windows: "Windows",
+  linux:   "Linux / Ubuntu",
+};
+
+/** Returns which OS tabs to show and filter steps accordingly. */
+function getVisibleSteps(steps: any[], activeTab: OsTab) {
+  if (activeTab === "all") return steps.map((s, i) => ({ ...s, displayOrder: i + 1 }));
+  return steps
+    .filter((s) => s.platform === activeTab || s.platform === "all")
+    .map((s, i) => ({ ...s, displayOrder: i + 1 }));
+}
+
+/** Detects which OS-specific platforms are present (excluding "all"). */
+function detectOsTabs(steps: any[]): OsTab[] {
+  const platforms = new Set(steps.map((s) => s.platform as string));
+  const tabs: OsTab[] = [];
+  if (platforms.has("windows")) tabs.push("windows");
+  if (platforms.has("linux"))   tabs.push("linux");
+  return tabs;
+}
+
 export default function Remediation() {
   const [searchParams]         = useSearchParams();
   const scanIdParam            = searchParams.get("scanId");
   const [statusFilter, setStatusFilter] = useState<Status | undefined>(undefined);
   const [expanded, setExpanded]         = useState<number | null>(null);
+  const [osTab, setOsTab]               = useState<Record<number, OsTab>>({});
   const [generating, setGenerating]     = useState(false);
   const [genError, setGenError]         = useState<string | null>(null);
   const [genSuccess, setGenSuccess]     = useState<string | null>(null);
@@ -222,17 +247,44 @@ export default function Remediation() {
                 {/* Expanded steps */}
                 {isOpen && (
                   <div className="px-4 pb-4 border-t border-gray-100">
-                    <div className="mt-4 space-y-3">
-                      {steps.map((step: any) => (
-                        <div key={step.order} className="flex gap-3">
+                    {/* OS tabs — only shown when there are Windows/Linux-specific steps */}
+                    {(() => {
+                      const osTabs = detectOsTabs(steps);
+                      if (osTabs.length === 0) return null;
+                      const activeTab = osTab[item.id] ?? "all";
+                      const allTabs: OsTab[] = ["all", ...osTabs];
+                      return (
+                        <div className="flex gap-1 mt-4 mb-3 border-b border-gray-100 pb-2">
+                          {allTabs.map((tab) => (
+                            <button
+                              key={tab}
+                              onClick={() => setOsTab((prev) => ({ ...prev, [item.id]: tab }))}
+                              className={`px-3 py-1 text-xs rounded-t font-medium transition-colors ${
+                                activeTab === tab
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:bg-gray-100"
+                              }`}
+                            >
+                              {tab !== "all" && (PLATFORM_ICONS[tab] ?? "")} {OS_TAB_LABELS[tab]}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    <div className="mt-2 space-y-3">
+                      {getVisibleSteps(steps, osTab[item.id] ?? "all").map((step: any) => (
+                        <div key={`${step.platform}-${step.order}`} className="flex gap-3">
                           <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center">
-                            {step.order}
+                            {step.displayOrder}
                           </span>
                           <div className="flex-1">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="text-xs">{PLATFORM_ICONS[step.platform] ?? "🔧"}</span>
-                              <span className="text-xs text-gray-400 capitalize">{step.platform}</span>
-                            </div>
+                            {(osTab[item.id] ?? "all") === "all" && (
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-xs">{PLATFORM_ICONS[step.platform] ?? "🔧"}</span>
+                                <span className="text-xs text-gray-400 capitalize">{step.platform}</span>
+                              </div>
+                            )}
                             <p className="text-sm text-gray-700">{step.instruction}</p>
                           </div>
                         </div>

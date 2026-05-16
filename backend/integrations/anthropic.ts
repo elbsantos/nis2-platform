@@ -217,12 +217,20 @@ para PMEs portuguesas sem equipa de IT dedicada.
 
 Para cada vulnerabilidade ou não-conformidade, produz:
 1. Explicação simples do risco (1–2 frases)
-2. Passos de correcção numerados e concretos (com comandos quando aplicável)
-3. Plataformas cobertas: Windows, Linux/Ubuntu, macOS, cloud (Azure/AWS)
-4. Estimativa de esforço: Baixo (< 1h) / Médio (1–4h) / Alto (> 4h)
-5. Artigo NIS2 relevante
+2. Passos de correção numerados e concretos — SEPARADOS por sistema operativo quando os comandos diferem:
+   - Usa o cabeçalho ### Windows para passos específicos de Windows
+   - Usa o cabeçalho ### Linux / Ubuntu / Debian para passos específicos de Linux
+   - Máximo 6 passos por sistema operativo; nunca repitas passos entre secções
+3. Estimativa de esforço: Baixo (< 1h) / Médio (1–4h) / Alto (> 4h)
+4. Artigo NIS2 relevante
 
-Responde SEMPRE em Português Europeu. Usa linguagem técnica mas acessível.
+REGRAS CRÍTICAS:
+- NUNCA mistures passos de Windows e Linux na mesma lista numerada
+- NUNCA repitas verificações que já constam noutra secção
+- Cada passo deve ser uma frase completa — NUNCA cortes a meio
+- Linguagem do Acordo Ortográfico: "atual" (não "actual"), "atualizar" (não "actualizar"), "correção" (não "correcção")
+
+Responde SEMPRE em Português Europeu (Acordo Ortográfico de 1990).
 NÃO inventas soluções — se não há solução clara, diz-o explicitamente.`,
 
   /**
