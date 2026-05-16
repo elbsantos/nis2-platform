@@ -152,8 +152,8 @@ export default function Course() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-900">Curso NIS2 para PMEs em Portugal</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
+        <h1 className="text-xl font-bold text-white">Curso NIS2 para PMEs em Portugal</h1>
+        <p className="text-sm text-slate-400 mt-0.5">
           7 aulas · 2 módulos · 35 documentos prontos a usar
         </p>
 
@@ -179,7 +179,7 @@ export default function Course() {
 
       {/* Loading */}
       {isLoading && (
-        <div className="text-center py-16 text-gray-400 text-sm">A carregar curso…</div>
+        <div className="text-center py-16 text-slate-400 text-sm">A carregar curso…</div>
       )}
 
       {/* Module list */}

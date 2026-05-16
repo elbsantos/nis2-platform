@@ -111,8 +111,8 @@ export default function Remediation() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Planos de Remediação</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <h1 className="text-xl font-bold text-white">Planos de Remediação</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
             Gerados por IA com base nos resultados dos scans NIS2
           </p>
         </div>
@@ -148,8 +148,8 @@ export default function Remediation() {
             onClick={() => setStatusFilter(undefined)}
             className={`px-3 py-1 text-xs rounded-full border transition-colors ${
               !statusFilter
-                ? "bg-gray-900 text-white border-gray-900"
-                : "text-gray-600 border-gray-200 hover:bg-gray-50"
+                ? "bg-white text-gray-900 border-white"
+                : "text-slate-300 border-slate-600 hover:bg-slate-700/50"
             }`}
           >
             Todos ({items.length})
@@ -160,8 +160,8 @@ export default function Remediation() {
               onClick={() => setStatusFilter(statusFilter === s ? undefined : s)}
               className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                 statusFilter === s
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "text-gray-600 border-gray-200 hover:bg-gray-50"
+                  ? "bg-white text-gray-900 border-white"
+                  : "text-slate-300 border-slate-600 hover:bg-slate-700/50"
               }`}
             >
               {STATUS_LABEL[s]} ({counts?.[s] ?? 0})
@@ -172,15 +172,15 @@ export default function Remediation() {
 
       {/* Loading */}
       {isLoading && (
-        <div className="text-center py-16 text-gray-400 text-sm">A carregar…</div>
+        <div className="text-center py-16 text-slate-400 text-sm">A carregar…</div>
       )}
 
       {/* Empty */}
       {!isLoading && items?.length === 0 && !scanIdParam && (
         <div className="text-center py-16">
           <div className="text-4xl mb-4">🛠️</div>
-          <p className="text-gray-500 font-medium mb-2">Sem planos de remediação</p>
-          <p className="text-sm text-gray-400">
+          <p className="text-slate-300 font-medium mb-2">Sem planos de remediação</p>
+          <p className="text-sm text-slate-400">
             Acede aos resultados de um scan e clica em "Gerar plano de remediação" para criar planos com IA.
           </p>
         </div>
@@ -188,7 +188,7 @@ export default function Remediation() {
 
       {!isLoading && items?.length === 0 && scanIdParam && (
         <div className="text-center py-12">
-          <p className="text-gray-400 text-sm mb-4">
+          <p className="text-slate-400 text-sm mb-4">
             Ainda não há planos gerados para este scan.
           </p>
           <button

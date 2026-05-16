@@ -44,8 +44,8 @@ function SessionList() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Questionário NIS2</h1>
-          <p className="text-sm text-gray-400 mt-0.5">42 controlos do Art. 21(2) da Diretiva NIS2</p>
+          <h1 className="text-xl font-bold text-white">Questionário NIS2</h1>
+          <p className="text-sm text-slate-400 mt-0.5">42 controlos do Art. 21(2) da Diretiva NIS2</p>
         </div>
         <button
           onClick={() => startMut.mutate({})}
@@ -63,8 +63,8 @@ function SessionList() {
       {!isLoading && sessions?.length === 0 && (
         <div className="text-center py-16">
           <div className="text-4xl mb-4">📋</div>
-          <p className="text-gray-500 font-medium mb-2">Ainda não fez nenhuma avaliação</p>
-          <p className="text-sm text-gray-400 mb-6">
+          <p className="text-slate-300 font-medium mb-2">Ainda não fez nenhuma avaliação</p>
+          <p className="text-sm text-slate-400 mb-6">
             O questionário avalia a conformidade da sua empresa com os 42 controlos obrigatórios do Art. 21(2) da NIS2.
           </p>
           <button
@@ -198,11 +198,11 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
       {/* Left sidebar — article navigation */}
       <aside className="w-52 shrink-0">
         <div className="sticky top-6 space-y-1">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
             {totalAnswered}/42 respondidos
           </p>
           {/* Progress bar */}
-          <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
+          <div className="w-full bg-slate-700 rounded-full h-1.5 mb-4">
             <div
               className="h-1.5 rounded-full bg-blue-600 transition-all"
               style={{ width: `${(totalAnswered / 42) * 100}%` }}
@@ -219,7 +219,7 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
                   activeArticle === slug
                     ? "bg-blue-700 text-white"
-                    : "text-gray-600 hover:bg-gray-100"
+                    : "text-slate-300 hover:bg-[#152744]"
                 }`}
               >
                 <span className="font-mono text-xs mr-1">
@@ -234,7 +234,7 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
             <button
               onClick={handleSave}
               disabled={saving || isCompleted}
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              className="w-full px-3 py-2 text-xs border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700/50 disabled:opacity-40"
             >
               {saving ? "A guardar…" : "Guardar progresso"}
             </button>
@@ -260,10 +260,10 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
         )}
 
         <div className="mb-4">
-          <h2 className="text-lg font-bold text-gray-900">
+          <h2 className="text-lg font-bold text-white">
             Art. 21(2)({activeArticle}) — {ARTICLE_LABELS[activeArticle]}
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             {answeredIn(activeArticle)}/{byArticle(activeArticle).length} controlos respondidos
           </p>
         </div>
@@ -336,7 +336,7 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
               if (idx > 0) setActiveArticle(articles[idx - 1]);
             }}
             disabled={articles.indexOf(activeArticle) === 0}
-            className="px-4 py-2 text-sm border border-gray-200 rounded-md text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-slate-600 rounded-md text-slate-300 disabled:opacity-40 hover:bg-slate-700/50"
           >
             ← Artigo anterior
           </button>

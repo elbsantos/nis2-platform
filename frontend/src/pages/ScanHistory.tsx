@@ -34,8 +34,8 @@ export default function ScanHistory() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Histórico de Scans</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Todos os scans da tua organização</p>
+          <h1 className="text-xl font-bold text-white">Histórico de Scans</h1>
+          <p className="text-sm text-slate-400 mt-0.5">Todos os scans da tua organização</p>
         </div>
         <Link
           to="/scan/start"
@@ -47,7 +47,7 @@ export default function ScanHistory() {
 
       {/* Loading */}
       {isLoading && (
-        <div className="text-center py-16 text-gray-400 text-sm">A carregar…</div>
+        <div className="text-center py-16 text-slate-400 text-sm">A carregar…</div>
       )}
 
       {/* Error */}
@@ -60,7 +60,7 @@ export default function ScanHistory() {
       {/* Empty */}
       {!isLoading && !error && scans?.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-gray-400 text-sm mb-4">Ainda não executaste nenhum scan.</p>
+          <p className="text-slate-400 text-sm mb-4">Ainda não executaste nenhum scan.</p>
           <Link
             to="/scan/start"
             className="inline-block px-4 py-2 bg-blue-700 text-white text-sm rounded-md hover:bg-blue-800"
@@ -132,15 +132,15 @@ export default function ScanHistory() {
             <button
               onClick={() => setPage((p) => p - 1)}
               disabled={!hasPrev}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-md text-gray-600 disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-sm border border-slate-600 rounded-md text-slate-300 disabled:opacity-40 hover:bg-slate-700/50 disabled:cursor-not-allowed"
             >
               ← Anterior
             </button>
-            <span className="text-xs text-gray-400">Página {page + 1}</span>
+            <span className="text-xs text-slate-400">Página {page + 1}</span>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!hasNext}
-              className="px-3 py-1.5 text-sm border border-gray-200 rounded-md text-gray-600 disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-sm border border-slate-600 rounded-md text-slate-300 disabled:opacity-40 hover:bg-slate-700/50 disabled:cursor-not-allowed"
             >
               Seguinte →
             </button>

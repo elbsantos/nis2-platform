@@ -19,8 +19,8 @@ function RequireAuth() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500 text-sm">A carregar…</div>
+      <div className="min-h-screen bg-[#0b1526] flex items-center justify-center">
+        <div className="text-slate-400 text-sm">A carregar…</div>
       </div>
     );
   }
@@ -36,14 +36,14 @@ function RequireAuth() {
 function AppNav() {
   const { user, logout } = useAuth();
   const base     = "px-3 py-2 text-sm font-medium rounded-md transition-colors";
-  const active   = `${base} bg-blue-700 text-white`;
-  const inactive = `${base} text-gray-600 hover:bg-gray-100`;
+  const active   = `${base} bg-[#1f3864] text-white`;
+  const inactive = `${base} text-slate-300 hover:bg-[#152744] hover:text-white`;
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-4">
+    <nav className="bg-[#0f1e38] border-b-2 border-[#b8860b] px-4">
       <div className="max-w-5xl mx-auto flex items-center gap-1 h-12">
-        <NavLink to="/" className="font-bold text-blue-700 text-sm mr-4 hover:text-blue-900">
-          NIS2 PT
+        <NavLink to="/" className="font-bold text-white text-sm mr-4 hover:text-[#f0c040] transition-colors">
+          NIS2 <span className="text-[#f0c040]">PT</span>
         </NavLink>
         <NavLink to="/scan/start"    className={({ isActive }) => isActive ? active : inactive}>Novo scan</NavLink>
         <NavLink to="/scan/history"  className={({ isActive }) => isActive ? active : inactive}>Histórico</NavLink>
@@ -52,10 +52,10 @@ function AppNav() {
         <NavLink to="/course"        className={({ isActive }) => isActive ? active : inactive}>Curso</NavLink>
         <NavLink to="/billing"       className={({ isActive }) => isActive ? active : inactive}>Planos</NavLink>
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-gray-400 hidden sm:block">{user?.email}</span>
+          <span className="text-xs text-slate-400 hidden sm:block">{user?.email}</span>
           <button
             onClick={() => logout().then(() => window.location.href = "/")}
-            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+            className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-[#152744] transition-colors"
           >
             Sair
           </button>
@@ -68,7 +68,7 @@ function AppNav() {
 // ── Authenticated layout ──────────────────────────────────────────────────────
 function AppLayout() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0b1526]">
       <AppNav />
       <Outlet />
     </div>

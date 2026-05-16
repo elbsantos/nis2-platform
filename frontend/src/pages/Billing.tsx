@@ -327,7 +327,7 @@ function FaqSection() {
 
   return (
     <div className="mt-16 max-w-2xl mx-auto">
-      <h2 className="text-lg font-bold text-gray-900 mb-6 text-center">
+      <h2 className="text-lg font-bold text-white mb-6 text-center">
         Perguntas frequentes
       </h2>
       <div className="space-y-3">
@@ -402,8 +402,8 @@ export default function Billing() {
 
       {/* Header */}
       <div className="text-center mb-10">
-        <h1 className="text-2xl font-bold text-gray-900">Planos e Preços</h1>
-        <p className="text-gray-500 mt-2 text-sm">
+        <h1 className="text-2xl font-bold text-white">Planos e Preços</h1>
+        <p className="text-slate-400 mt-2 text-sm">
           Conformidade NIS2 para PMEs portuguesas. Sem surpresas, sem contratos anuais.
         </p>
       </div>
@@ -455,7 +455,7 @@ export default function Billing() {
       </div>
 
       {/* Trust signals */}
-      <div className="mt-10 flex flex-wrap justify-center gap-6 text-xs text-gray-400">
+      <div className="mt-10 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
         <span>🔒 Pagamento seguro via Stripe</span>
         <span>🇵🇹 Fatura com IVA português</span>
         <span>↩️ Cancelamento sem penalização</span>
