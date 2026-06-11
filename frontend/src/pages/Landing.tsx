@@ -179,6 +179,7 @@ export default function Landing() {
 
   return (
     <div className="lp-page">
+
       {/* ANNOUNCEMENT */}
       <div className="announce">
         ⚠️&nbsp; Prazo de conformidade NIS2 em Portugal:&nbsp;
@@ -187,77 +188,120 @@ export default function Landing() {
 
       {/* NAV */}
       <nav>
-        <div className="nav-logo">NIS2 para <span>PMEs</span> em Portugal</div>
-        <div className="nav-links">
-          <Link to="/login" className="nav-link-ghost">Entrar</Link>
-          <Link to="/register" className="nav-cta">Começar Grátis →</Link>
-        </div>
+        <div className="nav-logo">CISPLAN <span>PT</span></div>
+        <ul className="nav-links-inline">
+          <li><a href="#scanner">Scanner</a></li>
+          <li><a href="#curso">Curso</a></li>
+          <li><a href="#dossier">Dossier</a></li>
+          <li><a href="#precos">Preços</a></li>
+          <li><Link to="/login" className="nav-link-ghost">Entrar</Link></li>
+        </ul>
+        <Link to="/register" className="nav-cta">Começar Grátis →</Link>
       </nav>
 
-      {/* HERO */}
+      {/* HERO — split-screen com dashboard mockup */}
       <section className="hero">
-        <div className="hero-content fade-in">
-          <div className="hero-badge">URGÊNCIA LEGAL · DL 125/2025</div>
-          <h1>A sua empresa<br />está em conformidade<br />com a <em>NIS2</em>?</h1>
-          <p className="hero-subtitle">
-            A plataforma completa para PMEs portuguesas cumprirem o Decreto-Lei 125/2025 —
-            scanner automático, curso certificado e remediação guiada por IA.
-          </p>
-          <div className="hero-proof">
-            <div className="hero-proof-item">
-              <span className="num">7</span>
-              <span className="label">Aulas</span>
-            </div>
-            <div className="hero-divider" />
-            <div className="hero-proof-item">
-              <span className="num">35</span>
-              <span className="label">Documentos</span>
-            </div>
-            <div className="hero-divider" />
-            <div className="hero-proof-item">
-              <span className="num">42</span>
-              <span className="label">Controlos NIS2</span>
-            </div>
-            <div className="hero-divider" />
-            <div className="hero-proof-item">
-              <span className="num">0</span>
-              <span className="label">Consultores</span>
-            </div>
-          </div>
-          <div className="hero-cta-group">
-            <Link to="/register" className="btn-primary">Começar Gratuitamente</Link>
-            <a href="#scanner" className="btn-secondary">Ver como funciona ↓</a>
-          </div>
-        </div>
+        <div className="hero-grid">
 
-        <div className="hero-card fade-in">
-          <div className="hero-card-label">O que está em risco sem conformidade</div>
-          <div className="law-item">
-            <div className="law-icon red">⚖️</div>
-            <div className="law-text">
-              <strong>Coimas até €10.000.000</strong>
-              <span>Ou 2% do volume de negócios mundial — o que for mais elevado. Entidades Essenciais.</span>
+          {/* LEFT */}
+          <div className="hero-left fade-in">
+            <div className="hero-badge">URGÊNCIA LEGAL · DL 125/2025</div>
+            <h1>A sua empresa<br />está em conformidade<br />com a <em>NIS2</em>?</h1>
+            <p className="hero-subtitle">
+              A plataforma completa para PMEs portuguesas cumprirem o Decreto-Lei 125/2025 —
+              scanner automático, curso certificado e remediação guiada por IA.
+            </p>
+            <div className="hero-stats">
+              <div><strong>7</strong><span>Aulas</span></div>
+              <div><strong>35</strong><span>Documentos</span></div>
+              <div><strong>42</strong><span>Controlos NIS2</span></div>
+              <div><strong>0</strong><span>Consultores</span></div>
+            </div>
+            <div className="hero-cta-group">
+              <Link to="/register" className="btn-primary">Começar Gratuitamente</Link>
+              <a href="#scanner" className="btn-secondary">Ver como funciona ↓</a>
+            </div>
+            <div className="trust-bar">
+              <small>CONFORMIDADE MAPEADA A:</small>
+              <span>Decreto-Lei 125/2025</span>
+              <span>Directiva NIS2 (EU 2022/2555)</span>
+              <span>CNCS Portugal</span>
             </div>
           </div>
-          <div className="law-item">
-            <div className="law-icon gold">👤</div>
-            <div className="law-text">
-              <strong>Responsabilidade pessoal dos gestores</strong>
-              <span>Suspensão de funções e coimas individuais até €1.000.000 por negligência comprovada.</span>
-            </div>
-          </div>
-          <div className="law-item">
-            <div className="law-icon red">📢</div>
-            <div className="law-text">
-              <strong>Publicidade da sanção</strong>
-              <span>O CNCS publica lista de empresas sancionadas — impacto reputacional imediato.</span>
-            </div>
-          </div>
-          <div className="law-item">
-            <div className="law-icon gold">🚫</div>
-            <div className="law-text">
-              <strong>Exclusão de concursos públicos</strong>
-              <span>Empresas em incumprimento podem perder contratos públicos e certificações de parceiros.</span>
+
+          {/* RIGHT — dashboard mockup */}
+          <div className="hero-right fade-in">
+            <div className="dashboard-frame">
+              <div className="browser-chrome">
+                <span className="dot red"></span>
+                <span className="dot yellow"></span>
+                <span className="dot green"></span>
+                <div className="url-bar">cisplan.pt/dashboard</div>
+              </div>
+              <div className="dashboard-mockup">
+                <div className="mockup-stats">
+                  <div className="mockup-stat">
+                    <div className="stat-num green">93</div>
+                    <div className="stat-label">Score NIS2</div>
+                  </div>
+                  <div className="mockup-stat">
+                    <div className="stat-num gold">1</div>
+                    <div className="stat-label">Vulnerabilidades</div>
+                  </div>
+                  <div className="mockup-stat">
+                    <div className="stat-num red">0</div>
+                    <div className="stat-label">Críticas</div>
+                  </div>
+                  <div className="mockup-stat">
+                    <div className="stat-num">4s</div>
+                    <div className="stat-label">Duração</div>
+                  </div>
+                </div>
+                <div className="mockup-chart">
+                  <svg viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="150,30 240,90 220,180 80,180 60,90"
+                             fill="none" stroke="#2a4470" strokeWidth="1" opacity="0.4"/>
+                    <polygon points="150,60 210,100 195,160 105,160 90,100"
+                             fill="none" stroke="#2a4470" strokeWidth="1" opacity="0.4"/>
+                    <polygon points="150,90 180,110 170,140 130,140 120,110"
+                             fill="none" stroke="#2a4470" strokeWidth="1" opacity="0.4"/>
+                    <polygon points="150,35 235,92 218,178 82,178 65,92"
+                             fill="rgba(240,192,64,0.15)" stroke="#f0c040" strokeWidth="2"/>
+                    <text x="150" y="22" fill="#94a3b8" fontSize="9" textAnchor="middle">Art. 21(2)(a)</text>
+                    <text x="248" y="96" fill="#94a3b8" fontSize="9">(b)</text>
+                    <text x="222" y="196" fill="#94a3b8" fontSize="9">(c)</text>
+                    <text x="52" y="196" fill="#94a3b8" fontSize="9">(d)</text>
+                    <text x="36" y="96" fill="#94a3b8" fontSize="9">(e)</text>
+                  </svg>
+                </div>
+                <div className="mockup-articles">
+                  <div className="article-row">
+                    <span className="art-label">Art. 21(2)(a)</span>
+                    <div className="art-bar"><div className="art-fill" style={{ width: "100%", background: "#10b981" }}></div></div>
+                    <span className="art-score">100</span>
+                  </div>
+                  <div className="article-row">
+                    <span className="art-label">Art. 21(2)(b)</span>
+                    <div className="art-bar"><div className="art-fill" style={{ width: "100%", background: "#10b981" }}></div></div>
+                    <span className="art-score">100</span>
+                  </div>
+                  <div className="article-row">
+                    <span className="art-label">Art. 21(2)(c)</span>
+                    <div className="art-bar"><div className="art-fill" style={{ width: "96%", background: "#10b981" }}></div></div>
+                    <span className="art-score">96</span>
+                  </div>
+                  <div className="article-row">
+                    <span className="art-label">Art. 21(2)(d)</span>
+                    <div className="art-bar"><div className="art-fill" style={{ width: "88%", background: "#f0c040" }}></div></div>
+                    <span className="art-score">88</span>
+                  </div>
+                  <div className="article-row">
+                    <span className="art-label">Art. 21(2)(e)</span>
+                    <div className="art-bar"><div className="art-fill" style={{ width: "72%", background: "#f59e0b" }}></div></div>
+                    <span className="art-score">72</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -277,30 +321,55 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* PROBLEM */}
+      {/* PROBLEM — grelha 4 colunas com card-data */}
       <section className="problem">
-        <div className="section-label">O Problema</div>
-        <h2>Porque é que a maioria das PMEs não está preparada</h2>
-        <p className="problem-intro">
-          A NIS2 é uma diretiva europeia complexa traduzida em 125 artigos de legislação portuguesa.
-          Os consultores cobram entre €15.000 e €50.000 por projecto de conformidade. A maioria das PMEs
-          fica paralisada — sem saber por onde começar.
-        </p>
-        <div className="problem-grid">
-          <div className="problem-card fade-in">
-            <div className="problem-num">01</div>
-            <h3>Linguagem jurídica inacessível</h3>
-            <p>Os textos legais são escritos para advogados, não para gestores. Sem tradução prática, é impossível saber o que fazer concretamente.</p>
+        <div className="container">
+          <div className="section-header">
+            <span className="section-tag red">O PROBLEMA</span>
+            <h2>Porque é que a maioria das PMEs não está preparada</h2>
+            <p className="subtitle">
+              A NIS2 é uma diretiva europeia complexa traduzida em 125 artigos de legislação portuguesa.
+              Os consultores cobram entre €15.000 e €50.000 por projecto de conformidade. A maioria das PMEs
+              fica paralisada — sem saber por onde começar.
+            </p>
           </div>
-          <div className="problem-card fade-in">
-            <div className="problem-num">02</div>
-            <h3>Consultores demasiado caros</h3>
-            <p>Para uma PME com 50 colaboradores, um projecto de conformidade típico custa mais do que um colaborador a tempo inteiro durante um ano.</p>
-          </div>
-          <div className="problem-card fade-in">
-            <div className="problem-num">03</div>
-            <h3>Prazos que não esperam</h3>
-            <p>O DL 125/2025 já está em vigor. O CNCS tem poderes de inspecção e pode auditar a qualquer momento — sem aviso prévio.</p>
+          <div className="problem-grid">
+            <div className="problem-card fade-in">
+              <div className="card-num">01</div>
+              <h3>Linguagem jurídica inacessível</h3>
+              <p>Os textos legais são escritos para advogados, não para gestores. Sem tradução prática, é impossível saber o que fazer concretamente.</p>
+              <div className="card-data">
+                <span className="data-label">Artigos do DL 125/2025</span>
+                <span className="data-value">125</span>
+              </div>
+            </div>
+            <div className="problem-card fade-in">
+              <div className="card-num">02</div>
+              <h3>Consultores demasiado caros</h3>
+              <p>Para uma PME com 50 colaboradores, um projecto de conformidade típico custa mais do que um colaborador a tempo inteiro durante um ano.</p>
+              <div className="card-data">
+                <span className="data-label">Custo médio anual</span>
+                <span className="data-value">€15K–€50K</span>
+              </div>
+            </div>
+            <div className="problem-card fade-in">
+              <div className="card-num">03</div>
+              <h3>Prazos que não esperam</h3>
+              <p>O DL 125/2025 já está em vigor. O CNCS tem poderes de inspecção e pode auditar a qualquer momento — sem aviso prévio.</p>
+              <div className="card-data">
+                <span className="data-label">Coima máxima</span>
+                <span className="data-value red">€10M</span>
+              </div>
+            </div>
+            <div className="problem-card fade-in">
+              <div className="card-num">04</div>
+              <h3>Sem ponto de partida claro</h3>
+              <p>A maioria das PMEs sabe que tem de fazer "algo" mas não sabe por onde começar nem em que ordem, nem o que o CNCS irá pedir.</p>
+              <div className="card-data">
+                <span className="data-label">PMEs em incumprimento</span>
+                <span className="data-value">~70%</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -365,65 +434,115 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* SCANNER SECTION */}
+      {/* SCANNER — split-screen com mockup */}
       <section className="scanner" id="scanner">
-        <div className="section-label">Plataforma SaaS</div>
-        <h2>Scanner NIS2 Agentless — o diagnóstico em 5 minutos</h2>
-        <p className="scanner-intro">
-          Sem instalar software. Sem acesso às suas redes internas. O scanner analisa a presença
-          digital da sua empresa e gera um score NIS2 detalhado por artigo — o ponto de partida
-          para qualquer projecto de conformidade.
-        </p>
-        <div className="scanner-grid fade-in">
-          <div className="scanner-card">
-            <div className="scanner-icon">🔍</div>
-            <h3>Exposição Digital Completa</h3>
-            <p>Portos abertos, CVEs públicos, certificados TLS, SPF/DKIM/DMARC e headers HTTP (HSTS, CSP, X-Frame-Options) — a superfície de ataque completa, não apenas a rede.</p>
+        <div className="feature-split">
+          <div className="feature-text fade-in">
+            <span className="section-tag blue">SCANNER NIS2 AGENTLESS</span>
+            <h2>Diagnóstico em 5 minutos<br />sem instalar software</h2>
+            <p>
+              Inserir o domínio. Verificar ownership via DNS TXT. Receber score NIS2 detalhado
+              por artigo. Tudo sem agentes, sem acesso à rede interna, sem complicações.
+            </p>
+            <ul className="feature-list">
+              <li>
+                <strong>Exposição Digital Completa</strong>
+                <span>Portos abertos, CVEs públicos, TLS, SPF/DKIM/DMARC, headers HTTP</span>
+              </li>
+              <li>
+                <strong>Scan em Lote + Subdomínios</strong>
+                <span>Múltiplos domínios e subdomínios em simultâneo — Pro: 15 targets · MSSP: 50 targets</span>
+              </li>
+              <li>
+                <strong>Score NIS2 por Artigo</strong>
+                <span>Pontuação 0–100 para cada requisito do Art. 21(2) da Directiva</span>
+              </li>
+              <li>
+                <strong>Remediação Guiada por IA</strong>
+                <span>Plano personalizado gerado por IA com passos concretos para cada lacuna</span>
+              </li>
+            </ul>
+            <Link to="/register" className="btn-primary">Iniciar Scanner Gratuito →</Link>
+            <small className="cta-fine-print">1 scan/mês gratuito · Sem cartão de crédito · Resultado em &lt;5 min</small>
           </div>
-          <div className="scanner-card">
-            <div className="scanner-icon">🌐</div>
-            <h3>Scan em Lote + Subdomínios</h3>
-            <p>Descubra automaticamente os subdomínios ativos via Certificate Transparency e scane múltiplos targets em paralelo. Pro: 15 targets/batch · MSSP: 50 targets/batch.</p>
-          </div>
-          <div className="scanner-card">
-            <div className="scanner-icon">📊</div>
-            <h3>Score NIS2 por Artigo (0–100)</h3>
-            <p>Pontuação por cada requisito do Art. 21.º(2) NIS2 — influenciada por portos, CVEs, email e headers. Lacunas identificadas com priorização automática por nível de risco.</p>
-          </div>
-          <div className="scanner-card">
-            <div className="scanner-icon">🤖</div>
-            <h3>Remediação Guiada por IA</h3>
-            <p>Plano de remediação personalizado gerado por IA (Claude), com passos concretos para cada vulnerabilidade — do patch ao processo documental NIS2.</p>
-          </div>
-        </div>
-        <div className="scanner-demo fade-in">
-          <div className="scanner-demo-text">
-            <strong>Exemplo de resultado de scan — empresa de serviços, 80 colaboradores</strong>
-            <p>Score calculado em tempo real a partir de dados públicos (Shodan + Censys + DNS). Sem instalar agentes na infraestrutura.</p>
-          </div>
-          <div className="scanner-score-row">
-            <div className="score-badge red">
-              <span className="score-num">38</span>
-              Art. 21.º
+
+          <div className="feature-mockup fade-in">
+            <div className="dashboard-frame">
+              <div className="browser-chrome">
+                <span className="dot red"></span>
+                <span className="dot yellow"></span>
+                <span className="dot green"></span>
+                <div className="url-bar">cisplan.pt/scan/novo</div>
+              </div>
+              <div className="scan-mockup">
+                <div className="scan-tabs">
+                  <div className="scan-tab active">🔍 Scan único</div>
+                  <div className="scan-tab">📋 Scan em lote</div>
+                  <div className="scan-tab">🌐 Subdomínios</div>
+                </div>
+                <label className="scan-label">Domínio ou endereço IP</label>
+                <div className="scan-input">
+                  <span>exemplo.pt</span>
+                  <button className="scan-btn">Verificar ownership →</button>
+                </div>
+                <div className="scan-layers">
+                  <div className="layer-row">
+                    <div className="layer-icon green"></div>
+                    <div className="layer-info">
+                      <strong>Portos &amp; Serviços</strong>
+                      <span>Shodan</span>
+                    </div>
+                    <span className="layer-status">✓</span>
+                  </div>
+                  <div className="layer-row">
+                    <div className="layer-icon green"></div>
+                    <div className="layer-info">
+                      <strong>Vulnerabilidades (CVE)</strong>
+                      <span>NVD + Shodan</span>
+                    </div>
+                    <span className="layer-status">✓</span>
+                  </div>
+                  <div className="layer-row">
+                    <div className="layer-icon green"></div>
+                    <div className="layer-info">
+                      <strong>TLS &amp; Certificados</strong>
+                      <span>Censys</span>
+                    </div>
+                    <span className="layer-status">✓</span>
+                  </div>
+                  <div className="layer-row">
+                    <div className="layer-icon blue"></div>
+                    <div className="layer-info">
+                      <strong>Segurança de Email</strong>
+                      <span>DNS · SPF · DKIM · DMARC</span>
+                    </div>
+                    <span className="layer-status loading">⋯</span>
+                  </div>
+                  <div className="layer-row">
+                    <div className="layer-icon"></div>
+                    <div className="layer-info">
+                      <strong>Headers HTTP</strong>
+                      <span>HSTS · CSP · X-Frame-Options</span>
+                    </div>
+                    <span className="layer-status pending">○</span>
+                  </div>
+                  <div className="layer-row">
+                    <div className="layer-icon"></div>
+                    <div className="layer-info">
+                      <strong>Dark Web &amp; Reputação</strong>
+                      <span>HIBP + DNS Blacklists</span>
+                    </div>
+                    <span className="layer-status pending">○</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="score-badge gold">
-              <span className="score-num">61</span>
-              Art. 20.º
-            </div>
-            <div className="score-badge green">
-              <span className="score-num">72</span>
-              Art. 23.º
-            </div>
           </div>
-        </div>
-        <div className="scanner-cta fade-in">
-          <Link to="/register" className="btn-primary">Iniciar Scanner Gratuito →</Link>
-          <p className="scanner-cta-note">1 scan gratuito por mês · Sem cartão de crédito · Resultado em menos de 5 minutos</p>
         </div>
       </section>
 
       {/* COURSE PREVIEW */}
-      <section className="course-preview" id="aulas">
+      <section className="course-preview" id="curso">
         <div className="section-label">Conteúdo do Curso</div>
         <h2>O que aprende em cada aula</h2>
         <p className="course-preview-intro">
@@ -432,10 +551,9 @@ export default function Landing() {
         </p>
 
         <div className="lessons-accordion fade-in">
-          {/* Module 1 header */}
           <div className="lesson-item" style={{ background: "#0f1e38", cursor: "default" }}>
             <div className="lesson-header no-click" style={{ padding: "14px 24px" }}>
-              <div className="lesson-num mod1" style={{ background: "rgba(255,255,255,0.08)", color: "#f0c040" }}>M1</div>
+              <div className="lesson-num mod1" style={{ background: "rgba(74,158,255,0.15)", color: "#4a9eff" }}>M1</div>
               <div className="lesson-info">
                 <strong style={{ color: "#ffffff", fontSize: "1rem" }}>Módulo 1 — Governança e Classificação</strong>
                 <span style={{ color: "#475569" }}>4 aulas · 4 horas de conteúdo · 20 documentos incluídos</span>
@@ -480,10 +598,9 @@ export default function Landing() {
             </div>
           ))}
 
-          {/* Module 2 header */}
           <div className="lesson-item" style={{ background: "#0f1e38", cursor: "default" }}>
             <div className="lesson-header no-click" style={{ padding: "14px 24px" }}>
-              <div className="lesson-num mod1" style={{ background: "rgba(155,0,0,0.2)", color: "#ff8a80" }}>M2</div>
+              <div className="lesson-num" style={{ background: "rgba(155,0,0,0.2)", color: "#ff8a80" }}>M2</div>
               <div className="lesson-info">
                 <strong style={{ color: "#ffffff", fontSize: "1rem" }}>Módulo 2 — Implementação e Operação</strong>
                 <span style={{ color: "#475569" }}>3 aulas · 3 horas de conteúdo · 15 documentos incluídos</span>
@@ -530,7 +647,7 @@ export default function Landing() {
       </section>
 
       {/* MATERIALS */}
-      <section className="materials">
+      <section className="materials" id="dossier">
         <div className="section-label">Os 35 Documentos Incluídos</div>
         <h2>Não é só formação. É o trabalho feito.</h2>
         <p className="materials-intro">
@@ -633,7 +750,7 @@ export default function Landing() {
             </div>
             <div className="penalty-item green">
               <div>
-                <div className="type">Plano Pro NIS2 PT — por mês</div>
+                <div className="type">Plano Pro CISPLAN PT — por mês</div>
                 <div className="sub">Scanner + Curso + Remediação IA</div>
               </div>
               <div className="amount">€89</div>
@@ -684,14 +801,13 @@ export default function Landing() {
       </section>
 
       {/* PRICING */}
-      <section className="pricing" id="pricing">
+      <section className="pricing" id="precos">
         <div className="pricing-header fade-in">
           <div className="section-label" style={{ color: "#f0c040" }}>Preços e Planos</div>
           <h2>Escolha o plano para a sua empresa</h2>
           <p>Todos os planos pagos incluem acesso ao curso, documentos editáveis e actualizações legislativas.</p>
         </div>
         <div className="pricing-grid fade-in" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-          {/* Free */}
           <div className="price-card">
             <div className="price-tier">Gratuito</div>
             <h3>Starter</h3>
@@ -712,7 +828,6 @@ export default function Landing() {
             <Link to="/register" className="price-btn outline">Começar Grátis</Link>
           </div>
 
-          {/* Pro — featured */}
           <div className="price-card featured">
             <div className="price-badge">MAIS POPULAR</div>
             <div className="price-tier">Empresa</div>
@@ -735,7 +850,6 @@ export default function Landing() {
             <Link to="/register?plan=pro" className="price-btn solid">Começar Pro →</Link>
           </div>
 
-          {/* MSSP */}
           <div className="price-card">
             <div className="price-tier">Parceiro / MSP</div>
             <h3>MSSP</h3>
@@ -757,7 +871,6 @@ export default function Landing() {
             <Link to="/register?plan=mssp" className="price-btn gold-btn">Começar MSSP →</Link>
           </div>
 
-          {/* Enterprise */}
           <div className="price-card" style={{ background: "rgba(15,30,56,0.95)", border: "1px solid rgba(212,160,23,0.35)" }}>
             <div className="price-tier" style={{ color: "#d4a017" }}>Grande Organização</div>
             <h3 style={{ color: "#ffffff" }}>Enterprise</h3>
@@ -775,7 +888,7 @@ export default function Landing() {
               <li className="yes">API access completa</li>
               <li className="yes">Gestor de conta dedicado</li>
             </ul>
-            <a href="mailto:hello@nis2pt.pt?subject=Plano Enterprise NIS2 PT" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
+            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN PT" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
           </div>
         </div>
 
@@ -833,19 +946,48 @@ export default function Landing() {
           que pode chegar a €7.000.000. Comece com o plano gratuito hoje e saiba exactamente onde está.
         </p>
         <Link to="/register" className="btn-white">Começar Gratuitamente →</Link>
-        <p className="final-cta-note">Sem cartão de crédito · Resultado em 5 minutos · Cancel a qualquer momento</p>
+        <p className="final-cta-note">Sem cartão de crédito · Resultado em 5 minutos · Cancele a qualquer momento</p>
       </section>
 
       {/* FOOTER */}
       <footer>
-        <div className="footer-logo">NIS2 para <span>PMEs</span> em Portugal</div>
-        <p>© 2026 · DL 125/2025 · Todos os direitos reservados</p>
-        <div className="footer-links">
-          <Link to="/login">Entrar</Link>
-          <Link to="/register">Registar</Link>
-          <a href="mailto:suporte@nis2pt.pt">Suporte</a>
+        <div className="footer-inner">
+          <div className="footer-brand">
+            <span className="footer-logo">CISPLAN <span>PT</span></span>
+            <p>A plataforma NIS2 para PMEs portuguesas.</p>
+            <p style={{ marginTop: 8 }}>Conformidade com o DL 125/2025 — scanner, curso e remediação IA.</p>
+          </div>
+          <div className="footer-col">
+            <h4>Plataforma</h4>
+            <a href="#scanner">Scanner NIS2</a>
+            <a href="#curso">Curso Certificado</a>
+            <a href="#dossier">Dossier de Conformidade</a>
+            <a href="#precos">Preços</a>
+          </div>
+          <div className="footer-col">
+            <h4>Planos</h4>
+            <a href="#precos">Starter — Gratuito</a>
+            <a href="#precos">Pro — €89/mês</a>
+            <a href="#precos">MSSP — €199/mês</a>
+            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN PT">Enterprise</a>
+          </div>
+          <div className="footer-col">
+            <h4>Conta</h4>
+            <Link to="/login">Entrar</Link>
+            <Link to="/register">Registar</Link>
+            <a href="mailto:suporte@cisplan.pt">Suporte</a>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <p>© 2026 CISPLAN PT · DL 125/2025 · Todos os direitos reservados</p>
+          <div className="footer-links">
+            <Link to="/login">Entrar</Link>
+            <Link to="/register">Registar</Link>
+            <a href="mailto:suporte@cisplan.pt">Suporte</a>
+          </div>
         </div>
       </footer>
+
     </div>
   );
 }
