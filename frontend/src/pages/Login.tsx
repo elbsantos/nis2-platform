@@ -1,6 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import "./Auth.css";
+
+const ARTICLES = [
+  { label: "Art. 21 — Segurança",    pct: 78, color: "#4a9eff" },
+  { label: "Art. 23 — Incidentes",   pct: 65, color: "#f0c040" },
+  { label: "Art. 20 — Governance",   pct: 82, color: "#10b981" },
+  { label: "Art. 24 — Continuidade", pct: 54, color: "#a78bfa" },
+];
 
 export default function Login() {
   const { login } = useAuth();
@@ -28,145 +36,151 @@ export default function Login() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0f1e38",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "'Source Sans 3', sans-serif",
-      padding: "24px",
-    }}>
-      {/* Google Fonts */}
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+3:wght@400;600;700&display=swap"
-      />
+    <div className="auth-page">
+      <div className="auth-layout">
 
-      {/* Logo */}
-      <Link to="/" style={{ textDecoration: "none", marginBottom: 40 }}>
-        <div style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: "1.4rem",
-          fontWeight: 700,
-          color: "#ffffff",
-        }}>
-          NIS2 para <span style={{ color: "#f0c040" }}>PMEs</span> em Portugal
-        </div>
-      </Link>
-
-      {/* Card */}
-      <div style={{
-        background: "#152744",
-        border: "1px solid #1e3a5f",
-        borderTop: "3px solid #b8860b",
-        padding: "40px 44px",
-        width: "100%",
-        maxWidth: 420,
-      }}>
-        <h1 style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: "1.6rem",
-          color: "#ffffff",
-          marginBottom: 8,
-          fontWeight: 700,
-        }}>
-          Entrar na plataforma
-        </h1>
-        <p style={{ color: "#64748b", fontSize: "0.9rem", marginBottom: 32 }}>
-          Não tens conta?{" "}
-          <Link to="/register" style={{ color: "#f0c040", textDecoration: "none", fontWeight: 600 }}>
-            Registar gratuitamente
+        {/* ── Form side ─────────────────────────────────── */}
+        <div className="auth-form-side">
+          <Link to="/" className="auth-logo">
+            <span className="auth-logo-text">
+              CISPLAN <span>PT</span>
+            </span>
           </Link>
-        </p>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div>
-            <label style={{ display: "block", color: "#94a3b8", fontSize: "0.8rem", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              placeholder="empresa@exemplo.pt"
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                background: "#0f1e38",
-                border: "1px solid #1e3a5f",
-                color: "#ffffff",
-                fontSize: "0.95rem",
-                fontFamily: "'Source Sans 3', sans-serif",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
+          <div className="auth-content">
+            <h1>Entrar na tua conta</h1>
+            <p className="auth-subtitle">
+              Não tens conta?{" "}
+              <Link to="/register">Registar gratuitamente</Link>
+            </p>
 
-          <div>
-            <label style={{ display: "block", color: "#94a3b8", fontSize: "0.8rem", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                background: "#0f1e38",
-                border: "1px solid #1e3a5f",
-                color: "#ffffff",
-                fontSize: "0.95rem",
-                fontFamily: "'Source Sans 3', sans-serif",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
+            <form className="auth-form" onSubmit={handleSubmit}>
+              <div className="auth-field">
+                <label htmlFor="login-email">Email</label>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  placeholder="empresa@exemplo.pt"
+                />
+              </div>
 
-          {error && (
-            <div style={{
-              background: "rgba(155,0,0,0.15)",
-              border: "1px solid rgba(155,0,0,0.4)",
-              color: "#ff8a80",
-              padding: "10px 14px",
-              fontSize: "0.875rem",
-            }}>
-              {error}
+              <div className="auth-field">
+                <label htmlFor="login-password">Password</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {error && <div className="auth-error">{error}</div>}
+
+              <button type="submit" disabled={loading} className="auth-cta">
+                {loading ? "A entrar…" : "Entrar →"}
+              </button>
+            </form>
+
+            <div className="auth-trust">
+              <span className="trust-item">
+                <span className="trust-icon">✓</span> Ligação segura TLS
+              </span>
+              <span className="trust-item">
+                <span className="trust-icon">✓</span> RGPD compliant
+              </span>
+              <span className="trust-item">
+                <span className="trust-icon">✓</span> Dados em Portugal
+              </span>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              background: loading ? "#6b1a1a" : "#9b0000",
-              color: "#ffffff",
-              padding: "14px",
-              border: "none",
-              fontFamily: "'Source Sans 3', sans-serif",
-              fontWeight: 700,
-              fontSize: "1rem",
-              cursor: loading ? "not-allowed" : "pointer",
-              letterSpacing: "0.03em",
-              transition: "background 0.2s",
-              marginTop: 4,
-            }}
-          >
-            {loading ? "A entrar…" : "Entrar →"}
-          </button>
-        </form>
+            <p className="auth-page-footer">
+              © 2026 CISPLAN PT · DL 125/2025
+            </p>
+          </div>
+        </div>
+
+        {/* ── Showcase side ─────────────────────────────── */}
+        <div className="auth-showcase">
+          <div className="showcase-inner">
+            <span className="showcase-eyebrow">Plataforma NIS2 para PMEs</span>
+            <div className="showcase-header">
+              <h2>Conformidade NIS2 ao alcance da tua empresa</h2>
+              <p>
+                Avalia a tua postura de segurança, identifica lacunas por artigo NIS2
+                e obtém recomendações prioritizadas pela IA.
+              </p>
+            </div>
+
+            {/* Dashboard mockup */}
+            <div className="showcase-mockup">
+              <div className="mockup-topbar">
+                <span className="mockup-title">Score de Conformidade NIS2</span>
+                <span className="mockup-score-badge">Score: 72/100</span>
+              </div>
+              <div className="mockup-articles">
+                {ARTICLES.map(a => (
+                  <div key={a.label} className="mockup-article-row">
+                    <span className="mockup-article-label">{a.label}</span>
+                    <div className="mockup-bar-track">
+                      <div
+                        className="mockup-bar-fill"
+                        style={{ width: `${a.pct}%`, background: a.color }}
+                      />
+                    </div>
+                    <span className="mockup-article-pct">{a.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Benefits */}
+            <div className="showcase-benefits">
+              <div className="benefit-card">
+                <span className="benefit-icon">📊</span>
+                <h4>Dashboard em tempo real</h4>
+                <p>Score por artigo NIS2 actualizado após cada scan</p>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-icon">🛡️</span>
+                <h4>47 controlos auditados</h4>
+                <p>Cobertura completa dos Anexos I e II da directiva</p>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-icon">⚡</span>
+                <h4>Remediação guiada</h4>
+                <p>Prioridades claras para reduzir risco rapidamente</p>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-icon">🇵🇹</span>
+                <h4>Feito para Portugal</h4>
+                <p>DL 125/2025, CNCS e templates em português</p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="showcase-stats">
+              <div className="stat-item">
+                <span className="stat-value">47</span>
+                <span className="stat-label">Controlos NIS2</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">89%</span>
+                <span className="stat-label">PMEs expostas</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">€10M</span>
+                <span className="stat-label">Coima máxima</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-
-      <p style={{ color: "#334155", fontSize: "0.78rem", marginTop: 24, textAlign: "center" }}>
-        © 2026 NIS2 PT · DL 125/2025
-      </p>
     </div>
   );
 }
