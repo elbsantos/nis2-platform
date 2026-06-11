@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import "./Landing.css";
 
@@ -157,12 +157,6 @@ const LESSONS = [
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Landing() {
-  const [openLesson, setOpenLesson] = useState<string | null>("item-11");
-
-  const toggleLesson = (id: string) => {
-    setOpenLesson(prev => (prev === id ? null : id));
-  };
-
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => entries.forEach(e => {
@@ -541,108 +535,197 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* COURSE PREVIEW */}
-      <section className="course-preview" id="curso">
-        <div className="section-label">Conteúdo do Curso</div>
-        <h2>O que aprende em cada aula</h2>
-        <p className="course-preview-intro">
-          Cada aula inclui um vídeo de explicação, uma demonstração prática dos materiais de apoio
-          e os documentos prontos a usar. Clique em qualquer aula para ver um preview.
-        </p>
-
-        <div className="lessons-accordion fade-in">
-          <div className="lesson-item" style={{ background: "#0f1e38", cursor: "default" }}>
-            <div className="lesson-header no-click" style={{ padding: "14px 24px" }}>
-              <div className="lesson-num mod1" style={{ background: "rgba(74,158,255,0.15)", color: "#4a9eff" }}>M1</div>
-              <div className="lesson-info">
-                <strong style={{ color: "#ffffff", fontSize: "1rem" }}>Módulo 1 — Governança e Classificação</strong>
-                <span style={{ color: "#475569" }}>4 aulas · 4 horas de conteúdo · 20 documentos incluídos</span>
-              </div>
-            </div>
+      {/* COURSE CONTENT — 2 colunas, módulos lado a lado */}
+      <section className="course-content" id="curso">
+        <div className="container">
+          <div className="section-header" style={{ textAlign: "left", maxWidth: "var(--container-max)", marginLeft: 0 }}>
+            <span className="section-tag blue">CONTEÚDO DO CURSO</span>
+            <h2>O que aprende em cada aula</h2>
+            <p className="subtitle" style={{ maxWidth: 700 }}>
+              Cada aula inclui um vídeo de explicação, uma demonstração prática dos materiais de apoio
+              e os documentos prontos a usar.
+            </p>
           </div>
 
-          {LESSONS.filter(l => l.mod === "mod1").map(lesson => (
-            <div
-              key={lesson.id}
-              id={lesson.id}
-              className={`lesson-item${openLesson === lesson.id ? " open" : ""}`}
-            >
-              <div className="lesson-header" onClick={() => toggleLesson(lesson.id)}>
-                <div className={`lesson-num ${lesson.mod}`}>{lesson.num}</div>
-                <div className="lesson-info">
-                  <strong>{lesson.title}</strong>
-                  <span>{lesson.subtitle}</span>
-                </div>
-                <div className="lesson-meta">
-                  <span className="lesson-duration">{lesson.duration}</span>
-                  {lesson.free && <span className="lesson-pill-free">PREVIEW</span>}
-                  <span className="lesson-arrow">▶</span>
+          <div className="modules-grid fade-in">
+
+            {/* MÓDULO 1 */}
+            <div className="module-card">
+              <div className="module-header m1">
+                <div className="module-badge">M1</div>
+                <div className="module-info">
+                  <h3>Módulo 1 — Governança e Classificação</h3>
+                  <div className="module-meta">
+                    <span>4 aulas</span><span>·</span>
+                    <span>4 horas de conteúdo</span><span>·</span>
+                    <span>20 documentos</span>
+                  </div>
                 </div>
               </div>
-              <div className="lesson-body">
-                <div className="lesson-body-inner">
-                  <VideoPlayer id={`v${lesson.num.replace(".", "")}`} videoId={lesson.videoId} mini />
-                  <div className="lesson-desc">
-                    <p>{lesson.desc}</p>
-                    <div className="lesson-materials">
-                      {lesson.materials.map((m, i) => (
-                        <div key={i} className="lm-item">
-                          <span className={`lm-icon ${m.type}`}>{m.type.toUpperCase()}</span>
-                          {m.label}
-                        </div>
-                      ))}
+              <div className="lessons-list">
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">1.1</span>
+                    <div className="lesson-content">
+                      <h4>Introdução à Cibersegurança e à NIS2</h4>
+                      <p className="lesson-subtitle">O que mudou com o DL 125/2025 · Porque é urgente · Panorama de ameaças</p>
                     </div>
+                    <div className="lesson-meta">
+                      <span className="badge-preview">PREVIEW</span>
+                      <span className="duration">18 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag xlsx">XLSX · Autoavaliação EE/EI</span>
+                    <span className="doc-tag xlsx">XLSX · Inventário Ativos Críticos</span>
+                    <span className="doc-tag pdf">PDF · Checklist Higiene Cibernética</span>
+                    <span className="doc-tag pdf">PDF · Resumo Executivo Gestão</span>
+                    <span className="doc-tag pdf">PDF · Guia 4 Semanas</span>
+                  </div>
+                </div>
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">1.2</span>
+                    <div className="lesson-content">
+                      <h4>Âmbito e Classificação de Entidades</h4>
+                      <p className="lesson-subtitle">EE vs EI · CAEs abrangidos · Regra de dimensão · Registo CNCS</p>
+                    </div>
+                    <div className="lesson-meta">
+                      <span className="duration">22 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag xlsx">XLSX · Calculadora Dimensão</span>
+                    <span className="doc-tag xlsx">XLSX · Guia CAEs Abrangidos</span>
+                    <span className="doc-tag pdf">PDF · Fluxograma 5 Passos</span>
+                    <span className="doc-tag pdf">PDF · Matriz Setor·Dimensão</span>
+                    <span className="doc-tag pdf">PDF · Checklist Registo CNCS</span>
+                  </div>
+                </div>
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">1.3</span>
+                    <div className="lesson-content">
+                      <h4>Responsabilidades da Gestão e Governança</h4>
+                      <p className="lesson-subtitle">Art. 20.º NIS2 · CISO · Responsabilidade pessoal · KPIs de gestão</p>
+                    </div>
+                    <div className="lesson-meta">
+                      <span className="duration">25 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag docx">DOCX · Carta Nomeação CISO</span>
+                    <span className="doc-tag pdf">PDF · Checklist Governança</span>
+                    <span className="doc-tag pdf">PDF · Ata Reunião Cibersegurança</span>
+                    <span className="doc-tag xlsx">XLSX · Registo de Riscos</span>
+                    <span className="doc-tag xlsx">XLSX · Dashboard KPIs</span>
+                  </div>
+                </div>
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">1.4</span>
+                    <div className="lesson-content">
+                      <h4>Gestão de Riscos e Cadeia de Abastecimento</h4>
+                      <p className="lesson-subtitle">TPRM · Due Diligence fornecedores · Cláusulas contratuais NIS2</p>
+                    </div>
+                    <div className="lesson-meta">
+                      <span className="duration">28 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag xlsx">XLSX · Inventário TPRM</span>
+                    <span className="doc-tag xlsx">XLSX · Exit Strategy Fornecedores</span>
+                    <span className="doc-tag pdf">PDF · Due Diligence</span>
+                    <span className="doc-tag pdf">PDF · Matriz Cloud</span>
+                    <span className="doc-tag docx">DOCX · Cláusulas Contratos</span>
                   </div>
                 </div>
               </div>
             </div>
-          ))}
 
-          <div className="lesson-item" style={{ background: "#0f1e38", cursor: "default" }}>
-            <div className="lesson-header no-click" style={{ padding: "14px 24px" }}>
-              <div className="lesson-num" style={{ background: "rgba(155,0,0,0.2)", color: "#ff8a80" }}>M2</div>
-              <div className="lesson-info">
-                <strong style={{ color: "#ffffff", fontSize: "1rem" }}>Módulo 2 — Implementação e Operação</strong>
-                <span style={{ color: "#475569" }}>3 aulas · 3 horas de conteúdo · 15 documentos incluídos</span>
-              </div>
-            </div>
-          </div>
-
-          {LESSONS.filter(l => l.mod === "mod2").map(lesson => (
-            <div
-              key={lesson.id}
-              id={lesson.id}
-              className={`lesson-item${openLesson === lesson.id ? " open" : ""}`}
-            >
-              <div className="lesson-header" onClick={() => toggleLesson(lesson.id)}>
-                <div className={`lesson-num ${lesson.mod}`}>{lesson.num}</div>
-                <div className="lesson-info">
-                  <strong>{lesson.title}</strong>
-                  <span>{lesson.subtitle}</span>
-                </div>
-                <div className="lesson-meta">
-                  <span className="lesson-duration">{lesson.duration}</span>
-                  <span className="lesson-arrow">▶</span>
+            {/* MÓDULO 2 */}
+            <div className="module-card">
+              <div className="module-header m2">
+                <div className="module-badge">M2</div>
+                <div className="module-info">
+                  <h3>Módulo 2 — Implementação e Operação</h3>
+                  <div className="module-meta">
+                    <span>3 aulas</span><span>·</span>
+                    <span>3 horas de conteúdo</span><span>·</span>
+                    <span>15 documentos</span>
+                  </div>
                 </div>
               </div>
-              <div className="lesson-body">
-                <div className="lesson-body-inner">
-                  <VideoPlayer id={`v${lesson.num.replace(".", "")}`} videoId={lesson.videoId} mini />
-                  <div className="lesson-desc">
-                    <p>{lesson.desc}</p>
-                    <div className="lesson-materials">
-                      {lesson.materials.map((m, i) => (
-                        <div key={i} className="lm-item">
-                          <span className={`lm-icon ${m.type}`}>{m.type.toUpperCase()}</span>
-                          {m.label}
-                        </div>
-                      ))}
+              <div className="lessons-list">
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">2.1</span>
+                    <div className="lesson-content">
+                      <h4>Medidas Técnicas e Operacionais — As 10 Medidas NIS2</h4>
+                      <p className="lesson-subtitle">PSI · MFA · Backups · Encriptação · Patch management</p>
                     </div>
+                    <div className="lesson-meta">
+                      <span className="duration">32 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag docx">DOCX · PSI completa</span>
+                    <span className="doc-tag xlsx">XLSX · Tracker 10 Medidas</span>
+                    <span className="doc-tag xlsx">XLSX · Calculadora RTO/RPO</span>
+                    <span className="doc-tag pdf">PDF · Guia MFA</span>
+                    <span className="doc-tag pdf">PDF · Cartão Emergência A5</span>
+                  </div>
+                </div>
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">2.2</span>
+                    <div className="lesson-content">
+                      <h4>Gestão e Reporte de Incidentes</h4>
+                      <p className="lesson-subtitle">IRP · Notificação CNCS 24h/72h/30d · Comunicação de crise · Forense</p>
+                    </div>
+                    <div className="lesson-meta">
+                      <span className="duration">26 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag docx">DOCX · IRP completo</span>
+                    <span className="doc-tag xlsx">XLSX · Log de Incidentes</span>
+                    <span className="doc-tag pdf">PDF · Templates CNCS (3 fases)</span>
+                    <span className="doc-tag pdf">PDF · Guia Comunicação Crise</span>
+                    <span className="doc-tag pdf">PDF · Checklist Forense</span>
+                  </div>
+                </div>
+                <div className="lesson-item">
+                  <div className="lesson-header">
+                    <span className="lesson-num">2.3</span>
+                    <div className="lesson-content">
+                      <h4>Supervisão, Auditorias e Conformidade Contínua</h4>
+                      <p className="lesson-subtitle">Auditoria CNCS · CAPA · Calendário PDCA · Dossier de conformidade</p>
+                    </div>
+                    <div className="lesson-meta">
+                      <span className="duration">24 min</span>
+                    </div>
+                  </div>
+                  <div className="lesson-docs">
+                    <span className="doc-tag pdf">PDF · Checklist Auto-Auditoria (34 itens)</span>
+                    <span className="doc-tag docx">DOCX · CAPA</span>
+                    <span className="doc-tag xlsx">XLSX · Calendário Anual</span>
+                    <span className="doc-tag xlsx">XLSX · Dossier Índice Mestre</span>
+                    <span className="doc-tag pdf">PDF · Resumo Executivo Curso</span>
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* BARRA DE TOTAIS */}
+          <div className="course-summary fade-in">
+            <div className="summary-item"><strong>7</strong><span>Aulas no total</span></div>
+            <div className="summary-item"><strong>7h</strong><span>De conteúdo em vídeo</span></div>
+            <div className="summary-item"><strong>35</strong><span>Documentos editáveis</span></div>
+            <div className="summary-item"><strong>42</strong><span>Controlos NIS2 cobertos</span></div>
+            <div className="summary-item"><strong>100%</strong><span>Mapeado ao DL 125/2025</span></div>
+          </div>
         </div>
       </section>
 
