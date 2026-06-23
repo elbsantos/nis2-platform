@@ -16,14 +16,20 @@ import {
 // ---------------------------------------------------------------------------
 
 export const organizations = mysqlTable("organizations", {
-  id:        int("id").autoincrement().primaryKey(),
-  name:      varchar("name", { length: 255 }).notNull(),
-  domain:    varchar("domain", { length: 255 }),
-  ownerId:   int("ownerId"),
-  sector:    varchar("sector", { length: 100 }),
-  size:      mysqlEnum("size", ["10-50", "50-250", "250+"]),
-  createdAt: timestamp("createdAt").notNull().defaultNow(),
-  updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  id:                   int("id").autoincrement().primaryKey(),
+  name:                 varchar("name", { length: 255 }).notNull(),
+  legalName:            varchar("legalName", { length: 255 }),
+  nipc:                 varchar("nipc", { length: 20 }),
+  domain:               varchar("domain", { length: 255 }),
+  address:              varchar("address", { length: 500 }),
+  ownerId:              int("ownerId"),
+  sector:               varchar("sector", { length: 100 }),
+  size:                 varchar("size", { length: 50 }),
+  securityOfficerName:  varchar("securityOfficerName", { length: 255 }),
+  securityOfficerEmail: varchar("securityOfficerEmail", { length: 255 }),
+  keyAssets:            json("keyAssets").$type<string[]>(),
+  createdAt:            timestamp("createdAt").notNull().defaultNow(),
+  updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
 });
 
 // ---------------------------------------------------------------------------
@@ -201,11 +207,39 @@ export const courseProgress = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// Control evidence
+// ---------------------------------------------------------------------------
+
+export const controlEvidence = mysqlTable(
+  "control_evidence",
+  {
+    id:             int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    controlId:      varchar("controlId", { length: 20 }).notNull(),
+    sessionId:      int("sessionId"),
+    status:         varchar("status", { length: 20 }).notNull().default("missing"),
+    source:         varchar("source", { length: 20 }).notNull().default("manual"),
+    fileKey:        varchar("fileKey", { length: 500 }),
+    fileName:       varchar("fileName", { length: 255 }),
+    templateId:     varchar("templateId", { length: 100 }),
+    notes:          text("notes"),
+    createdAt:      timestamp("createdAt").notNull().defaultNow(),
+    updatedAt:      timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_org_control").on(t.organizationId, t.controlId),
+    index("idx_ce_org").on(t.organizationId),
+    index("idx_ce_control").on(t.controlId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
 
-export type User         = typeof users.$inferSelect;
-export type Organization = typeof organizations.$inferSelect;
-export type Scan         = typeof scans.$inferSelect;
-export type Vulnerability = typeof vulnerabilities.$inferSelect;
-export type Subscription = typeof subscriptions.$inferSelect;
+export type User           = typeof users.$inferSelect;
+export type Organization   = typeof organizations.$inferSelect;
+export type Scan           = typeof scans.$inferSelect;
+export type Vulnerability  = typeof vulnerabilities.$inferSelect;
+export type Subscription   = typeof subscriptions.$inferSelect;
+export type ControlEvidence = typeof controlEvidence.$inferSelect;
