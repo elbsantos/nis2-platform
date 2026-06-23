@@ -215,7 +215,7 @@ function BulkScanTab() {
 
   const { data: sub } = trpc.billing.getSubscription.useQuery();
   const plan = sub?.plan ?? "free";
-  const maxTargets = plan === "mssp" || plan === "enterprise" ? 50 : plan === "pro" ? 15 : 0;
+  const maxTargets = plan === "mssp" ? 50 : plan === "pro" ? 15 : 0;
 
   const startBulkMut = trpc.scan.startBulk.useMutation({
     onSuccess: (data) => {
@@ -323,7 +323,7 @@ function SubdomainScanTab() {
     );
   }
 
-  const maxSubs = plan === "mssp" || plan === "enterprise" ? 200 : 50;
+  const maxSubs = plan === "mssp" ? 200 : 50;
 
   const handleVerify = async () => {
     setError(""); setVerified(false); setDiscovered([]); setSelected(new Set());
