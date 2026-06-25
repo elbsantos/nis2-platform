@@ -8,8 +8,21 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { freeProcedure } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, isIpAddress } from "../services/scan-executor";
-import { createScan, getScanById, getScansByOrgId, getScansByBatchId } from "../db";
+import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan } from "../db";
+import { getRedisClient } from "../middlewares/rateLimit";
 import { isSafeTarget } from "../middlewares/security";
+
+const SCAN_CACHE_TTL_HOURS     = parseInt(process.env.SCAN_CACHE_TTL_HOURS     ?? "24", 10);
+const MAX_FORCE_RESCANS_PER_DAY = parseInt(process.env.MAX_FORCE_RESCANS_PER_DAY ?? "3",  10);
+
+function formatScannedAgo(completedAt: Date): string {
+  const hours = Math.floor((Date.now() - completedAt.getTime()) / 3_600_000);
+  if (hours < 1)  return "há menos de 1 hora";
+  if (hours === 1) return "há 1 hora";
+  if (hours < 24) return `há ${hours} horas`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "há 1 dia" : `há ${days} dias`;
+}
 
 // Strip protocol, path, port and whitespace — accept "https://example.com/path" as "example.com"
 function normaliseTarget(raw: string): string {
@@ -51,18 +64,20 @@ export const scanRouter = {
     }),
 
   /**
-   * Start a new scan (free tier: 1/month, pro/mssp: unlimited)
+   * Start a new scan (free tier: 1/month, pro/mssp: unlimited).
+   * Returns a cached result if a completed scan for the same target exists within
+   * SCAN_CACHE_TTL_HOURS (default 24h). Pass force:true to override the cache
+   * (limited to MAX_FORCE_RESCANS_PER_DAY per org).
    */
   start: freeProcedure
     .input(
       z.object({
         target: safeTarget,
-        mode: z.enum(["sme", "supply"]).default("sme"),
+        mode:  z.enum(["sme", "supply"]).default("sme"),
+        force: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Scan limit check disabled for validation/testing phase
-
       // Verify ownership
       const ownership = await verifyOwnership(input.target, ctx.org.id);
       if (!ownership.verified) {
@@ -72,25 +87,67 @@ export const scanRouter = {
         throw new TRPCError({ code: "FORBIDDEN", message: `Verificação de ownership falhou. ${hint}` });
       }
 
+      // ── TTL cache — fast-path for recently scanned targets (OBJETIVO 2+4) ──
+      const recentScan = await getRecentCompletedScan(ctx.org.id, input.target, SCAN_CACHE_TTL_HOURS);
+
+      if (recentScan && !input.force) {
+        return {
+          scanId:     recentScan.id,
+          status:     "cached" as const,
+          scannedAgo: formatScannedAgo(recentScan.completedAt!),
+        };
+      }
+
+      // ── Force-rescan rate limit ────────────────────────────────────────────
+      if (recentScan && input.force) {
+        const today    = new Date().toISOString().slice(0, 10);
+        const forceKey = `force-rescan:org:${ctx.org.id}:${today}`;
+        try {
+          const redis = await getRedisClient();
+          const count = parseInt((await redis.get(forceKey)) ?? "0", 10);
+          if (count >= MAX_FORCE_RESCANS_PER_DAY) {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS",
+              message: `Limite de ${MAX_FORCE_RESCANS_PER_DAY} re-scans forçados por dia atingido.`,
+            });
+          }
+          const newCount = await redis.incrBy(forceKey, 1);
+          if (newCount === 1) await redis.expire(forceKey, 25 * 3600);
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          // Redis unavailable — allow the force-rescan rather than blocking the user
+        }
+      }
+
       // Create scan record
       const scan = await createScan({
         organizationId: ctx.org.id,
         target: input.target,
-        mode: input.mode,
+        mode:   input.mode,
         status: "pending",
       });
 
+      // Monthly credit counter (OBJETIVO 5)
+      const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+      getRedisClient()
+        .then(async (redis) => {
+          const key = `scan:credits:org:${ctx.org.id}:${ym}`;
+          const n   = await redis.incrBy(key, 1);
+          if (n === 1) await redis.expire(key, 35 * 24 * 3600);
+        })
+        .catch(() => {}); // non-fatal
+
       // Start scan async (non-blocking)
       executeAgentlessScan({
-        scanId: scan.id,
+        scanId:         scan.id,
         organizationId: ctx.org.id,
-        target: input.target,
-        mode: input.mode,
+        target:         input.target,
+        mode:           input.mode,
       }).catch((err) => {
         console.error(`[Scan ${scan.id}] Async execution error:`, err);
       });
 
-      return { scanId: scan.id, status: "started" };
+      return { scanId: scan.id, status: "started" as const };
     }),
 
   /**

@@ -12,6 +12,7 @@ import { billingRouter }       from "./billing.router";
 import { courseRouter }        from "./course.router";
 import { docsRouter }          from "./docs.router";
 import { reportRouter }        from "./report.router";
+import { adminRouter }         from "./admin.router";
 
 export const appRouter = router({
   scan:          scanRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   course:        courseRouter,
   docs:          docsRouter,
   report:        reportRouter,
+  admin:         adminRouter,
 });
 
 export type AppRouter = typeof appRouter;
