@@ -517,6 +517,43 @@ export async function getRemediationItemsByScanId(scanId: number) {
     .orderBy(desc(remediationItems.createdAt));
 }
 
+export async function getRemediationItemsWithScanInfo(
+  orgId: number,
+  opts?: {
+    status?: "todo" | "in_progress" | "done" | "wont_fix";
+    scanId?: number;
+  }
+) {
+  return getDb()
+    .select({
+      id:                remediationItems.id,
+      scanId:            remediationItems.scanId,
+      title:             remediationItems.title,
+      steps:             remediationItems.steps,
+      effort:            remediationItems.effort,
+      status:            remediationItems.status,
+      nis2Articles:      remediationItems.nis2Articles,
+      dueDate:           remediationItems.dueDate,
+      target:            scans.target,
+      mode:              scans.mode,
+      cveId:             vulnerabilities.cveId,
+      severity:          vulnerabilities.severity,
+      cvssScore:         vulnerabilities.cvssScore,
+      affectedComponent: vulnerabilities.affectedComponent,
+    })
+    .from(remediationItems)
+    .leftJoin(scans, eq(remediationItems.scanId, scans.id))
+    .leftJoin(vulnerabilities, eq(remediationItems.vulnId, vulnerabilities.id))
+    .where(
+      and(
+        eq(remediationItems.organizationId, orgId),
+        opts?.status   ? eq(remediationItems.status, opts.status)     : undefined,
+        opts?.scanId != null ? eq(remediationItems.scanId, opts.scanId) : undefined,
+      )
+    )
+    .orderBy(desc(remediationItems.createdAt));
+}
+
 export async function updateRemediationStatus(
   itemId: number,
   orgId: number,
