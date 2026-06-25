@@ -469,7 +469,7 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
           </div>
           <p className="text-lg text-slate-300 leading-relaxed">{v.description}</p>
           <p className="text-lg text-slate-400">{v.affectedService}</p>
-          {(v.nis2Articles?.length > 0 || v.cisControls?.length > 0 || v.iso27001Controls?.length > 0 || v.nistCsfControls?.length > 0) && (
+          {(( v.nis2Articles?.length ?? 0) > 0 || (v.cisControls?.length ?? 0) > 0 || (v.iso27001Controls?.length ?? 0) > 0 || (v.nistCsfControls?.length ?? 0) > 0) && (
             <div className="flex items-center flex-wrap gap-2">
               {v.nis2Articles?.map((a) => (
                 <span key={a} className="text-lg text-slate-400">{a}</span>

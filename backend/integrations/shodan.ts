@@ -4,18 +4,21 @@
  * Thin wrapper around the Shodan InternetDB (free, no key) and
  * Shodan API (paid, for CVE details and service versions).
  *
- * v1 strategy:
- *  - Use InternetDB (free) for port discovery
- *  - Use paid API only when SHODAN_API_KEY is set (Pro tier)
+ * Cost strategy:
+ *  - InternetDB is always the default (free, no API key)
+ *  - Paid API requires SHODAN_API_KEY + SHODAN_USE_PAID=true (explicit opt-in)
  *  - Cache results in Redis for 24h to minimise API calls + cost
  */
 
 import { getRedisClient } from "../middlewares/rateLimit";
 
 const CACHE_TTL_SECONDS = 24 * 60 * 60; // 24 hours
-const SHODAN_API_KEY = process.env.SHODAN_API_KEY ?? "";
-const INTERNETDB_URL = "https://internetdb.shodan.io";
-const SHODAN_API_URL = "https://api.shodan.io";
+const SHODAN_API_KEY  = process.env.SHODAN_API_KEY ?? "";
+// Paid API is opt-in: set SHODAN_USE_PAID=true to use the richer paid endpoint.
+// Default: InternetDB (free) — avoids spending Shodan API credits unintentionally.
+const SHODAN_USE_PAID = process.env.SHODAN_USE_PAID === "true";
+const INTERNETDB_URL  = "https://internetdb.shodan.io";
+const SHODAN_API_URL  = "https://api.shodan.io";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -168,7 +171,8 @@ export async function lookupHost(
       return cached;
     }
 
-    const result = SHODAN_API_KEY
+    // InternetDB first (free); paid API only when explicitly opted in
+    const result = (SHODAN_API_KEY && SHODAN_USE_PAID)
       ? await apiLookup(ip)
       : await internetDbLookup(ip);
 

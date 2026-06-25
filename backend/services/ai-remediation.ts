@@ -12,6 +12,7 @@ import {
   getOrganizationById,
   createRemediationItem,
   getRemediationItemsByScanId,
+  getRemediationItemByCvePrefix,
 } from "../db";
 
 // ---------------------------------------------------------------------------
@@ -301,14 +302,30 @@ export async function generateRemediationForScan(
   let created = 0;
   for (const vuln of vulns) {
     try {
+      // Cross-scan dedup: reuse existing AI plan for this CVE if one exists for this org
+      const existingItem = await getRemediationItemByCvePrefix(organizationId, vuln.cveId);
+      if (existingItem) {
+        await createRemediationItem({
+          organizationId,
+          scanId,
+          vulnId:       vuln.id > 0 ? vuln.id : undefined,
+          title:        existingItem.title,
+          steps:        (existingItem.steps as Array<{ order: number; instruction: string; platform: string }> | null) ?? [],
+          effort:       existingItem.effort,
+          nis2Articles: (existingItem.nis2Articles as string[] | null) ?? [],
+        });
+        created += 1;
+        continue;
+      }
+
       const plan = await generatePlanForVuln(vuln, orgContext);
       await createRemediationItem({
         organizationId,
         scanId,
-        vulnId:      vuln.id,
-        title:       plan.title,
-        steps:       plan.steps,
-        effort:      plan.effort,
+        vulnId:       vuln.id,
+        title:        plan.title,
+        steps:        plan.steps,
+        effort:       plan.effort,
         nis2Articles: plan.nis2Articles,
       });
       created += 1;
