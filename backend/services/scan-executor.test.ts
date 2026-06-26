@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
 
-// Mock the integrations
+// Mock all integrations and external dependencies
 vi.mock("../integrations/shodan", () => ({
   lookupHost: vi.fn(),
 }));
@@ -17,9 +17,34 @@ vi.mock("../integrations/censys", () => ({
   lookupHost: vi.fn(),
 }));
 
+vi.mock("../integrations/direct-tls", () => ({
+  checkDirectTls: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/http-headers", () => ({
+  checkHttpHeaders: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/email-security", () => ({
+  checkEmailSecurity: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/ssh-check", () => ({
+  checkSsh: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/dark-web", () => ({
+  checkDarkWeb: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/nvd", () => ({
+  batchLookupCveVersionRanges: vi.fn().mockResolvedValue(new Map()),
+  isVersionInNvdRanges: vi.fn().mockReturnValue(true),
+}));
+
 vi.mock("../db", () => ({
-  updateScanStatus: vi.fn(),
-  createVulnerability: vi.fn(),
+  updateScanStatus: vi.fn().mockResolvedValue(undefined),
+  createVulnerability: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("dns/promises", () => ({
@@ -176,6 +201,7 @@ describe("executeAgentlessScan", () => {
           port: 22,
           transport: "tcp",
           product: "OpenSSH",
+          version: "8.4p1",
           vulns: {
             "CVE-2021-SSH": {
               cvss: 9.8,
