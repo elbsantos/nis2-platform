@@ -14,7 +14,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
+import type { MessageParam, TextBlockParam } from "@anthropic-ai/sdk/resources/messages";
 import { getRedisClient } from "../middlewares/rateLimit";
 
 // ---------------------------------------------------------------------------
@@ -45,6 +45,11 @@ export interface ChatOptions {
   orgId?: number;
   /** "free" | "pro" | "mssp" — determines monthly token limit */
   plan?: string;
+  /**
+   * Enable Anthropic prompt caching on the system prompt (default: true).
+   * Reduces cost for repeated calls with the same long system prompt.
+   */
+  cacheSystem?: boolean;
 }
 
 export interface StreamOptions extends ChatOptions {
@@ -120,11 +125,18 @@ export async function chat(opts: ChatOptions): Promise<string> {
 
   const client = getClient();
 
+  // Prompt caching: wrap system in an array with cache_control when enabled (default).
+  // Saves cost on repeated calls with the same long system prompt (e.g. remediationPlanner).
+  const cacheEnabled = opts.cacheSystem !== false;
+  const systemParam: string | TextBlockParam[] = cacheEnabled
+    ? [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }]
+    : opts.system;
+
   const response = await client.messages.create({
     model:       process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
     max_tokens:  opts.maxTokens ?? 1024,
     temperature: opts.temperature ?? 0.3,
-    system:      opts.system,
+    system:      systemParam,
     messages:    opts.messages,
   });
 
@@ -158,11 +170,16 @@ export async function streamChat(opts: StreamOptions): Promise<void> {
   const client = getClient();
   let fullText = "";
 
+  const cacheEnabled = opts.cacheSystem !== false;
+  const systemParam: string | TextBlockParam[] = cacheEnabled
+    ? [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }]
+    : opts.system;
+
   const stream = client.messages.stream({
     model:       process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
     max_tokens:  opts.maxTokens ?? 1024,
     temperature: opts.temperature ?? 0.3,
-    system:      opts.system,
+    system:      systemParam,
     messages:    opts.messages,
   });
 

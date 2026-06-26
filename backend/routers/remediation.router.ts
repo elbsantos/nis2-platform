@@ -9,7 +9,7 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { freeProcedure } from "../middlewares/planGuard";
 import {
-  getRemediationItemsByOrgId,
+  getRemediationItemsWithScanInfo,
   updateRemediationStatus,
   getScanById,
 } from "../db";
@@ -23,10 +23,14 @@ export const remediationRouter = router({
     .input(
       z.object({
         status: z.enum(["todo", "in_progress", "done", "wont_fix"]).optional(),
+        scanId: z.number().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      return getRemediationItemsByOrgId(ctx.org.id, input.status);
+      return getRemediationItemsWithScanInfo(ctx.org.id, {
+        status: input.status,
+        scanId: input.scanId,
+      });
     }),
 
   /**

@@ -15,7 +15,7 @@ import {
   vulnerabilities,
   subscriptions,
 } from "../database/schema";
-import { eq, desc, asc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, asc, and, gte, like, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Connection pool — resilient singleton that resets on fatal errors
@@ -299,6 +299,32 @@ export async function getUserByOrgId(orgId: number) {
   return getUserById(org.ownerId);
 }
 
+/**
+ * Returns the most recent completed scan for the given org+target within the
+ * specified TTL window. Used by the scan router to short-circuit repeated scans.
+ */
+export async function getRecentCompletedScan(
+  orgId: number,
+  target: string,
+  ttlHours = 24
+) {
+  const since = new Date(Date.now() - ttlHours * 3_600_000);
+  const rows = await getDb()
+    .select()
+    .from(scans)
+    .where(
+      and(
+        eq(scans.organizationId, orgId),
+        eq(scans.target, target),
+        eq(scans.status, "completed"),
+        gte(scans.completedAt, since)
+      )
+    )
+    .orderBy(desc(scans.completedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function countScansThisMonth(orgId: number): Promise<number> {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -310,6 +336,24 @@ export async function countScansThisMonth(orgId: number): Promise<number> {
     .where(and(eq(scans.organizationId, orgId), gte(scans.createdAt, startOfMonth)));
 
   return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * Returns the first existing remediation item for this org whose title starts
+ * with `${cveId} —`. Used to avoid regenerating AI plans for known CVEs.
+ */
+export async function getRemediationItemByCvePrefix(orgId: number, cveId: string) {
+  const rows = await getDb()
+    .select()
+    .from(remediationItems)
+    .where(
+      and(
+        eq(remediationItems.organizationId, orgId),
+        like(remediationItems.title, `${cveId} —%`)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -470,6 +514,43 @@ export async function getRemediationItemsByScanId(scanId: number) {
     .select()
     .from(remediationItems)
     .where(eq(remediationItems.scanId, scanId))
+    .orderBy(desc(remediationItems.createdAt));
+}
+
+export async function getRemediationItemsWithScanInfo(
+  orgId: number,
+  opts?: {
+    status?: "todo" | "in_progress" | "done" | "wont_fix";
+    scanId?: number;
+  }
+) {
+  return getDb()
+    .select({
+      id:                remediationItems.id,
+      scanId:            remediationItems.scanId,
+      title:             remediationItems.title,
+      steps:             remediationItems.steps,
+      effort:            remediationItems.effort,
+      status:            remediationItems.status,
+      nis2Articles:      remediationItems.nis2Articles,
+      dueDate:           remediationItems.dueDate,
+      target:            scans.target,
+      mode:              scans.mode,
+      cveId:             vulnerabilities.cveId,
+      severity:          vulnerabilities.severity,
+      cvssScore:         vulnerabilities.cvssScore,
+      affectedComponent: vulnerabilities.affectedComponent,
+    })
+    .from(remediationItems)
+    .leftJoin(scans, eq(remediationItems.scanId, scans.id))
+    .leftJoin(vulnerabilities, eq(remediationItems.vulnId, vulnerabilities.id))
+    .where(
+      and(
+        eq(remediationItems.organizationId, orgId),
+        opts?.status   ? eq(remediationItems.status, opts.status)     : undefined,
+        opts?.scanId != null ? eq(remediationItems.scanId, opts.scanId) : undefined,
+      )
+    )
     .orderBy(desc(remediationItems.createdAt));
 }
 
