@@ -19,6 +19,7 @@ export interface NvdCveInfo {
   cveId: string;
   ranges: NvdVersionRange[];
   hasRangeData: boolean; // false = NVD returned no CPE config → conservative include
+  affectedProducts: string[]; // "vendor:product" pairs from CPE criteria, e.g. ["apache:http_server"]
 }
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,11 @@ async function getCached(cveId: string): Promise<NvdCveInfo | null> {
   try {
     const redis = await getRedisClient();
     const raw = await redis.get(`nvd:cve:${cveId}`);
-    return raw ? (JSON.parse(raw) as NvdCveInfo) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as NvdCveInfo;
+    // Backwards-compatible: old cached entries may lack affectedProducts
+    if (!parsed.affectedProducts) parsed.affectedProducts = [];
+    return parsed;
   } catch {
     return null;
   }
@@ -45,30 +50,39 @@ async function setCache(info: NvdCveInfo): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// CPE version extraction — handles specific-version CPEs like
+// CPE parsing — handles NVD 2.3 format:
 // cpe:2.3:a:apache:http_server:2.4.7:*:*:*:*:*:*:*
+//                   ^^^^^^      ^^^^^^^^^^^  = vendor:product
 // ---------------------------------------------------------------------------
 
 function extractVersionFromCpe(criteria: string): string | null {
-  // Format: cpe:2.3:type:vendor:product:VERSION:...
   const parts = criteria.split(":");
-  // Index 5 is the version part (0-indexed: cpe, 2.3, type, vendor, product, version)
-  const version = parts[5];
+  const version = parts[5]; // cpe, 2.3, type, vendor, product, VERSION
   if (!version || version === "*" || version === "-") return null;
   return version;
 }
 
+function extractVendorProductFromCpe(criteria: string): string | null {
+  const parts = criteria.split(":");
+  // cpe:2.3:type:vendor:product:... → indices 3 and 4
+  const vendor = parts[3];
+  const product = parts[4];
+  if (!vendor || !product || vendor === "*" || product === "*") return null;
+  return `${vendor}:${product}`;
+}
+
 // ---------------------------------------------------------------------------
-// Parse NVD API response → version ranges
+// Parse NVD API response → version ranges + affected products
 // ---------------------------------------------------------------------------
 
 function parseNvdResponse(data: unknown, cveId: string): NvdCveInfo {
   try {
     const root = data as any;
     const item = root?.vulnerabilities?.[0]?.cve;
-    if (!item) return { cveId, ranges: [], hasRangeData: false };
+    if (!item) return { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };
 
     const ranges: NvdVersionRange[] = [];
+    const productSet = new Set<string>();
 
     const configurations: any[] = item.configurations ?? [];
     for (const config of configurations) {
@@ -77,6 +91,9 @@ function parseNvdResponse(data: unknown, cveId: string): NvdCveInfo {
         const cpeMatches: any[] = node.cpeMatch ?? [];
         for (const match of cpeMatches) {
           if (!match.vulnerable) continue;
+
+          const vp = extractVendorProductFromCpe(match.criteria ?? "");
+          if (vp) productSet.add(vp);
 
           const hasExplicitRange =
             match.versionStartIncluding ||
@@ -105,9 +122,14 @@ function parseNvdResponse(data: unknown, cveId: string): NvdCveInfo {
       }
     }
 
-    return { cveId, ranges, hasRangeData: ranges.length > 0 };
+    return {
+      cveId,
+      ranges,
+      hasRangeData: ranges.length > 0,
+      affectedProducts: [...productSet],
+    };
   } catch {
-    return { cveId, ranges: [], hasRangeData: false };
+    return { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };
   }
 }
 
@@ -128,7 +150,7 @@ export async function lookupCveVersionRanges(cveId: string): Promise<NvdCveInfo>
 
     if (!res.ok) {
       console.warn(`[NVD] ${cveId} → HTTP ${res.status}`);
-      const info: NvdCveInfo = { cveId, ranges: [], hasRangeData: false };
+      const info: NvdCveInfo = { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };
       await setCache(info);
       return info;
     }
@@ -139,7 +161,7 @@ export async function lookupCveVersionRanges(cveId: string): Promise<NvdCveInfo>
     return info;
   } catch (err) {
     console.warn(`[NVD] ${cveId} fetch error:`, err instanceof Error ? err.message : err);
-    return { cveId, ranges: [], hasRangeData: false };
+    return { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };
   }
 }
 

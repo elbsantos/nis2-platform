@@ -325,6 +325,34 @@ function calculateNIS2Scores(
 }
 
 // ---------------------------------------------------------------------------
+// CPE helpers — for matching Shodan CPEs to banner-detected services
+// ---------------------------------------------------------------------------
+
+// Extract "vendor:product" from CPE 2.2 or 2.3 strings.
+// CPE 2.2: "cpe:/a:apache:http_server:2.4.7"  → "apache:http_server"
+// CPE 2.3: "cpe:2.3:a:apache:http_server:..." → "apache:http_server"
+function parseCpeVendorProduct(cpe: string): string | null {
+  const parts = cpe.split(":");
+  let vendor: string, product: string;
+  if (cpe.startsWith("cpe:2.3:")) {
+    vendor = parts[3]; product = parts[4];
+  } else {
+    vendor = parts[2]; product = parts[3];
+  }
+  if (!vendor || !product || vendor === "*" || product === "*") return null;
+  return `${vendor}:${product}`;
+}
+
+// Returns true if vendor:product string is compatible with the detected service name.
+// E.g. "apache:http_server" matches serviceName "apache".
+function cpeMatchesService(vendorProduct: string, serviceName: string): boolean {
+  const lc = serviceName.toLowerCase();
+  const [vendor, product] = vendorProduct.split(":");
+  return lc.includes(vendor) || lc.includes(product) ||
+    vendor.includes(lc) || product.includes(lc);
+}
+
+// ---------------------------------------------------------------------------
 // Main executor
 // ---------------------------------------------------------------------------
 
@@ -403,24 +431,51 @@ export async function executeAgentlessScan(
         cves: isSharedInfra ? [] : Object.keys(p.vulns ?? {}),
       })) ?? [];
 
-    // ── Enrich HTTP ports with Server: banner from HTTP headers ───────────
-    // Shodan often reports service="unknown" for ports 80/443; the Server: header
-    // gives us the actual product and version (e.g. "Apache/2.4.7 (Ubuntu)").
+    // ── Enrich HTTP ports with Server: banner + CPE-based CVE assignment ──────
+    // InternetDB ports carry no product/version/vulns. The Server: response header
+    // provides the service identity. Host-level CVEs (shodanData.vulns) are then
+    // assigned to the correct port via CPE matching so NVD can filter by product
+    // and version. The paid Shodan API may also return a product without version;
+    // the banner fills in the missing version in that case too.
+    const bannerEnrichedPorts = new Set<number>();
+
     if (httpHeaders?.serverBanner) {
       const banner = httpHeaders.serverBanner;
-      // Parse "Product/version (OS)" — e.g. "Apache/2.4.7 (Ubuntu)", "nginx/1.18.0"
       const m = banner.match(/^([A-Za-z0-9_\-\.]+)(?:\/([^\s(]+))?/);
       if (m) {
-        const product = m[1];
-        const version = m[2];
+        const bannerProduct = m[1];
+        const bannerVersion = m[2];
+        const shodanCpes = shodanData?.cpes ?? [];
+        const hostCves   = shodanData?.vulns ?? [];
+
         for (const p of openPorts) {
-          if ((p.port === 80 || p.port === 443) && p.service === "unknown") {
-            p.service = product.toLowerCase();
-            p.product = product;
-            if (version) p.version = version;
+          if (p.port !== 80 && p.port !== 443) continue;
+
+          // Set service from banner when Shodan has none
+          if (p.service === "unknown") {
+            p.service = bannerProduct.toLowerCase();
+            p.product = bannerProduct;
+          }
+          // Fill missing version — paid Shodan API may return product but not version
+          if (!p.version && bannerVersion) {
+            p.version = bannerVersion;
+          }
+
+          // Assign host-level CVEs when version is now known, no per-port CVEs exist,
+          // and a matching CPE confirms the service identity (prevents SSH CVEs from
+          // appearing on the Apache port, etc.).
+          if (p.version && p.cves.length === 0 && hostCves.length > 0 && shodanCpes.length > 0) {
+            const matchCpe = shodanCpes
+              .map(parseCpeVendorProduct)
+              .find((vp): vp is string => vp !== null && cpeMatchesService(vp, p.service));
+            if (matchCpe) {
+              p.cves = [...hostCves];
+              bannerEnrichedPorts.add(p.port);
+              console.log(`[CVE] Porto ${p.port} (${p.service} ${p.version}): ${hostCves.length} CVEs candidatos via CPE ${matchCpe}`);
+            }
           }
         }
-        console.log(`[Scanner] Server banner: ${banner} → produto=${product} versão=${version ?? "desconhecida"}`);
+        console.log(`[Scanner] Server banner: ${banner} → produto=${bannerProduct} versão=${bannerVersion ?? "desconhecida"}`);
       }
     }
 
@@ -511,9 +566,25 @@ export async function executeAgentlessScan(
           continue;
         }
 
+        const nvdInfo = nvdRangeMap.get(cveId);
+
+        // For banner-enriched ports (CVEs came from host-level, not per-port Shodan):
+        // filter by NVD affected products to prevent cross-service leakage.
+        // Example: CVE affecting "openbsd:openssh" is excluded from the Apache port.
+        if (bannerEnrichedPorts.has(portFinding.port)) {
+          if (nvdInfo && nvdInfo.affectedProducts.length > 0) {
+            const productMatch = nvdInfo.affectedProducts.some(
+              (ap) => cpeMatchesService(ap, portFinding.service)
+            );
+            if (!productMatch) {
+              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
+              continue;
+            }
+          }
+        }
+
         // Filter by version using NVD ranges — skip CVEs that don't affect the detected version
         if (hasVersion) {
-          const nvdInfo = nvdRangeMap.get(cveId);
           if (nvdInfo?.hasRangeData) {
             const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
             if (!inRange) {
