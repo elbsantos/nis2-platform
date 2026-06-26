@@ -14,6 +14,7 @@ import type { HttpHeadersResult } from "../integrations/http-headers";
 import type { DarkWebResult } from "../integrations/dark-web";
 import { getCisControls } from "../utils/cis-mapping";
 import { getIso27001Controls, getNistCsfControls } from "../utils/framework-mapping";
+import { batchLookupCveVersionRanges, isVersionInNvdRanges } from "../integrations/nvd";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -324,6 +325,34 @@ function calculateNIS2Scores(
 }
 
 // ---------------------------------------------------------------------------
+// CPE helpers — for matching Shodan CPEs to banner-detected services
+// ---------------------------------------------------------------------------
+
+// Extract "vendor:product" from CPE 2.2 or 2.3 strings.
+// CPE 2.2: "cpe:/a:apache:http_server:2.4.7"  → "apache:http_server"
+// CPE 2.3: "cpe:2.3:a:apache:http_server:..." → "apache:http_server"
+function parseCpeVendorProduct(cpe: string): string | null {
+  const parts = cpe.split(":");
+  let vendor: string, product: string;
+  if (cpe.startsWith("cpe:2.3:")) {
+    vendor = parts[3]; product = parts[4];
+  } else {
+    vendor = parts[2]; product = parts[3];
+  }
+  if (!vendor || !product || vendor === "*" || product === "*") return null;
+  return `${vendor}:${product}`;
+}
+
+// Returns true if vendor:product string is compatible with the detected service name.
+// E.g. "apache:http_server" matches serviceName "apache".
+function cpeMatchesService(vendorProduct: string, serviceName: string): boolean {
+  const lc = serviceName.toLowerCase();
+  const [vendor, product] = vendorProduct.split(":");
+  return lc.includes(vendor) || lc.includes(product) ||
+    vendor.includes(lc) || product.includes(lc);
+}
+
+// ---------------------------------------------------------------------------
 // Main executor
 // ---------------------------------------------------------------------------
 
@@ -347,8 +376,10 @@ export async function executeAgentlessScan(
 
     const isDomain = !isIpAddress(options.target);
 
-    // ── 2. Shodan + Censys + Direct TLS (parallel) ─────────────────────────
-    const [shodanData, censysData, directTls] = await Promise.all([
+    // ── 2. Shodan + Censys + Direct TLS + HTTP headers (parallel) ──────────
+    // HTTP headers fetched here (not in step 6) so the Server: banner is
+    // available to enrich port 80/443 service/version before the CVE loop.
+    const [shodanData, censysData, directTls, httpHeaders] = await Promise.all([
       import("../integrations/shodan").then((m) =>
         m.lookupHost(options.target).catch(() => null)
       ) as Promise<ShodanHostResult | null>,
@@ -360,6 +391,9 @@ export async function executeAgentlessScan(
             m.checkDirectTls(options.target).catch(() => null)
           ) as Promise<DirectTlsResult | null>
         : Promise.resolve(null),
+      import("../integrations/http-headers").then((m) =>
+        m.checkHttpHeaders(options.target).catch(() => null)
+      ) as Promise<HttpHeadersResult | null>,
     ]);
 
     // ── 3. Detect shared/anycast infrastructure ────────────────────────────
@@ -396,6 +430,54 @@ export async function executeAgentlessScan(
         version: p.version,
         cves: isSharedInfra ? [] : Object.keys(p.vulns ?? {}),
       })) ?? [];
+
+    // ── Enrich HTTP ports with Server: banner + CPE-based CVE assignment ──────
+    // InternetDB ports carry no product/version/vulns. The Server: response header
+    // provides the service identity. Host-level CVEs (shodanData.vulns) are then
+    // assigned to the correct port via CPE matching so NVD can filter by product
+    // and version. The paid Shodan API may also return a product without version;
+    // the banner fills in the missing version in that case too.
+    const bannerEnrichedPorts = new Set<number>();
+
+    if (httpHeaders?.serverBanner) {
+      const banner = httpHeaders.serverBanner;
+      const m = banner.match(/^([A-Za-z0-9_\-\.]+)(?:\/([^\s(]+))?/);
+      if (m) {
+        const bannerProduct = m[1];
+        const bannerVersion = m[2];
+        const shodanCpes = shodanData?.cpes ?? [];
+        const hostCves   = shodanData?.vulns ?? [];
+
+        for (const p of openPorts) {
+          if (p.port !== 80 && p.port !== 443) continue;
+
+          // Set service from banner when Shodan has none
+          if (p.service === "unknown") {
+            p.service = bannerProduct.toLowerCase();
+            p.product = bannerProduct;
+          }
+          // Fill missing version — paid Shodan API may return product but not version
+          if (!p.version && bannerVersion) {
+            p.version = bannerVersion;
+          }
+
+          // Assign host-level CVEs when version is now known, no per-port CVEs exist,
+          // and a matching CPE confirms the service identity (prevents SSH CVEs from
+          // appearing on the Apache port, etc.).
+          if (p.version && p.cves.length === 0 && hostCves.length > 0 && shodanCpes.length > 0) {
+            const matchCpe = shodanCpes
+              .map(parseCpeVendorProduct)
+              .find((vp): vp is string => vp !== null && cpeMatchesService(vp, p.service));
+            if (matchCpe) {
+              p.cves = [...hostCves];
+              bannerEnrichedPorts.add(p.port);
+              console.log(`[CVE] Porto ${p.port} (${p.service} ${p.version}): ${hostCves.length} CVEs candidatos via CPE ${matchCpe}`);
+            }
+          }
+        }
+        console.log(`[Scanner] Server banner: ${banner} → produto=${bannerProduct} versão=${bannerVersion ?? "desconhecida"}`);
+      }
+    }
 
     // Add Censys services not already in Shodan
     const censysPorts: PortFinding[] =
@@ -437,7 +519,36 @@ export async function executeAgentlessScan(
     const { createVulnerability } = await import("../db");
     const currentYear = new Date().getFullYear();
 
+    // Pre-fetch NVD version ranges for all CVEs found — batch to stay within rate limits.
+    // This allows us to filter out CVEs that don't actually affect the detected version.
+    const allCveIds = openPorts.flatMap((p) => p.cves);
+    const nvdRangeMap = await batchLookupCveVersionRanges(allCveIds);
+
     for (const portFinding of openPorts) {
+      // When a port has CVEs but no version, emit ONE synthetic finding instead of all CVEs.
+      // This avoids flooding the report with potentially inapplicable CVEs.
+      const hasVersion = Boolean(portFinding.version);
+      const hasCves = portFinding.cves.length > 0;
+
+      if (hasCves && !hasVersion) {
+        const svcName = portFinding.service !== "unknown" ? portFinding.service : `serviço na porta ${portFinding.port}`;
+        console.log(`[CVE filter] Porto ${portFinding.port}: versão desconhecida com ${portFinding.cves.length} CVEs → NIS2-SVC-UNKNOWN`);
+        const nis2Unknown = ["Art. 21(2)(e)", "Art. 21(2)(f)"];
+        vulns.push({
+          cveId: "NIS2-SVC-UNKNOWN",
+          cvssScore: 5.0,
+          severity: "medium",
+          description: `${svcName} (porto ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`,
+          affectedService: portFinding.service,
+          nis2Articles: nis2Unknown,
+          cisControls:      getCisControls("NIS2-SVC-UNKNOWN", nis2Unknown),
+          iso27001Controls: getIso27001Controls("NIS2-SVC-UNKNOWN", nis2Unknown),
+          nistCsfControls:  getNistCsfControls("NIS2-SVC-UNKNOWN", nis2Unknown),
+          remediationHint: `Identifica a versão do ${svcName} e actualiza para eliminar as vulnerabilidades conhecidas.`,
+        });
+        continue;
+      }
+
       for (const cveId of portFinding.cves) {
         // Filter out CVEs with future year — reserved IDs not yet officially published
         const cveYearMatch = cveId.match(/^CVE-(\d{4})-/);
@@ -454,6 +565,37 @@ export async function executeAgentlessScan(
           console.log(`[Scanner] Skipping unscored CVE ${cveId}`);
           continue;
         }
+
+        const nvdInfo = nvdRangeMap.get(cveId);
+
+        // For banner-enriched ports (CVEs came from host-level, not per-port Shodan):
+        // filter by NVD affected products to prevent cross-service leakage.
+        // Example: CVE affecting "openbsd:openssh" is excluded from the Apache port.
+        if (bannerEnrichedPorts.has(portFinding.port)) {
+          if (nvdInfo && nvdInfo.affectedProducts.length > 0) {
+            const productMatch = nvdInfo.affectedProducts.some(
+              (ap) => cpeMatchesService(ap, portFinding.service)
+            );
+            if (!productMatch) {
+              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
+              continue;
+            }
+          }
+        }
+
+        // Filter by version using NVD ranges — skip CVEs that don't affect the detected version
+        if (hasVersion) {
+          if (nvdInfo?.hasRangeData) {
+            const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
+            if (!inRange) {
+              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
+              continue;
+            }
+            console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
+          }
+          // If hasRangeData=false: NVD returned no config → conservative include (log nothing)
+        }
+
         const severity = (s: number) =>
           s >= 9 ? "critical" : s >= 7 ? "high" : s >= 4 ? "medium" : "low";
         const sevPT = (s: number) =>
@@ -549,17 +691,12 @@ export async function executeAgentlessScan(
       }
     }
 
-    // ── 6. Email security + HTTP headers (parallel, domain-only for email) ─
-    const [emailSecurity, httpHeaders] = await Promise.all([
-      isDomain
-        ? import("../integrations/email-security").then((m) =>
-            m.checkEmailSecurity(options.target).catch(() => null)
-          )
-        : Promise.resolve(null),
-      import("../integrations/http-headers").then((m) =>
-        m.checkHttpHeaders(options.target).catch(() => null)
-      ),
-    ]);
+    // ── 6. Email security (domain-only; http-headers already fetched in step 2) ─
+    const emailSecurity = isDomain
+      ? await import("../integrations/email-security").then((m) =>
+          m.checkEmailSecurity(options.target).catch(() => null)
+        )
+      : null;
 
     // Convert failed email checks to synthetic vulns
     const extraDeductions: ExtraDeduction[] = [];

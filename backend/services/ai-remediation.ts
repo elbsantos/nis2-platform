@@ -286,7 +286,11 @@ export async function generateRemediationForScan(
         remediation:       v.remediationHint ?? null,
       }));
 
-  if (vulns.length === 0) return 0;
+  const filteredVulns = vulns.filter(
+    (v) => v.cveId?.trim() && v.description?.trim()
+  );
+
+  if (filteredVulns.length === 0) return 0;
 
   const orgContext = {
     name:   org?.name ?? "Organização",
@@ -299,7 +303,7 @@ export async function generateRemediationForScan(
 
   // Process sequentially to avoid rate limiting
   let created = 0;
-  for (const vuln of vulns) {
+  for (const vuln of filteredVulns) {
     try {
       const plan = await generatePlanForVuln(vuln, orgContext);
       await createRemediationItem({

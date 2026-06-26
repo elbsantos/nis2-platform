@@ -15,7 +15,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:web": "tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

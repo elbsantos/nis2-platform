@@ -26,6 +26,7 @@ export interface HttpHeadersResult {
   checks: HttpHeaderCheck[];
   score: number;
   url: string;
+  serverBanner?: string; // value of the Server: response header, e.g. "Apache/2.4.7 (Ubuntu)"
 }
 
 function fetchHeaders(url: string, redirectsLeft = 3): Promise<IncomingHttpHeaders> {
@@ -220,6 +221,8 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
     }
   }
 
+  const serverBanner = headerValue(headers, "server");
+
   const checks: HttpHeaderCheck[] = [
     checkHSTS(headers, isHttps),
     checkCSP(headers),
@@ -239,5 +242,5 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
     else if (check.status === "warn") deduction += 5;
   }
 
-  return { checks, score: Math.max(0, 100 - deduction), url: usedUrl };
+  return { checks, score: Math.max(0, 100 - deduction), url: usedUrl, serverBanner };
 }

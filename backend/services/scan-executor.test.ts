@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
 
-// Mock the integrations
+// Mock all integrations and external dependencies
 vi.mock("../integrations/shodan", () => ({
   lookupHost: vi.fn(),
 }));
@@ -17,9 +17,34 @@ vi.mock("../integrations/censys", () => ({
   lookupHost: vi.fn(),
 }));
 
+vi.mock("../integrations/direct-tls", () => ({
+  checkDirectTls: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/http-headers", () => ({
+  checkHttpHeaders: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/email-security", () => ({
+  checkEmailSecurity: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/ssh-check", () => ({
+  checkSsh: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/dark-web", () => ({
+  checkDarkWeb: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("../integrations/nvd", () => ({
+  batchLookupCveVersionRanges: vi.fn().mockResolvedValue(new Map()),
+  isVersionInNvdRanges: vi.fn().mockReturnValue(true),
+}));
+
 vi.mock("../db", () => ({
-  updateScanStatus: vi.fn(),
-  createVulnerability: vi.fn(),
+  updateScanStatus: vi.fn().mockResolvedValue(undefined),
+  createVulnerability: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("dns/promises", () => ({
@@ -29,6 +54,8 @@ vi.mock("dns/promises", () => ({
 import { executeAgentlessScan, verifyOwnership } from "./scan-executor";
 import { lookupHost as shodanLookup } from "../integrations/shodan";
 import { lookupHost as censysLookup } from "../integrations/censys";
+import { checkHttpHeaders } from "../integrations/http-headers";
+import { batchLookupCveVersionRanges } from "../integrations/nvd";
 import { resolveTxt } from "dns/promises";
 
 describe("verifyOwnership", () => {
@@ -176,6 +203,7 @@ describe("executeAgentlessScan", () => {
           port: 22,
           transport: "tcp",
           product: "OpenSSH",
+          version: "8.4p1",
           vulns: {
             "CVE-2021-SSH": {
               cvss: 9.8,
@@ -202,5 +230,61 @@ describe("executeAgentlessScan", () => {
 
     const sshVuln = result.vulnerabilities.find((v) => v.cveId === "CVE-2021-SSH");
     expect(sshVuln?.nis2Articles).toContain("Art. 21(2)(i)");
+  });
+
+  it("enriquece porto 80 com banner Server e CVEs via CPE quando InternetDB nao tem versao", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+
+    // InternetDB: port 80 without product/version/vulns; host-level CVE + Apache CPE
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: ["example.com"],
+      tags: [],
+      cpes: ["cpe:/a:apache:http_server:2.4.7"],
+      vulns: ["CVE-2014-0117"],
+      ports: [{ port: 80, transport: "tcp" }],
+    });
+
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "1.2.3.4", services: [], tlsIssues: [] });
+
+    // Server: header returns Apache/2.4.7
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [],
+      score: 50,
+      url: "http://example.com",
+      serverBanner: "Apache/2.4.7 (Ubuntu)",
+    });
+
+    // NVD confirms CVE-2014-0117 affects apache:http_server
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(
+      new Map([
+        [
+          "CVE-2014-0117",
+          {
+            cveId: "CVE-2014-0117",
+            ranges: [{ versionStartIncluding: "2.4.0", versionEndExcluding: "2.4.10" }],
+            hasRangeData: true,
+            affectedProducts: ["apache:http_server"],
+          },
+        ],
+      ])
+    );
+
+    const result = await executeAgentlessScan({
+      scanId: 1,
+      organizationId: 1,
+      target: "example.com",
+      mode: "sme",
+    });
+
+    expect(result.success).toBe(true);
+    // Port 80 should show apache 2.4.7, not unknown
+    const port80 = result.openPorts.find((p) => p.port === 80);
+    expect(port80?.service).toBe("apache");
+    expect(port80?.version).toBe("2.4.7");
+    // CVE-2014-0117 should appear (affects apache:http_server 2.4.7)
+    const apacheCve = result.vulnerabilities.find((v) => v.cveId === "CVE-2014-0117");
+    expect(apacheCve).toBeDefined();
+    expect(apacheCve?.affectedService).toBe("apache");
   });
 });
