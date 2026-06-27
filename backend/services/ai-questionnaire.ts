@@ -30,17 +30,18 @@ export interface NIS2ControlEvidence {
 }
 
 export interface NIS2Control {
-  id:           string;       // ex.: "a-1"
-  article:      string;       // ex.: "Art. 21(2)(a)"
-  articleSlug:  string;       // ex.: "a"
-  articleTitle: string;
-  measure:      Measure;      // = articleSlug para estes 42 controlos
-  question:     string;
-  helpText:     string;
-  why:          string;       // 1 linha; porquê este controlo importa
-  evidence:     NIS2ControlEvidence;
-  autoSource?:  AutoSource;   // scanner preenche/verifica automaticamente
-  weight:       number;       // default 1
+  id:            string;       // ex.: "a-1"
+  article:       string;       // ex.: "Art. 21(2)(a)"
+  articleSlug:   string;       // ex.: "a"
+  articleTitle:  string;
+  measure:       Measure;      // = articleSlug para estes 42 controlos
+  question:      string;
+  helpText:      string;
+  why:           string;       // 1 linha; porquê este controlo importa
+  evidence:      NIS2ControlEvidence;
+  autoSource?:   AutoSource;   // scanner preenche/verifica automaticamente
+  weight:        number;       // default 1
+  frameworkSlug: string;       // ADR-002: "nis2-eu" por defeito
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +460,8 @@ export const NIS2_CONTROLS: NIS2Control[] = [
     evidence: { required: true, type: "documento", description: "Política de comunicações com lista de canais aprovados para informação sensível" },
     weight: 1,
   },
-];
+// ADR-002: frameworkSlug adicionado via map — nunca cravar "nis2-eu" inline
+].map((c) => ({ ...c, frameworkSlug: "nis2-eu" })) as NIS2Control[];
 
 // ---------------------------------------------------------------------------
 // Scoring — weight-aware (com weight=1, comportamento idêntico ao anterior)

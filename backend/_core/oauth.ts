@@ -9,7 +9,7 @@ import type { Application } from "express";
 import { SignJWT } from "jose";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { getUserByEmail, createUser, createOrganization, getOrganizationByOwnerId } from "../db";
+import { getUserByEmail, createUser, createOrganization, getOrCreateOrgForOwner } from "../db";
 
 const COOKIE_NAME = "auth_token";
 const COOKIE_OPTIONS = {
@@ -171,7 +171,7 @@ export function registerOAuthRoutes(app: Application): void {
       const user = await getUserById(userId);
       if (!user) { res.status(401).json({ error: "Utilizador não encontrado" }); return; }
 
-      const org = await getOrganizationByOwnerId(userId);
+      const org = await getOrCreateOrgForOwner(userId, user.name ?? undefined);
       res.json({ id: user.id, email: user.email, name: user.name, org });
     } catch {
       res.status(401).json({ error: "Token inválido" });
