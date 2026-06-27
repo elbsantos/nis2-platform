@@ -89,6 +89,25 @@ export const COMPANY_SECTOR_LABEL: Record<CompanySector, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// ADR-002 — Identidade fiscal e jurisdição
+// ---------------------------------------------------------------------------
+
+export const taxIdType = z.enum(["NIPC", "NIF", "NIT", "EIN", "VAT", "OTHER"]);
+export type TaxIdType = z.infer<typeof taxIdType>;
+
+export const TAX_ID_TYPE_LABEL: Record<TaxIdType, string> = {
+  NIPC:  "NIPC (Número de Identificação de Pessoa Coletiva — PT)",
+  NIF:   "NIF (Número de Identificação Fiscal — PT)",
+  NIT:   "NIT (Número de Identificação Tributária — BR)",
+  EIN:   "EIN (Employer Identification Number — US)",
+  VAT:   "VAT Number (IVA — UE)",
+  OTHER: "Outro",
+};
+
+export const jurisdictionCode = z.string().length(2).toUpperCase();
+export type JurisdictionCode = z.infer<typeof jurisdictionCode>;
+
+// ---------------------------------------------------------------------------
 // Estado e origem da evidência
 // ---------------------------------------------------------------------------
 

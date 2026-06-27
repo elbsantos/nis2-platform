@@ -19,7 +19,9 @@ export const organizations = mysqlTable("organizations", {
   id:                   int("id").autoincrement().primaryKey(),
   name:                 varchar("name", { length: 255 }).notNull(),
   legalName:            varchar("legalName", { length: 255 }),
-  nipc:                 varchar("nipc", { length: 20 }),
+  taxId:                varchar("taxId", { length: 20 }),        // ADR-002: renomeado de nipc
+  taxIdType:            varchar("taxIdType", { length: 50 }).default("NIPC"),  // ADR-002: NIPC|NIF|NIT|EIN|VAT…
+  jurisdiction:         varchar("jurisdiction", { length: 2 }).default("PT"),  // ADR-002: ISO 3166-1 alpha-2
   domain:               varchar("domain", { length: 255 }),
   address:              varchar("address", { length: 500 }),
   ownerId:              int("ownerId"),

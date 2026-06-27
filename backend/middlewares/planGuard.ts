@@ -58,16 +58,9 @@ export function planProcedure(minimumPlan: Plan) {
   return protectedProcedure.use(async (opts) => {
     const { ctx, next } = opts;
 
-    // Get org from context (requires auth)
-    const { getOrganizationByOwnerId } = await import("../db");
-    const org = await getOrganizationByOwnerId(ctx.user.id);
-
-    if (!org) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organização não encontrada. Completa o registo primeiro.",
-      });
-    }
+    // Self-heal: cria org se não existir (ADR-002 — lazy creation)
+    const { getOrCreateOrgForOwner } = await import("../db");
+    const org = await getOrCreateOrgForOwner(ctx.user.id, ctx.user.name ?? undefined);
 
     const currentPlan = await getOrgPlan(org.id);
     const hasAccess = PLAN_RANK[currentPlan] >= PLAN_RANK[minimumPlan];

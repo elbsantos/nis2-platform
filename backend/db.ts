@@ -102,8 +102,38 @@ export async function getOrganizationByOwnerId(ownerId: number) {
     .select()
     .from(organizations)
     .where(eq(organizations.ownerId, ownerId))
+    .orderBy(asc(organizations.id))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * ADR-002: Self-heal — retorna a org do dono ou cria uma se não existir.
+ * Garante uma-org-por-dono: se já existe, nunca cria duplicado.
+ */
+export async function getOrCreateOrgForOwner(
+  ownerId: number,
+  displayName?: string
+): Promise<NonNullable<Awaited<ReturnType<typeof getOrganizationByOwnerId>>>> {
+  const existing = await getOrganizationByOwnerId(ownerId);
+  if (existing) return existing;
+
+  const name = displayName?.trim() || `Org-${ownerId}`;
+  const [row] = await getDb()
+    .insert(organizations)
+    .values({ name, ownerId })
+    .$returningId();
+
+  // Link user → org
+  await getDb()
+    .update(users)
+    .set({ organizationId: row.id })
+    .where(eq(users.id, ownerId));
+
+  // Fetch full org row (includes sector, size, etc.)
+  const created = await getOrganizationByOwnerId(ownerId);
+  if (!created) throw new Error(`[DB] getOrCreateOrgForOwner: org ${row.id} not found after insert`);
+  return created;
 }
 
 export async function getOrganizationById(orgId: number) {
