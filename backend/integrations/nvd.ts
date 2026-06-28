@@ -20,6 +20,7 @@ export interface NvdCveInfo {
   ranges: NvdVersionRange[];
   hasRangeData: boolean; // false = NVD returned no CPE config → conservative include
   affectedProducts: string[]; // "vendor:product" pairs from CPE criteria, e.g. ["apache:http_server"]
+  cvssScore?: number; // CVSS v3.1 preferred > v3.0 > v2; absent = NVD not scored yet
 }
 
 // ---------------------------------------------------------------------------
@@ -122,11 +123,19 @@ function parseNvdResponse(data: unknown, cveId: string): NvdCveInfo {
       }
     }
 
+    // Extract CVSS score: v3.1 preferred > v3.0 > v2 (all from primary source)
+    const metrics = item.metrics ?? {};
+    const cvssScore: number | undefined =
+      metrics.cvssMetricV31?.[0]?.cvssData?.baseScore ??
+      metrics.cvssMetricV30?.[0]?.cvssData?.baseScore ??
+      metrics.cvssMetricV2?.[0]?.cvssData?.baseScore;
+
     return {
       cveId,
       ranges,
       hasRangeData: ranges.length > 0,
       affectedProducts: [...productSet],
+      cvssScore,
     };
   } catch {
     return { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };

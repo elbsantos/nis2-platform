@@ -352,6 +352,29 @@ function cpeMatchesService(vendorProduct: string, serviceName: string): boolean 
     vendor.includes(lc) || product.includes(lc);
 }
 
+// Extract version from CPE 2.2 ("cpe:/a:apache:http_server:2.4.7") or
+// CPE 2.3 ("cpe:2.3:a:apache:http_server:2.4.7:*:...") strings.
+function parseCpeVersion(cpe: string): string | null {
+  const parts = cpe.split(":");
+  const v = cpe.startsWith("cpe:2.3:") ? parts[5] : parts[4];
+  if (!v || v === "*" || v === "-") return null;
+  return v;
+}
+
+// Maps well-known port numbers to service name tokens for CPE matching.
+// Used to identify services on non-HTTP ports using Shodan CPE data.
+const CPE_PORT_HINTS: Record<number, string> = {
+  21:    "ftp",
+  22:    "ssh",
+  25:    "smtp",
+  110:   "pop3",
+  143:   "imap",
+  3306:  "mysql",
+  5432:  "postgresql",
+  6379:  "redis",
+  27017: "mongodb",
+};
+
 // ---------------------------------------------------------------------------
 // Main executor
 // ---------------------------------------------------------------------------
@@ -479,6 +502,25 @@ export async function executeAgentlessScan(
       }
     }
 
+    // Phase 2: CPE-based service/version identification for non-HTTP "unknown" ports.
+    // Only updates display fields (service, version) — does NOT assign host CVEs.
+    // CVE assignment for SSH is handled by the dedicated SSH check (step 5b).
+    const shodanCpesAll = shodanData?.cpes ?? [];
+    for (const p of openPorts) {
+      if (p.service !== "unknown") continue;
+      const hint = CPE_PORT_HINTS[p.port];
+      if (!hint) continue;
+      for (const cpe of shodanCpesAll) {
+        const vp = parseCpeVendorProduct(cpe);
+        if (!vp || !cpeMatchesService(vp, hint)) continue;
+        p.service = vp.split(":")[1] ?? hint;
+        const cpeVer = parseCpeVersion(cpe);
+        if (cpeVer && !p.version) p.version = cpeVer;
+        console.log(`[Scanner] Porto ${p.port}: CPE → ${p.service} ${p.version ?? "(versão desconhecida)"}`);
+        break;
+      }
+    }
+
     // Add Censys services not already in Shodan
     const censysPorts: PortFinding[] =
       censysData?.services
@@ -558,7 +600,11 @@ export async function executeAgentlessScan(
         }
 
         const shodanPort = shodanData?.ports?.find((p) => p.port === portFinding.port);
-        const cvssScore: number = shodanPort?.vulns?.[cveId]?.cvss ?? 5.0;
+        const nvdInfo = nvdRangeMap.get(cveId);
+
+        // Prefer per-port Shodan CVSS (paid API), then NVD CVSS, then 5.0 as last resort.
+        // For InternetDB (free), shodanPort.vulns is always undefined → NVD CVSS used instead.
+        const cvssScore: number = shodanPort?.vulns?.[cveId]?.cvss ?? nvdInfo?.cvssScore ?? 5.0;
 
         // Skip CVEs with no CVSS score (unscored = not yet officially published)
         if (cvssScore === 0) {
@@ -566,21 +612,23 @@ export async function executeAgentlessScan(
           continue;
         }
 
-        const nvdInfo = nvdRangeMap.get(cveId);
-
-        // For banner-enriched ports (CVEs came from host-level, not per-port Shodan):
-        // filter by NVD affected products to prevent cross-service leakage.
-        // Example: CVE affecting "openbsd:openssh" is excluded from the Apache port.
+        // Strict mode for banner-enriched ports (CVEs came from host-level Shodan, not per-port).
+        // Without NVD product confirmation we cannot verify the CVE applies to this service.
+        // "Conservative include" would reintroduce the 120-CVE regression; be explicit instead.
         if (bannerEnrichedPorts.has(portFinding.port)) {
-          if (nvdInfo && nvdInfo.affectedProducts.length > 0) {
-            const productMatch = nvdInfo.affectedProducts.some(
-              (ap) => cpeMatchesService(ap, portFinding.service)
-            );
-            if (!productMatch) {
-              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
-              continue;
-            }
+          if (!nvdInfo || nvdInfo.affectedProducts.length === 0) {
+            // No NVD data or no product info → cannot confirm → exclude
+            console.log(`[CVE filter] ${cveId} — excluído (sem dados NVD de produto; porto banner ${portFinding.port})`);
+            continue;
           }
+          const productMatch = nvdInfo.affectedProducts.some(
+            (ap) => cpeMatchesService(ap, portFinding.service)
+          );
+          if (!productMatch) {
+            console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
+            continue;
+          }
+          // Product confirmed by NVD — version filter runs below (same path as non-banner)
         }
 
         // Filter by version using NVD ranges — skip CVEs that don't affect the detected version
@@ -661,6 +709,13 @@ export async function executeAgentlessScan(
         .catch(() => null);
 
       if (sshResult) {
+        // Update port 22 display fields from live SSH banner (fallback after CPE enrichment)
+        const port22 = allPorts.find((p) => p.port === 22);
+        if (port22) {
+          if (port22.service === "unknown") port22.service = "openssh";
+          if (!port22.version && sshResult.version) port22.version = sshResult.version;
+        }
+
         for (const sv of sshResult.vulns) {
           const affectedService = `SSH (${sshResult.software})`;
           vulns.push({
