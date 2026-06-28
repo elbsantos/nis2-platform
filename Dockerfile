@@ -29,10 +29,6 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy compiled assets from builder
 COPY --from=builder /app/dist ./dist
 
-# drizzle-kit needs the config and schema to run push/migrate
-COPY drizzle.config.ts ./
-COPY database/ ./database/
-
 # Course documents served at runtime
 COPY backend/content/ ./backend/content/
 
