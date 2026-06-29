@@ -105,7 +105,7 @@ const OPENSSH_RULES: VulnRule[] = [
     severity: "critical",
     description:
       'OpenSSH "regreSSHion" (CVE-2024-6387) — race condition no signal handler permite execução remota de código não autenticado em servidores Linux com glibc. Afecta OpenSSH 8.5p1–9.7p1.',
-    nis2Articles: ["Art. 21(2)(h)", "Art. 21(2)(i)"],
+    nis2Articles: ["Art. 21(2)(i)"],  // RCE SSH → controlo de acessos (i)
     remediationHint: "Actualiza OpenSSH para versão 9.8p1 ou superior.",
   },
   {
@@ -115,7 +115,7 @@ const OPENSSH_RULES: VulnRule[] = [
     severity: "critical",
     description:
       "OpenSSH < 9.6 — injecção de comandos OS via hostname controlado pelo utilizador em configurações ProxyCommand/ssh_config com expansão de tokens.",
-    nis2Articles: ["Art. 21(2)(e)", "Art. 21(2)(i)"],
+    nis2Articles: ["Art. 21(2)(i)"],  // command injection SSH → controlo de acessos (i)
     remediationHint: "Actualiza OpenSSH para 9.6p1 ou superior.",
   },
   {
@@ -145,7 +145,7 @@ const OPENSSH_RULES: VulnRule[] = [
     severity: "high",
     description:
       "OpenSSH < 7.1p2 — a funcionalidade UseRoaming vaza conteúdo de memória do processo para servidores maliciosos, podendo expor chaves privadas SSH e outros dados sensíveis.",
-    nis2Articles: ["Art. 21(2)(h)", "Art. 21(2)(i)"],
+    nis2Articles: ["Art. 21(2)(i)"],  // memory leak de chaves SSH → controlo de acessos (i)
     remediationHint: "Actualiza OpenSSH para 7.1p2 ou superior. Adiciona 'UseRoaming no' em /etc/ssh/ssh_config como medida imediata.",
   },
 ];
@@ -156,7 +156,7 @@ const OPENSSH_RULES: VulnRule[] = [
 
 function buildOutdatedFinding(version: string): SshVuln | null {
   if (!versionLessThan(version, "8.0")) return null;
-  const nis2Articles = ["Art. 21(2)(h)", "Art. 21(2)(i)"];
+  const nis2Articles = ["Art. 21(2)(i)"];  // versão SSH desactualizada → controlo de acessos (i)
   const cveId = "NIS2-SSH-OUTDATED";
   return {
     cveId,

@@ -31,7 +31,10 @@ export interface AgentlessScanOptions {
 export interface NIS2ArticleScore {
   article: string;
   title: string;
-  score: number;
+  /** null = não avaliável por scan externo (medida organizacional); 0–100 = score técnico */
+  score: number | null;
+  /** false = medida organizacional, não observável por scan externo */
+  scannable: boolean;
   findings: string[];
 }
 
@@ -83,74 +86,87 @@ export interface TlsIssueFinding {
 
 // ---------------------------------------------------------------------------
 // NIS2 Article mapping — Art. 21(2)(a)–(j)
-// Weight = percentage of overall score
+//
+// scannable=false: medida organizacional, não observável por scan externo.
+//   Estas medidas NÃO recebem score do scan — aparecem como "não avaliável".
+//   O score global do scan é calculado apenas sobre as medidas scannable=true.
+//
+// scannable=true: tem componente técnica observável externamente.
+//   (e) parcial · (f) parcial · (h) · (i) parcial · (j) parcial
+//
+// Porta/keyword → medida: um achado pertence a UMA só medida.
+//   Telnet (23), FTP (21) → (h) criptografia (protocolo em claro)
+//   syslog (514), TFTP (69), rpcbind (111) → (e) serviços expostos
+//   CVEs "default-password / weak-auth / anonymous" → (i) controlo de acessos
 // ---------------------------------------------------------------------------
 
 const NIS2_ARTICLE_MAP: Record<string, {
   title: string;
   riskPorts: number[];
-  riskCveKeywords: string[];
   weight: number;
+  scannable: boolean;
 }> = {
   "Art. 21(2)(a)": {
     title: "Políticas de segurança dos sistemas de informação",
     riskPorts: [],
-    riskCveKeywords: [],
     weight: 10,
+    scannable: false,   // puramente organizacional
   },
   "Art. 21(2)(b)": {
     title: "Gestão de incidentes",
     riskPorts: [],
-    riskCveKeywords: [],
     weight: 10,
+    scannable: false,   // puramente organizacional
   },
   "Art. 21(2)(c)": {
     title: "Continuidade de negócio e gestão de crises",
     riskPorts: [],
-    riskCveKeywords: [],
     weight: 8,
+    scannable: false,   // puramente organizacional
   },
   "Art. 21(2)(d)": {
     title: "Segurança da cadeia de abastecimento",
     riskPorts: [],
-    riskCveKeywords: ["supply-chain", "dependency"],
     weight: 8,
+    scannable: false,   // não observável por scan externo
   },
   "Art. 21(2)(e)": {
     title: "Segurança na aquisição e desenvolvimento de sistemas",
-    riskPorts: [8080, 8443, 9200, 5984, 27017], // Dev servers, Elasticsearch, CouchDB, MongoDB
-    riskCveKeywords: ["injection", "xss", "rce", "deserialization", "xxe"],
+    // Dev servers, Elasticsearch, CouchDB, MongoDB + syslog, TFTP, rpcbind (movidos de g)
+    riskPorts: [8080, 8443, 9200, 5984, 27017, 514, 69, 111],
     weight: 12,
+    scannable: true,
   },
   "Art. 21(2)(f)": {
     title: "Políticas de avaliação de eficácia das medidas",
     riskPorts: [],
-    riskCveKeywords: [],
     weight: 5,
+    scannable: true,    // parcial: serviços de monitorização expostos
   },
   "Art. 21(2)(g)": {
     title: "Práticas básicas de ciberhigiene e formação",
-    riskPorts: [23, 21, 514, 69, 111], // Telnet, FTP, syslog, TFTP, rpcbind
-    riskCveKeywords: ["default-password", "weak-auth", "no-auth", "anonymous"],
+    riskPorts: [],      // portas movidas para (h) e (e); não observável por scan
     weight: 10,
+    scannable: false,   // formação/higiene organizacional não é observável externamente
   },
   "Art. 21(2)(h)": {
     title: "Criptografia e encriptação",
-    riskPorts: [80], // Plain HTTP
-    riskCveKeywords: ["ssl", "tls", "weak-cipher", "heartbleed", "poodle", "rc4", "des"],
+    // Plain HTTP + FTP (21) + Telnet (23) — protocolos em claro (movidos de g)
+    riskPorts: [80, 21, 23],
     weight: 15,
+    scannable: true,
   },
   "Art. 21(2)(i)": {
     title: "Segurança dos recursos humanos e controlo de acessos",
     riskPorts: [3389, 22, 445, 5900, 5985], // RDP, SSH, SMB, VNC, WinRM
-    riskCveKeywords: ["privilege-escalation", "credential", "bypass-auth", "bruteforce"],
     weight: 12,
+    scannable: true,
   },
   "Art. 21(2)(j)": {
     title: "Autenticação multifator e comunicações seguras",
     riskPorts: [25, 110, 143, 587], // SMTP, POP3, IMAP (plain)
-    riskCveKeywords: ["mfa", "2fa", "otp", "starttls"],
     weight: 10,
+    scannable: true,
   },
 };
 
@@ -228,32 +244,44 @@ export async function verifyOwnership(
 }
 
 // ---------------------------------------------------------------------------
-// Map CVE to NIS2 articles (keyword-based heuristic)
+// Map CVE to a single NIS2 article (one finding → one medida)
+//
+// Regra: cada achado pertence a UMA medida, a mais específica que corresponde.
+// Medidas não scannáveis (a,b,c,d,g) não recebem achados de scan.
+// Prioridade: (h) cripto > (i) acessos > (j) autenticação > (e) sistemas > fallback (e)
 // ---------------------------------------------------------------------------
 
 function mapCveToNIS2Articles(cveId: string, description: string): string[] {
   const desc = description.toLowerCase();
-  const articles: string[] = [];
 
-  if (/ssl|tls|cipher|encrypt|heartbleed|poodle|rc4|des/.test(desc))
-    articles.push("Art. 21(2)(h)");
-  if (/rdp|ssh|smb|vnc|winrm|auth|credential|privilege|bruteforce/.test(desc))
-    articles.push("Art. 21(2)(i)");
-  if (/inject|xss|rce|execut|deserializ|xxe/.test(desc))
-    articles.push("Art. 21(2)(e)");
-  if (/telnet|ftp|default.pass|weak.auth|anonymous/.test(desc))
-    articles.push("Art. 21(2)(g)");
-  if (/mfa|otp|two.factor|starttls/.test(desc))
-    articles.push("Art. 21(2)(j)");
-  if (/supply.chain|dependency|third.party/.test(desc))
-    articles.push("Art. 21(2)(d)");
+  // (h) Criptografia — problemas de protocolo em claro ou cipher fraco
+  if (/ssl|tls|cipher|encrypt|heartbleed|poodle|rc4|des|weak.cipher/.test(desc))
+    return ["Art. 21(2)(h)"];
 
-  if (!articles.length) articles.push("Art. 21(2)(e)"); // fallback
-  return articles;
+  // (i) Controlo de acessos — acesso remoto, credenciais, privilege escalation
+  // Inclui keywords de (g) ("default-password", "weak-auth", "anonymous") movidos aqui
+  if (/rdp|ssh|smb|vnc|winrm|auth|credential|privilege|bruteforce|default.pass|weak.auth|no.auth|anonymous/.test(desc))
+    return ["Art. 21(2)(i)"];
+
+  // (j) Autenticação/identidade — MFA, OTP, STARTTLS, email auth
+  if (/mfa|otp|two.factor|starttls|dmarc|dkim|spf/.test(desc))
+    return ["Art. 21(2)(j)"];
+
+  // (e) Segurança de sistemas — injecção, execução, deserialização, serviços expostos
+  if (/inject|xss|rce|execut|deserializ|xxe|telnet|ftp|supply.chain|dependency/.test(desc))
+    return ["Art. 21(2)(e)"];
+
+  return ["Art. 21(2)(e)"]; // fallback: vulnerabilidade de sistema genérica
 }
 
 // ---------------------------------------------------------------------------
 // Calculate NIS2 scores per article
+//
+// Regras:
+//   • Artigos não scannáveis (scannable=false) → score=null, findings=[].
+//     Não entram na média ponderada (score global reflete só o avaliável).
+//   • Dedup por CVE dentro de cada artigo — o mesmo CVE não conta mais de uma vez.
+//   • Dedup por porto dentro de cada artigo — porto não deduzido duas vezes.
 // ---------------------------------------------------------------------------
 
 interface ExtraDeduction {
@@ -274,31 +302,37 @@ function calculateNIS2Scores(
   let totalWeight = 0;
 
   for (const [article, def] of Object.entries(NIS2_ARTICLE_MAP)) {
+    // Medidas organizacionais não avaliáveis por scan externo
+    if (!def.scannable) {
+      scores.push({ article, title: def.title, score: null, scannable: false, findings: [] });
+      continue;
+    }
+
     const findings: string[] = [];
     let deduction = 0;
+    const seenPorts = new Set<number>();
+    const seenCves  = new Set<string>();
 
-    // Port-based deductions
+    // Port-based deductions (sem duplicados)
     for (const riskPort of def.riskPorts) {
-      if (openPortSet.has(riskPort)) {
+      if (openPortSet.has(riskPort) && !seenPorts.has(riskPort)) {
+        seenPorts.add(riskPort);
         const svc = ports.find((p) => p.port === riskPort);
-        findings.push(
-          `Porto ${riskPort} (${svc?.service ?? "unknown"}) exposto — aumenta superfície de ataque`
-        );
+        findings.push(`Porto ${riskPort} (${svc?.service ?? "unknown"}) exposto — aumenta superfície de ataque`);
         deduction += 15;
       }
     }
 
-    // CVE-based deductions
+    // CVE-based deductions (cada CVE conta uma vez por artigo)
     for (const vuln of vulns) {
-      if (vuln.nis2Articles.includes(article)) {
-        findings.push(
-          `${vuln.cveId} (CVSS ${vuln.cvssScore.toFixed(1)}) — ${vuln.description}`
-        );
+      if (vuln.nis2Articles.includes(article) && !seenCves.has(vuln.cveId)) {
+        seenCves.add(vuln.cveId);
+        findings.push(`${vuln.cveId} (CVSS ${vuln.cvssScore.toFixed(1)}) — ${vuln.description}`);
         deduction += Math.min(vuln.cvssScore * 3, 25);
       }
     }
 
-    // TLS issues (only Art. 21(2)(h))
+    // TLS issues (apenas Art. 21(2)(h))
     if (article === "Art. 21(2)(h)") {
       for (const tls of tlsIssues) {
         findings.push(`Porto ${tls.port}: ${tls.issue}`);
@@ -306,7 +340,7 @@ function calculateNIS2Scores(
       }
     }
 
-    // Email security + HTTP header deductions
+    // Deduções extra (avisos/warns que não têm vuln associada)
     for (const extra of extraDeductions) {
       if (extra.article === article) {
         findings.push(extra.finding);
@@ -315,12 +349,13 @@ function calculateNIS2Scores(
     }
 
     const score = Math.max(0, Math.round(100 - deduction));
-    scores.push({ article, title: def.title, score, findings });
+    scores.push({ article, title: def.title, score, scannable: true, findings });
     weightedTotal += score * def.weight;
-    totalWeight += def.weight;
+    totalWeight   += def.weight;
   }
 
-  const overall = Math.round(weightedTotal / totalWeight);
+  // Overall = média ponderada APENAS sobre artigos scannáveis
+  const overall = totalWeight > 0 ? Math.round(weightedTotal / totalWeight) : 0;
   return { scores, overall };
 }
 
@@ -542,7 +577,15 @@ export async function executeAgentlessScan(
         cves: [],
       }));
 
-    const allPorts = [...openPorts, ...censysPorts, ...directPorts];
+    // Dedup by port number: Shodan e Censys podem ambos reportar o mesmo porto.
+    // Shodan tem prioridade (pode ter CVEs/versão); Censys/direct apenas preenchem gaps.
+    const _rawAllPorts = [...openPorts, ...censysPorts, ...directPorts];
+    const _seenPortNums = new Set<number>();
+    const allPorts = _rawAllPorts.filter((p) => {
+      if (_seenPortNums.has(p.port)) return false;
+      _seenPortNums.add(p.port);
+      return true;
+    });
 
     // ── TLS issues — prefer direct TLS (works through CDN), fall back to Censys
     const censysTlsIssues: TlsIssueFinding[] = censysData?.tlsIssues ?? [];
@@ -575,7 +618,7 @@ export async function executeAgentlessScan(
       if (hasCves && !hasVersion) {
         const svcName = portFinding.service !== "unknown" ? portFinding.service : `serviço na porta ${portFinding.port}`;
         console.log(`[CVE filter] Porto ${portFinding.port}: versão desconhecida com ${portFinding.cves.length} CVEs → NIS2-SVC-UNKNOWN`);
-        const nis2Unknown = ["Art. 21(2)(e)", "Art. 21(2)(f)"];
+        const nis2Unknown = ["Art. 21(2)(e)"];
         vulns.push({
           cveId: "NIS2-SVC-UNKNOWN",
           cvssScore: 5.0,
@@ -773,7 +816,7 @@ export async function executeAgentlessScan(
             nistCsfControls:  check.nistCsfControls  ?? getNistCsfControls(cveId, [check.nis2Article]),
             remediationHint: `Configura ${check.name} no DNS do domínio ${options.target}.`,
           });
-          extraDeductions.push({ article: check.nis2Article, finding: `${check.name}: ${check.detail}`, deduction: 20 });
+          // Não adicionar extraDeduction: a vuln já deduz pelo cvssScore — evita dupla contagem.
         } else if (check.status === "warn") {
           extraDeductions.push({ article: check.nis2Article, finding: `${check.name} (aviso): ${check.detail}`, deduction: 8 });
         }
@@ -798,7 +841,7 @@ export async function executeAgentlessScan(
             nistCsfControls:  check.nistCsfControls  ?? getNistCsfControls(cveId, [check.nis2Article]),
             remediationHint: `Adiciona o header ${check.name} na configuração do servidor web.`,
           });
-          extraDeductions.push({ article: check.nis2Article, finding: `${check.name}: ${check.detail}`, deduction: 12 });
+          // Não adicionar extraDeduction: a vuln já deduz pelo cvssScore — evita dupla contagem.
         } else if (check.status === "warn") {
           extraDeductions.push({ article: check.nis2Article, finding: `${check.name} (aviso): ${check.detail}`, deduction: 4 });
         }
@@ -814,9 +857,9 @@ export async function executeAgentlessScan(
       for (const breach of darkWeb.breaches) {
         const cvssScore = breach.hasPasswords ? 8.5 : 6.0;
         const cveId = `NIS2-BREACH-${breach.name.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 20)}`;
-        const breachNis2 = breach.hasPasswords
-          ? ["Art. 21(2)(i)", "Art. 21(2)(j)"]
-          : ["Art. 21(2)(i)"];
+        // Um breach mapeia para (i) controlo de acessos.
+        // Para passwords, extra warn em (j) autenticação — sem criar vuln duplicada.
+        const breachNis2 = ["Art. 21(2)(i)"];
         vulns.push({
           cveId,
           cvssScore,
@@ -829,11 +872,7 @@ export async function executeAgentlessScan(
           nistCsfControls:  getNistCsfControls(cveId, breachNis2),
           remediationHint: `Força o reset de passwords afectadas pelo breach "${breach.name}" e activa MFA em todas as contas.`,
         });
-        extraDeductions.push({
-          article: "Art. 21(2)(i)",
-          finding: `Breach "${breach.name}": ${breach.dataClasses.join(", ")}`,
-          deduction: breach.hasPasswords ? 20 : 8,
-        });
+        // Não adicionar extraDeduction para (i): a vuln já deduz — evita dupla contagem.
         if (breach.hasPasswords) {
           extraDeductions.push({
             article: "Art. 21(2)(j)",
@@ -851,22 +890,25 @@ export async function executeAgentlessScan(
             severity: "high",
             description: bl.detail,
             affectedService: isIpAddress(options.target) ? "network" : "domain",
-            nis2Articles: ["Art. 21(2)(g)", "Art. 21(2)(j)"],
-            cisControls: getCisControls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
-            iso27001Controls: getIso27001Controls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
-            nistCsfControls: getNistCsfControls(cveId, ["Art. 21(2)(g)", "Art. 21(2)(j)"]),
+            // Lista negra = indicador de comprometimento → (i) controlo de acessos.
+            // (g) é não-scannável; não mapear para ela por scan externo.
+            nis2Articles: ["Art. 21(2)(i)"],
+            cisControls: getCisControls(cveId, ["Art. 21(2)(i)"]),
+            iso27001Controls: getIso27001Controls(cveId, ["Art. 21(2)(i)"]),
+            nistCsfControls: getNistCsfControls(cveId, ["Art. 21(2)(i)"]),
             remediationHint: `Investiga o compromisso que colocou o ${isIpAddress(options.target) ? "IP" : "domínio"} na lista negra ${bl.name} e solicita remoção após resolução.`,
           });
-          extraDeductions.push({
-            article: "Art. 21(2)(g)",
-            finding: `Lista negra ${bl.name}: ${bl.detail}`,
-            deduction: 20,
-          });
+          // Vuln já deduz pelo cvssScore; sem extraDeduction extra para (i).
         }
       }
     }
 
     // ── 8. Calculate NIS2 scores ───────────────────────────────────────────
+    // Dedup vulns: mesmo CVE pode vir de múltiplas fontes (Shodan + SSH check + dark web).
+    // Mantemos o primeiro encontrado (o que vem do Shodan/NVD tem CVSS mais preciso).
+    const _seenCveIds = new Set<string>();
+    vulns.splice(0, vulns.length, ...vulns.filter((v) => !_seenCveIds.has(v.cveId) && (_seenCveIds.add(v.cveId), true)));
+
     const { scores, overall } = calculateNIS2Scores(allPorts, vulns, tlsIssues, extraDeductions);
 
     // ── 9. Mark scan complete ──────────────────────────────────────────────

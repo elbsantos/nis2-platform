@@ -165,10 +165,10 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     doc.on("error", reject);
 
     const results   = (scan?.results ?? {}) as Record<string, any>;
-    const nis2Scores: Array<{ article: string; title: string; score: number; findings: string[] }> =
+    const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
       results.nis2Scores ?? [];
-    const overall = results.overallScore ?? (nis2Scores.length
-      ? Math.round(nis2Scores.reduce((a, s) => a + s.score, 0) / nis2Scores.length) : 0);
+    // overall vem sempre do campo calculado (só artigos scannáveis); fallback 0 se ausente.
+    const overall = results.overallScore ?? 0;
     const counts = {
       critical: vulns.filter(v => v.severity === "critical").length,
       high:     vulns.filter(v => v.severity === "high").length,
@@ -264,13 +264,19 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
         const bx   = MARGIN + col * (colW + 20);
         const by   = y + row * 22;
         const art  = s.article.replace("Art. 21(2)", "").replace(/[()]/g, "");
-        const fill = Math.round((s.score / 100) * (colW - 55));
         doc.rect(bx + 20, by + 6, colW - 55, 8).fillColor(C.border).fill();
-        doc.rect(bx + 20, by + 6, Math.max(2, fill), 8).fillColor(scoreColor(s.score)).fill();
         doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.muted)
            .text(art, bx, by + 5, { width: 18, align: "right" });
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(scoreColor(s.score))
-           .text(`${s.score}`, bx + colW - 30, by + 5, { width: 28, align: "right" });
+        if (s.score === null) {
+          // Medida não avaliável por scan — barra vazia + texto "N/A"
+          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+             .text("N/A", bx + colW - 30, by + 5, { width: 28, align: "right" });
+        } else {
+          const fill = Math.round((s.score / 100) * (colW - 55));
+          doc.rect(bx + 20, by + 6, Math.max(2, fill), 8).fillColor(scoreColor(s.score)).fill();
+          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(scoreColor(s.score))
+             .text(`${s.score}`, bx + colW - 30, by + 5, { width: 28, align: "right" });
+        }
       });
       y += half * 22 + 10;
     }
@@ -402,10 +408,9 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     doc.on("error", reject);
 
     const results   = (scan?.results ?? {}) as Record<string, any>;
-    const nis2Scores: Array<{ article: string; title: string; score: number; findings: string[] }> =
+    const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
       results.nis2Scores ?? [];
-    const overall = results.overallScore ?? (nis2Scores.length
-      ? Math.round(nis2Scores.reduce((a, s) => a + s.score, 0) / nis2Scores.length) : 0);
+    const overall = results.overallScore ?? 0;
     const openPorts: Array<{ port: number; protocol: string; service: string; product?: string; version?: string; cves: string[] }> =
       results.openPorts ?? [];
 
@@ -622,13 +627,14 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       }
       const artInfo = NIS2_ARTICLES[s.article];
       const BAR_MAX = 160;
-      const barFill = Math.max(2, Math.round((s.score / 100) * BAR_MAX));
-      const col = scoreColor(s.score);
+      const isNonScannable = s.score === null;
+      const barFill = isNonScannable ? 0 : Math.max(2, Math.round((s.score! / 100) * BAR_MAX));
+      const col = isNonScannable ? C.muted : scoreColor(s.score!);
 
-      // Score circle (small)
+      // Score circle (small) — "N/A" para medidas não avaliáveis por scan
       doc.circle(MARGIN + 16, y + 16, 14).fillColor(col).fill();
       doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white)
-         .text(String(s.score), MARGIN + 4, y + 11, { width: 24, align: "center" });
+         .text(isNonScannable ? "N/A" : String(s.score), MARGIN + 4, y + 11, { width: 24, align: "center" });
 
       // Article + short title
       doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
