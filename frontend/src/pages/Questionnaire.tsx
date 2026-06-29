@@ -80,23 +80,24 @@ function SessionList() {
       {sessions && sessions.length > 0 && (
         <div className="space-y-3">
           {sessions.map((s) => {
-            const score = s.score ? parseInt(s.score) : null;
+            const score   = s.score ? parseInt(s.score) : null;
             const answers = (s.answers as any[]) ?? [];
+            const done    = s.status === "completed";
             return (
-              <button
+              <div
                 key={s.id}
-                onClick={() => navigate(`/questionnaire/${s.id}`)}
-                className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all"
               >
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    className="flex-1 text-left"
+                    onClick={() => navigate(`/questionnaire/${s.id}`)}
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        s.status === "completed"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-blue-100 text-blue-800"
+                        done ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
                       }`}>
-                        {s.status === "completed" ? "Concluído" : "Em curso"}
+                        {done ? "Concluído" : "Em curso"}
                       </span>
                       <span className="text-xs text-gray-400">#{s.id}</span>
                     </div>
@@ -106,17 +107,27 @@ function SessionList() {
                     <p className="text-xs text-gray-400 mt-0.5">
                       {new Date(s.createdAt).toLocaleDateString("pt-PT")}
                     </p>
+                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {done && (
+                      <button
+                        onClick={() => navigate(`/questionnaire/${s.id}/report`)}
+                        className="px-3 py-1.5 text-xs font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800"
+                      >
+                        Ver relatório
+                      </button>
+                    )}
+                    {score !== null && (
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                        style={{ backgroundColor: score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444" }}
+                      >
+                        {score}
+                      </div>
+                    )}
                   </div>
-                  {score !== null && (
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                      style={{ backgroundColor: score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444" }}
-                    >
-                      {score}
-                    </div>
-                  )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -142,9 +153,9 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
 
   const saveAnswersMut  = trpc.questionnaire.saveAnswers.useMutation();
   const completeMut     = trpc.questionnaire.complete.useMutation({
-    onSuccess: (result) => {
+    onSuccess: () => {
       utils.questionnaire.list.invalidate();
-      navigate("/questionnaire", { state: { completed: true, score: result.overall } });
+      navigate(`/questionnaire/${sessionId}/report`);
     },
   });
 
@@ -254,8 +265,14 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
       {/* Main content */}
       <main className="flex-1 min-w-0">
         {isCompleted && (
-          <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
-            Esta avaliação está concluída. Score final: <strong>{session.score}/100</strong>
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800 flex items-center justify-between gap-4">
+            <span>Avaliação concluída — Score: <strong>{session.score}/100</strong></span>
+            <button
+              onClick={() => navigate(`/questionnaire/${sessionId}/report`)}
+              className="px-3 py-1.5 text-xs font-medium bg-green-700 text-white rounded-lg hover:bg-green-800 shrink-0"
+            >
+              Ver relatório
+            </button>
           </div>
         )}
 

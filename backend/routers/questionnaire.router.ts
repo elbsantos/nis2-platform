@@ -20,6 +20,24 @@ import {
   explainControl,
 } from "../services/ai-questionnaire";
 
+// ---------------------------------------------------------------------------
+// Pesos das medidas para cálculo de prioridade no relatório
+// Alinhado com NIS2_ARTICLE_MAP em scan-executor (importância regulatória)
+// ---------------------------------------------------------------------------
+const MEASURE_WEIGHTS: Record<string, number> = {
+  a: 10, b: 10, c: 8, d: 8, e: 12, f: 5, g: 10, h: 15, i: 12, j: 10,
+};
+
+// ---------------------------------------------------------------------------
+// Metadados das 10 medidas — derivado de NIS2_CONTROLS para evitar duplicação
+// ---------------------------------------------------------------------------
+const MEASURE_META: Record<string, { article: string; title: string }> = {};
+for (const c of NIS2_CONTROLS) {
+  if (!MEASURE_META[c.articleSlug]) {
+    MEASURE_META[c.articleSlug] = { article: c.article, title: c.articleTitle };
+  }
+}
+
 export const questionnaireRouter = router({
   /**
    * List of all 42 NIS2 controls (static — no DB needed)
@@ -127,6 +145,93 @@ export const questionnaireRouter = router({
       });
 
       return { overall: scores.overall, byArticle: scores.byArticle };
+    }),
+
+  /**
+   * Relatório completo de uma sessão concluída:
+   * score por medida, lacunas e plano de ação priorizado.
+   */
+  report: freeProcedure
+    .input(z.object({ sessionId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const session = await getQuestionnaireSessionById(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND" });
+      if (session.organizationId !== ctx.org.id) throw new TRPCError({ code: "FORBIDDEN" });
+      if (session.status !== "completed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Sessão não concluída" });
+      }
+
+      const answers = (session.answers ?? []) as Array<{
+        controlId: string;
+        answer: string;
+        score: number;
+      }>;
+      const articleScores = (session.articleScores ?? {}) as Record<string, number>;
+      const answerMap = new Map(answers.map((a) => [a.controlId, a.answer]));
+
+      // ── Score por medida ──────────────────────────────────────────────────
+      const measureScores = (["a","b","c","d","e","f","g","h","i","j"] as const).map((slug) => {
+        const meta     = MEASURE_META[slug] ?? { article: `Art. 21(2)(${slug})`, title: slug };
+        const controls = NIS2_CONTROLS.filter((c) => c.articleSlug === slug);
+        const applicable = controls.filter((c) => {
+          const ans = answerMap.get(c.id);
+          return ans !== undefined && ans !== "na";
+        });
+        const gapCount = applicable.filter((c) => {
+          const ans = answerMap.get(c.id);
+          return ans === "no" || ans === "partial";
+        }).length;
+        return {
+          slug,
+          article:      meta.article,
+          title:        meta.title,
+          score:        applicable.length > 0 ? (articleScores[slug] ?? null) : null,
+          controlCount: controls.length,
+          answeredCount: applicable.length,
+          gapCount,
+        };
+      });
+
+      // ── Lacunas — controlos não cumpridos ou parciais ─────────────────────
+      const gaps = answers
+        .filter((a) => a.answer === "no" || a.answer === "partial")
+        .map((a) => {
+          const control = NIS2_CONTROLS.find((c) => c.id === a.controlId);
+          if (!control) return null;
+          const answerScore    = a.answer === "partial" ? 50 : 0;
+          const measureWeight  = MEASURE_WEIGHTS[control.articleSlug] ?? 10;
+          // prioridade: medidas mais pesadas e respostas mais negativas primeiro
+          const priority       = measureWeight * (100 - answerScore);
+          return {
+            controlId:           control.id,
+            article:             control.article,
+            articleSlug:         control.articleSlug,
+            articleTitle:        control.articleTitle,
+            question:            control.question,
+            answer:              a.answer as "no" | "partial",
+            helpText:            control.helpText,
+            why:                 control.why,
+            priority,
+            suggestedDocument:   control.evidence.description ?? null,
+            evidenceType:        control.evidence.type,
+            evidenceRequired:    control.evidence.required,
+          };
+        })
+        .filter((g): g is NonNullable<typeof g> => g !== null)
+        .sort((a, b) => b.priority - a.priority);
+
+      return {
+        sessionId:    session.id,
+        completedAt:  session.completedAt,
+        overallScore: session.score ? parseInt(session.score, 10) : 0,
+        answeredCount: answers.filter((a) => a.answer !== "na").length,
+        totalApplicable: NIS2_CONTROLS.filter((c) => {
+          const ans = answerMap.get(c.id);
+          return ans !== undefined && ans !== "na";
+        }).length,
+        measureScores,
+        gaps,          // ordenadas por prioridade — servem de plano de ação
+      };
     }),
 
   /**
