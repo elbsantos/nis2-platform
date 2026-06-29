@@ -1,4 +1,5 @@
-import { rateLimit } from "express-rate-limit";
+import { rateLimit, MemoryStore } from "express-rate-limit";
+import type { Store, Options, ClientRateLimitInfo } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 import { createClient } from "redis";
 import type { Request, Response, NextFunction } from "express";
@@ -14,25 +15,91 @@ export async function getRedisClient() {
   redisClient = createClient({
     url: process.env.REDIS_URL ?? "redis://localhost:6379",
     socket: {
-      connectTimeout: 2000,
+      connectTimeout: 3000,
+      // Retry up to 10 times with exponential backoff (covers Railway Redis restarts).
       reconnectStrategy: (retries) => {
-        if (retries > 3) return new Error("Redis unavailable");
-        return Math.min(retries * 100, 1000);
+        if (retries > 10) return new Error("Redis: demasiadas tentativas de reconexão");
+        return Math.min(retries * 200, 5_000);
       },
     },
   });
 
   redisClient.on("error", (err) => {
-    console.error("[Redis] Connection error:", err.message);
+    console.error("[Redis] Erro de ligação:", err.message);
   });
 
-  redisClient.on("reconnecting", () => {
-    console.warn("[Redis] Reconnecting…");
+  redisClient.on("ready", () => {
+    console.log("[Redis] Ligação estabelecida / restabelecida");
   });
 
   await redisClient.connect();
-  console.log("[Redis] Connected");
   return redisClient;
+}
+
+// ---------------------------------------------------------------------------
+// ResilientStore — Redis-backed with silent MemoryStore fallback
+//
+// Why this exists:
+//   rate-limit-redis v4 + node-redis v4 have a subtle EVALSHA/NOSCRIPT
+//   interaction. On a fresh Redis (script not loaded), EVALSHA returns NOSCRIPT
+//   and rate-limit-redis catches it to retry with EVAL — but ONLY if the error
+//   is thrown, not swallowed.
+//
+//   The previous sendCommand wrapper returned 1 on any error, which:
+//     • Prevented the NOSCRIPT→EVAL fallback inside rate-limit-redis
+//     • Caused parseScriptResponse(1) → TypeError on every request
+//     • Surfaced as "express-rate-limit: error from store" on every request
+//     • Effectively disabled rate limiting permanently
+//
+//   Here, sendCommand is the plain node-redis v4 form (no catch wrapper), so
+//   NOSCRIPT propagates correctly through rate-limit-redis's own handler.
+//   Any other Redis error is caught by ResilientStore.increment/decrement/
+//   resetKey and silently handled by MemoryStore — no log noise, rate limiting
+//   always active.
+// ---------------------------------------------------------------------------
+class ResilientStore implements Store {
+  private redisStore: RedisStore;
+  private memStore: MemoryStore;
+
+  constructor(client: ReturnType<typeof createClient>) {
+    this.redisStore = new RedisStore({
+      // Correct form for node-redis v4: no error-swallowing wrapper.
+      // Errors (NOSCRIPT, network, etc.) propagate to rate-limit-redis,
+      // which handles NOSCRIPT by retrying with EVAL internally.
+      sendCommand: (...args: string[]) => client.sendCommand(args),
+      prefix: "rl:",
+    });
+    this.memStore = new MemoryStore();
+  }
+
+  init(options: Options): void {
+    if (typeof this.redisStore.init === "function") this.redisStore.init(options);
+    this.memStore.init(options);
+  }
+
+  async increment(key: string): Promise<ClientRateLimitInfo> {
+    try {
+      return await this.redisStore.increment(key);
+    } catch {
+      return this.memStore.increment(key);
+    }
+  }
+
+  async decrement(key: string): Promise<void> {
+    try {
+      await this.redisStore.decrement(key);
+    } catch {
+      await this.memStore.decrement(key);
+    }
+  }
+
+  async resetKey(key: string): Promise<void> {
+    try {
+      await this.redisStore.resetKey(key);
+    } catch {
+      await this.memStore.resetKey(key);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -40,40 +107,27 @@ export async function getRedisClient() {
 // ---------------------------------------------------------------------------
 function keyGenerator(req: Request): string {
   const userId = (req as any).user?.id;
-  if (userId) return `rl:user:${userId}`;
+  if (userId) return `user:${userId}`;
 
   // X-Forwarded-For is set by Cloudflare; fall back to req.ip
   const forwarded = req.headers["x-forwarded-for"];
   const ip = Array.isArray(forwarded)
     ? forwarded[0]
     : (forwarded?.split(",")[0] ?? req.ip ?? "unknown");
-  return `rl:ip:${ip}`;
+  return `ip:${ip}`;
 }
 
 // ---------------------------------------------------------------------------
-// Build store — Redis when available, memory fallback otherwise
+// Build store — Redis when available (ResilientStore), memory otherwise
 // ---------------------------------------------------------------------------
-async function buildStore() {
-  if (process.env.NODE_ENV !== "production") return undefined; // dev/test: memory store
+async function buildStore(): Promise<Store | undefined> {
+  if (process.env.NODE_ENV !== "production") return undefined;
 
   try {
     const client = await getRedisClient();
-    return new RedisStore({
-      // Wrap sendCommand so a disconnected Redis never crashes the middleware.
-      // When Redis is down we return 1 (first hit in window) — effectively
-      // disabling rate limiting rather than taking the API offline.
-      sendCommand: async (...args: string[]) => {
-        try {
-          if (!client.isOpen) return 1;
-          return await client.sendCommand(args);
-        } catch {
-          return 1; // fail-open: allow request, don't crash
-        }
-      },
-      prefix: "rl:",
-    });
+    return new ResilientStore(client);
   } catch {
-    console.warn("[RateLimit] Redis unavailable — falling back to in-memory store");
+    console.warn("[RateLimit] Redis indisponível no arranque — rate limiting por instância (memória)");
     return undefined;
   }
 }
@@ -161,7 +215,7 @@ export async function createScanLimiter(plan: "free" | "pro" | "mssp" = "free") 
   const store = await buildStore();
 
   return rateLimit({
-    windowMs: 60 * 60 * 1_000, // 1 hour
+    windowMs: 60 * 60 * 1_000,
     limit: limits[plan],
     standardHeaders: "draft-8",
     legacyHeaders: false,
