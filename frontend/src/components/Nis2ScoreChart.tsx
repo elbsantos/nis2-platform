@@ -10,7 +10,9 @@ import {
 export interface ArticleScore {
   article: string;
   title: string;
-  score: number;
+  /** null = medida organizacional, não avaliável por scan externo */
+  score: number | null;
+  scannable?: boolean;
   findings: string[];
 }
 
@@ -35,14 +37,17 @@ function conformanceLabel(score: number): string {
 }
 
 export default function Nis2ScoreChart({ scores }: Props) {
-  const data = scores.map((s) => ({
+  // Radar e overall: apenas artigos com score técnico (scannable, score !== null)
+  const scannable = scores.filter((s) => s.score !== null && s.scannable !== false);
+
+  const data = scannable.map((s) => ({
     subject: shortLabel(s.article),
-    score: s.score,
+    score: s.score as number,
     fullMark: 100,
   }));
 
-  const overall = scores.length
-    ? Math.round(scores.reduce((acc, s) => acc + s.score, 0) / scores.length)
+  const overall = scannable.length
+    ? Math.round(scannable.reduce((acc, s) => acc + (s.score as number), 0) / scannable.length)
     : 0;
 
   return (
@@ -56,13 +61,16 @@ export default function Nis2ScoreChart({ scores }: Props) {
           {overall}
         </div>
         <div>
-          <p className="text-xl text-slate-400">Score NIS2 Global</p>
+          <p className="text-xl text-slate-400">Score técnico (scan)</p>
           <p className="text-2xl font-semibold text-white mt-1">{conformanceLabel(overall)}</p>
-          <p className="text-lg text-slate-400 mt-1">{scores.length} artigos avaliados</p>
+          <p className="text-lg text-slate-400 mt-1">{scannable.length} artigos avaliados por scan</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Avaliação parcial — medidas organizacionais requerem questionário
+          </p>
         </div>
       </div>
 
-      {/* Radar chart */}
+      {/* Radar chart — apenas artigos scannáveis */}
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={data} margin={{ top: 16, right: 30, bottom: 16, left: 30 }}>
@@ -94,23 +102,36 @@ export default function Nis2ScoreChart({ scores }: Props) {
         </ResponsiveContainer>
       </div>
 
-      {/* Per-article breakdown */}
+      {/* Per-article breakdown — todos os artigos, indicando não-scannáveis */}
       <div className="space-y-3">
         {scores.map((s) => (
           <div key={s.article} className="flex items-center gap-4">
             <span className="text-lg text-slate-400 w-32 shrink-0 font-mono">{s.article}</span>
-            <div className="flex-1 h-3 bg-[#1e3a5f] rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${s.score}%`, backgroundColor: scoreColor(s.score) }}
-              />
-            </div>
-            <span
-              className="text-xl font-bold w-12 text-right shrink-0"
-              style={{ color: scoreColor(s.score) }}
-            >
-              {s.score}
-            </span>
+            {s.score === null ? (
+              <>
+                <div className="flex-1 h-3 bg-[#1e3a5f] rounded-full overflow-hidden">
+                  <div className="h-full w-0" />
+                </div>
+                <span className="text-sm text-slate-500 w-36 text-right shrink-0 italic">
+                  Não avaliável por scan
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="flex-1 h-3 bg-[#1e3a5f] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${s.score}%`, backgroundColor: scoreColor(s.score) }}
+                  />
+                </div>
+                <span
+                  className="text-xl font-bold w-12 text-right shrink-0"
+                  style={{ color: scoreColor(s.score) }}
+                >
+                  {s.score}
+                </span>
+              </>
+            )}
           </div>
         ))}
       </div>
