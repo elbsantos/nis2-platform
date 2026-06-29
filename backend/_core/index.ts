@@ -34,9 +34,10 @@ async function startServer() {
   logEnvStatus();
 
   // ── 0. Schema migrations — corre antes de qualquer query ───────────────
-  await runStartupMigrations().catch((err) =>
-    console.error("[Migrations] Erro nas migrações de arranque:", err)
-  );
+  await runStartupMigrations().catch((err: Error) => {
+    console.error("[Migrations] Falha crítica — a abortar o arranque:", err.message ?? err);
+    process.exit(1);
+  });
 
   const app = express();
   const server = createServer(app);
