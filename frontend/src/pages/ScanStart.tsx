@@ -18,20 +18,33 @@ function Spinner() {
 }
 
 // ---------------------------------------------------------------------------
-// Tab selector
+// Feature flags — colocar true para reactivar quando o tab estiver pronto
+// ---------------------------------------------------------------------------
+
+const ENABLE_BATCH_SCAN     = false;  // feat/batch-scan
+const ENABLE_SUBDOMAIN_SCAN = false;  // feat/subdomain-scan
+
+// ---------------------------------------------------------------------------
+// Tab selector — oculta tabs desactivados; omite o bar quando só há um tab
 // ---------------------------------------------------------------------------
 
 type Tab = "único" | "lote" | "subdomínios";
 
+const ALL_TABS: { id: Tab; label: string; icon: string; enabled: boolean }[] = [
+  { id: "único",       label: "Scan único",   icon: "🔍", enabled: true               },
+  { id: "lote",        label: "Scan em lote", icon: "📋", enabled: ENABLE_BATCH_SCAN  },
+  { id: "subdomínios", label: "Subdomínios",  icon: "🌐", enabled: ENABLE_SUBDOMAIN_SCAN },
+];
+
+const VISIBLE_TABS = ALL_TABS.filter((t) => t.enabled);
+
 function TabBar({ active, setTab }: { active: Tab; setTab: (t: Tab) => void }) {
-  const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: "único",       label: "Scan único",   icon: "🔍" },
-    { id: "lote",        label: "Scan em lote", icon: "📋" },
-    { id: "subdomínios", label: "Subdomínios",  icon: "🌐" },
-  ];
+  // Com apenas um tab visível não há escolha — não renderizar a barra
+  if (VISIBLE_TABS.length <= 1) return null;
+
   return (
     <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-      {tabs.map((t) => (
+      {VISIBLE_TABS.map((t) => (
         <button
           key={t.id}
           onClick={() => setTab(t.id)}
@@ -525,7 +538,7 @@ function CapabilitiesPanel() {
 // ---------------------------------------------------------------------------
 
 export default function ScanStart() {
-  const [tab, setTab] = useState<Tab>("único");
+  const [tab, setTab] = useState<Tab>(VISIBLE_TABS[0]?.id ?? "único");
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #0f172a 0%, #0c1a3a 50%, #0f172a 100%)" }}>
