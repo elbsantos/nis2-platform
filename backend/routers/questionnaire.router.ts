@@ -19,6 +19,10 @@ import {
   calculateScores,
   explainControl,
 } from "../services/ai-questionnaire";
+import {
+  generateQuestionnaireReportPdf,
+  type QReportData,
+} from "../services/questionnaire-pdf-generator";
 
 // ---------------------------------------------------------------------------
 // Pesos das medidas para cálculo de prioridade no relatório
@@ -36,6 +40,90 @@ for (const c of NIS2_CONTROLS) {
   if (!MEASURE_META[c.articleSlug]) {
     MEASURE_META[c.articleSlug] = { article: c.article, title: c.articleTitle };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helper partilhado: constrói os dados do relatório a partir de uma sessão.
+// Usado por `report` (query JSON) e `exportPdf` (query PDF).
+// ---------------------------------------------------------------------------
+async function buildReportData(
+  session: Awaited<ReturnType<typeof getQuestionnaireSessionById>>,
+  orgName: string
+): Promise<QReportData> {
+  if (!session) throw new TRPCError({ code: "NOT_FOUND" });
+  if (session.status !== "completed") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Sessão não concluída" });
+  }
+
+  const answers = (session.answers ?? []) as Array<{
+    controlId: string;
+    answer: string;
+    score: number;
+  }>;
+  const articleScores = (session.articleScores ?? {}) as Record<string, number>;
+  const answerMap = new Map(answers.map((a) => [a.controlId, a.answer]));
+
+  const measureScores = (["a","b","c","d","e","f","g","h","i","j"] as const).map((slug) => {
+    const meta       = MEASURE_META[slug] ?? { article: `Art. 21(2)(${slug})`, title: slug };
+    const controls   = NIS2_CONTROLS.filter((c) => c.articleSlug === slug);
+    const applicable = controls.filter((c) => {
+      const ans = answerMap.get(c.id);
+      return ans !== undefined && ans !== "na";
+    });
+    const gapCount = applicable.filter((c) => {
+      const ans = answerMap.get(c.id);
+      return ans === "no" || ans === "partial";
+    }).length;
+    return {
+      slug,
+      article:      meta.article,
+      title:        meta.title,
+      score:        applicable.length > 0 ? (articleScores[slug] ?? null) : null,
+      controlCount: controls.length,
+      answeredCount: applicable.length,
+      gapCount,
+    };
+  });
+
+  const gaps = answers
+    .filter((a) => a.answer === "no" || a.answer === "partial")
+    .map((a) => {
+      const control = NIS2_CONTROLS.find((c) => c.id === a.controlId);
+      if (!control) return null;
+      const answerScore   = a.answer === "partial" ? 50 : 0;
+      const measureWeight = MEASURE_WEIGHTS[control.articleSlug] ?? 10;
+      const priority      = measureWeight * (100 - answerScore);
+      return {
+        controlId:         control.id,
+        article:           control.article,
+        articleSlug:       control.articleSlug,
+        articleTitle:      control.articleTitle,
+        question:          control.question,
+        answer:            a.answer as "no" | "partial",
+        helpText:          control.helpText,
+        why:               control.why,
+        priority,
+        suggestedDocument: control.evidence.description ?? null,
+        evidenceType:      control.evidence.type,
+        evidenceRequired:  control.evidence.required,
+      };
+    })
+    .filter((g): g is NonNullable<typeof g> => g !== null)
+    .sort((a, b) => b.priority - a.priority);
+
+  return {
+    orgName,
+    sessionId:       session.id,
+    completedAt:     session.completedAt,
+    overallScore:    session.score ? parseInt(session.score, 10) : 0,
+    answeredCount:   answers.filter((a) => a.answer !== "na").length,
+    totalApplicable: NIS2_CONTROLS.filter((c) => {
+      const ans = answerMap.get(c.id);
+      return ans !== undefined && ans !== "na";
+    }).length,
+    measureScores,
+    gaps,
+  };
 }
 
 export const questionnaireRouter = router({
@@ -157,81 +245,30 @@ export const questionnaireRouter = router({
       const session = await getQuestionnaireSessionById(input.sessionId);
       if (!session) throw new TRPCError({ code: "NOT_FOUND" });
       if (session.organizationId !== ctx.org.id) throw new TRPCError({ code: "FORBIDDEN" });
-      if (session.status !== "completed") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Sessão não concluída" });
-      }
+      const data = await buildReportData(session, ctx.org.name);
+      // report omits orgName (frontend já tem o contexto)
+      const { orgName: _orgName, ...rest } = data;
+      return rest;
+    }),
 
-      const answers = (session.answers ?? []) as Array<{
-        controlId: string;
-        answer: string;
-        score: number;
-      }>;
-      const articleScores = (session.articleScores ?? {}) as Record<string, number>;
-      const answerMap = new Map(answers.map((a) => [a.controlId, a.answer]));
+  /**
+   * Exporta o relatório de autoavaliação em PDF (Buffer → base64).
+   */
+  exportPdf: freeProcedure
+    .input(z.object({ sessionId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const session = await getQuestionnaireSessionById(input.sessionId);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND" });
+      if (session.organizationId !== ctx.org.id) throw new TRPCError({ code: "FORBIDDEN" });
 
-      // ── Score por medida ──────────────────────────────────────────────────
-      const measureScores = (["a","b","c","d","e","f","g","h","i","j"] as const).map((slug) => {
-        const meta     = MEASURE_META[slug] ?? { article: `Art. 21(2)(${slug})`, title: slug };
-        const controls = NIS2_CONTROLS.filter((c) => c.articleSlug === slug);
-        const applicable = controls.filter((c) => {
-          const ans = answerMap.get(c.id);
-          return ans !== undefined && ans !== "na";
-        });
-        const gapCount = applicable.filter((c) => {
-          const ans = answerMap.get(c.id);
-          return ans === "no" || ans === "partial";
-        }).length;
-        return {
-          slug,
-          article:      meta.article,
-          title:        meta.title,
-          score:        applicable.length > 0 ? (articleScores[slug] ?? null) : null,
-          controlCount: controls.length,
-          answeredCount: applicable.length,
-          gapCount,
-        };
-      });
+      const data   = await buildReportData(session, ctx.org.name);
+      const buffer = await generateQuestionnaireReportPdf(data);
 
-      // ── Lacunas — controlos não cumpridos ou parciais ─────────────────────
-      const gaps = answers
-        .filter((a) => a.answer === "no" || a.answer === "partial")
-        .map((a) => {
-          const control = NIS2_CONTROLS.find((c) => c.id === a.controlId);
-          if (!control) return null;
-          const answerScore    = a.answer === "partial" ? 50 : 0;
-          const measureWeight  = MEASURE_WEIGHTS[control.articleSlug] ?? 10;
-          // prioridade: medidas mais pesadas e respostas mais negativas primeiro
-          const priority       = measureWeight * (100 - answerScore);
-          return {
-            controlId:           control.id,
-            article:             control.article,
-            articleSlug:         control.articleSlug,
-            articleTitle:        control.articleTitle,
-            question:            control.question,
-            answer:              a.answer as "no" | "partial",
-            helpText:            control.helpText,
-            why:                 control.why,
-            priority,
-            suggestedDocument:   control.evidence.description ?? null,
-            evidenceType:        control.evidence.type,
-            evidenceRequired:    control.evidence.required,
-          };
-        })
-        .filter((g): g is NonNullable<typeof g> => g !== null)
-        .sort((a, b) => b.priority - a.priority);
+      const dateStr    = new Date().toISOString().slice(0, 10);
+      const filename   = `nis2-autoavaliacao-sessao${input.sessionId}-${dateStr}.pdf`;
+      const pdfBase64  = buffer.toString("base64");
 
-      return {
-        sessionId:    session.id,
-        completedAt:  session.completedAt,
-        overallScore: session.score ? parseInt(session.score, 10) : 0,
-        answeredCount: answers.filter((a) => a.answer !== "na").length,
-        totalApplicable: NIS2_CONTROLS.filter((c) => {
-          const ans = answerMap.get(c.id);
-          return ans !== undefined && ans !== "na";
-        }).length,
-        measureScores,
-        gaps,          // ordenadas por prioridade — servem de plano de ação
-      };
+      return { pdfBase64, filename };
     }),
 
   /**
