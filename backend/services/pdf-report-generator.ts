@@ -53,17 +53,66 @@ const PAGE_W = 595, PAGE_H = 842, MARGIN = 50, CONTENT_W = PAGE_W - MARGIN * 2;
 // ---------------------------------------------------------------------------
 
 const NIS2_ARTICLES: Record<string, { short: string; desc: string }> = {
-  "Art. 21(2)(a)": { short: "Políticas de Risco",              desc: "Políticas de análise de risco e segurança dos sistemas de informação" },
-  "Art. 21(2)(b)": { short: "Gestão de Incidentes",             desc: "Deteção, resposta e notificação de incidentes de segurança" },
-  "Art. 21(2)(c)": { short: "Continuidade de Negócio",          desc: "Cópias de segurança (backups), recuperação de desastres e gestão de crises" },
-  "Art. 21(2)(d)": { short: "Cadeia de Abastecimento",          desc: "Segurança nos fornecedores e parceiros tecnológicos" },
-  "Art. 21(2)(e)": { short: "Desenvolvimento Seguro",            desc: "Segurança na aquisição, desenvolvimento e manutenção de sistemas" },
-  "Art. 21(2)(f)": { short: "Avaliação de Eficácia",             desc: "Avaliação e monitorização contínua das medidas de cibersegurança" },
-  "Art. 21(2)(g)": { short: "Ciberhigiene e Formação",           desc: "Práticas básicas de ciberhigiene e formação de colaboradores" },
-  "Art. 21(2)(h)": { short: "Criptografia e Encriptação",        desc: "Encriptação de dados em trânsito e em repouso" },
-  "Art. 21(2)(i)": { short: "Controlo de Acessos",               desc: "Segurança dos recursos humanos e gestão de identidades" },
-  "Art. 21(2)(j)": { short: "Autenticação e Identidade",         desc: "Autenticação forte, segurança nos canais de comunicação e validação de identidade institucional" },
+  "Art. 21(2)(a)": { short: "Políticas de Risco",                  desc: "Políticas de análise de risco e segurança dos sistemas de informação" },
+  "Art. 21(2)(b)": { short: "Gestão de Incidentes",                desc: "Deteção, resposta e notificação de incidentes de segurança" },
+  "Art. 21(2)(c)": { short: "Continuidade de Negócio",             desc: "Cópias de segurança (backups), recuperação de desastres e gestão de crises" },
+  "Art. 21(2)(d)": { short: "Cadeia de Abastecimento",             desc: "Segurança nos fornecedores e parceiros tecnológicos" },
+  "Art. 21(2)(e)": { short: "Aquisição e Desenvolvimento Seguros", desc: "Segurança na aquisição, desenvolvimento e manutenção de sistemas de informação" },
+  "Art. 21(2)(f)": { short: "Avaliação de Eficácia",               desc: "Avaliação e monitorização contínua das medidas de cibersegurança" },
+  "Art. 21(2)(g)": { short: "Ciberhigiene e Formação",             desc: "Práticas básicas de ciberhigiene e formação de colaboradores" },
+  "Art. 21(2)(h)": { short: "Criptografia e Encriptação",          desc: "Encriptação de dados em trânsito e em repouso; protocolos seguros" },
+  "Art. 21(2)(i)": { short: "Segurança RH e Controlo de Acessos", desc: "Segurança dos recursos humanos, controlo de acessos e gestão de ativos" },
+  "Art. 21(2)(j)": { short: "Autenticação e Identidade",           desc: "Autenticação multifator, segurança nas comunicações e validação de identidade institucional" },
 };
+
+// ---------------------------------------------------------------------------
+// Score recalculation — idêntico ao scan-executor (média ponderada só scannáveis)
+// Garante que o PDF usa sempre a mesma fórmula que o ecrã, independentemente
+// do valor overallScore guardado na BD (que pode ser de um scan anterior ao fix).
+// ---------------------------------------------------------------------------
+
+const SCANNABLE_ARTICLES = new Set([
+  "Art. 21(2)(e)", "Art. 21(2)(f)", "Art. 21(2)(h)", "Art. 21(2)(i)", "Art. 21(2)(j)",
+]);
+const ARTICLE_WEIGHTS: Record<string, number> = {
+  "Art. 21(2)(e)": 12, "Art. 21(2)(f)": 5, "Art. 21(2)(h)": 15,
+  "Art. 21(2)(i)": 12, "Art. 21(2)(j)": 10,
+};
+
+function recalcOverall(
+  nis2Scores: Array<{ article: string; score: number | null; scannable?: boolean }>
+): number | null {
+  let wSum = 0, wTotal = 0;
+  for (const s of nis2Scores) {
+    if (s.score === null) continue;
+    if (!SCANNABLE_ARTICLES.has(s.article)) continue;
+    const w = ARTICLE_WEIGHTS[s.article] ?? 10;
+    wSum += s.score * w;
+    wTotal += w;
+  }
+  return wTotal > 0 ? Math.round(wSum / wTotal) : null;
+}
+
+// ---------------------------------------------------------------------------
+// CVE count per port — usa vulns filtrados pelo NVD em vez do array bruto do Shodan.
+// Método 1 (preferido): filtra por v.port quando disponível (vulns da tabela DB).
+// Método 2 (fallback): intersecção com a lista raw p.cves quando port=null.
+// ---------------------------------------------------------------------------
+
+function portFilteredCveCount(
+  port: number,
+  rawCves: string[],
+  vulns: Vuln[]
+): number {
+  const byPort = vulns.filter((v) => v.port === port);
+  if (byPort.length > 0) return byPort.length;
+  // Fallback para scans sem port em DB (vulnerabilidades do scan.results)
+  if (rawCves.length > 0) {
+    const cveSet = new Set(rawCves);
+    return vulns.filter((v) => cveSet.has(v.cveId)).length;
+  }
+  return 0;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,8 +216,9 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     const results   = (scan?.results ?? {}) as Record<string, any>;
     const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
       results.nis2Scores ?? [];
-    // overall vem sempre do campo calculado (só artigos scannáveis); fallback 0 se ausente.
-    const overall = results.overallScore ?? 0;
+    // Recalcula o overall com a fórmula correcta (média ponderada dos artigos scannáveis).
+    // Não usa o overallScore armazenado — pode ter sido calculado com lógica anterior ao fix.
+    const overall = recalcOverall(nis2Scores) ?? results.overallScore ?? 0;
     const counts = {
       critical: vulns.filter(v => v.severity === "critical").length,
       high:     vulns.filter(v => v.severity === "high").length,
@@ -410,7 +460,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     const results   = (scan?.results ?? {}) as Record<string, any>;
     const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
       results.nis2Scores ?? [];
-    const overall = results.overallScore ?? 0;
+    const overall = recalcOverall(nis2Scores) ?? results.overallScore ?? 0;
     const openPorts: Array<{ port: number; protocol: string; service: string; product?: string; version?: string; cves: string[] }> =
       results.openPorts ?? [];
 
@@ -445,8 +495,9 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     });
     y += 14;
 
-    // Ports & Services — only list ports with known CVEs; clean ports are noise for PMEs
-    const exposedPorts = openPorts.filter(p => (p.cves ?? []).length > 0);
+    // Ports & Services — mostra apenas portos com CVEs filtrados pelo NVD (não raw Shodan).
+    // portFilteredCveCount usa vulns da tabela DB (filtrados) para evitar CVEs impossíveis.
+    const exposedPorts = openPorts.filter(p => portFilteredCveCount(p.port, p.cves ?? [], vulns) > 0);
     const cleanCount   = openPorts.length - exposedPorts.length;
 
     y = drawSectionTitle(doc, "Portos com Vulnerabilidades Conhecidas", y);
@@ -477,7 +528,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
            .text(p.protocol.toUpperCase(), MARGIN + 60, y + 5, { width: 60 });
         doc.fillColor(C.text).text(p.service, MARGIN + 125, y + 5, { width: 100 });
         doc.fillColor(C.muted).text(truncate(`${p.product ?? ""} ${p.version ?? ""}`.trim() || "—", 35), MARGIN + 230, y + 5, { width: 160 });
-        const cveCount = p.cves.length;
+        const cveCount = portFilteredCveCount(p.port, p.cves ?? [], vulns);
         doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
         doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
            .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
@@ -660,6 +711,14 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
              .text(ef.text, MARGIN + 48, fy, { width: FIND_W });
           fy += findingHeights[fi];
         });
+      } else if (isNonScannable) {
+        // Medida organizacional — não avaliável por scan externo
+        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+           .text(
+             "Não avaliável por scan — requer questionário de autoavaliação (medida organizacional não observável externamente).",
+             MARGIN + 48, y + 30, { width: FIND_W }
+           );
       } else {
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.success).fill();
         doc.fontSize(7.5).font("Helvetica").fillColor(C.success)
@@ -906,7 +965,7 @@ function buildNextSteps(
   const steps: string[] = [];
   if (overall < 60) {
     steps.push("Efectua uma auditoria de segurança completa com prioridade alta — a conformidade NIS2 está em risco imediato.");
-    steps.push("Contacta o CNCS e avalia a necessidade de notificação preventiva.");
+    steps.push("Avalia o risco identificado com os responsáveis de TI e prioriza a correcção das vulnerabilidades críticas antes de novas exposições.");
   }
   if (counts.critical > 0)
     steps.push(`Patcha ${counts.critical} vulnerabilidade(s) crítica(s) identificadas — janela recomendada: 24 a 72 horas.`);
