@@ -18,6 +18,9 @@ export interface ArticleScore {
 
 interface Props {
   scores: ArticleScore[];
+  /** Score global pré-calculado pelo scan-executor (results.overallScore).
+   *  Passa directamente do componente pai para evitar recálculo no frontend. */
+  overallScore: number;
 }
 
 function scoreColor(score: number): string {
@@ -36,13 +39,7 @@ function conformanceLabel(score: number): string {
   return "Conformidade baixa";
 }
 
-// Pesos regulatórios alinhados com scan-executor.ts (MEASURE_WEIGHTS).
-// Artigos não-scannáveis (a, b, c, d, f, g) têm score=null → excluídos pelo filtro abaixo.
-const NIS2_WEIGHTS: Record<string, number> = {
-  "Art. 21(2)(e)": 12, "Art. 21(2)(h)": 15, "Art. 21(2)(i)": 12, "Art. 21(2)(j)": 10,
-};
-
-export default function Nis2ScoreChart({ scores }: Props) {
+export default function Nis2ScoreChart({ scores, overallScore }: Props) {
   // Radar e overall: apenas artigos com score técnico (scannable, score !== null)
   const scannable = scores.filter((s) => s.score !== null && s.scannable !== false);
 
@@ -52,16 +49,9 @@ export default function Nis2ScoreChart({ scores }: Props) {
     fullMark: 100,
   }));
 
-  // Média ponderada — mesma fórmula do scan-executor para score global consistente.
-  const overall = (() => {
-    let wSum = 0, wTotal = 0;
-    for (const s of scannable) {
-      const w = NIS2_WEIGHTS[s.article] ?? 10;
-      wSum += (s.score as number) * w;
-      wTotal += w;
-    }
-    return wTotal > 0 ? Math.round(wSum / wTotal) : 0;
-  })();
+  // Score global vem do pai (results.overallScore calculado pelo scan-executor).
+  // Não recalculamos aqui — única fonte de verdade.
+  const overall = overallScore;
 
   return (
     <div className="space-y-8">

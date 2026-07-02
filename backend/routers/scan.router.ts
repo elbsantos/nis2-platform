@@ -117,6 +117,15 @@ export const scanRouter = {
           if (err instanceof TRPCError) throw err;
           // Redis unavailable — allow the force-rescan rather than blocking the user
         }
+
+        // Invalida caches de integrações para que re-scan forçado use dados frescos.
+        // Shodan resolve o IP internamente; Censys usa o target directamente.
+        const { invalidateCache: invalidateShodan } = await import("../integrations/shodan");
+        await invalidateShodan(input.target).catch(() => {});
+        try {
+          const redis = await getRedisClient();
+          await redis.del(`censys:${input.target}`);
+        } catch { /* Redis indisponível — scan usa dados em cache se existirem */ }
       }
 
       // Create scan record

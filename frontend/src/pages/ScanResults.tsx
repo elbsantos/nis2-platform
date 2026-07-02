@@ -110,7 +110,11 @@ export default function ScanResults() {
   }
 
   const results   = scan.results as any;
-  const vulnCount = results?.vulnerabilitiesFound ?? 0;
+  // CORREÇÃO 4: fonte única — comprimento do array, não contador separado.
+  // Fallback vulnerabilitiesFound garante retrocompatibilidade com scans antigos.
+  const vulnCount = (results?.vulnerabilities as unknown[] | undefined)?.length
+    ?? results?.vulnerabilitiesFound
+    ?? 0;
   const critical  = results?.criticalCount ?? 0;
   const high      = results?.highCount ?? 0;
 
@@ -147,7 +151,10 @@ export default function ScanResults() {
         <section className={`${CARD} p-6`}>
           <h2 className="text-2xl font-semibold text-white mb-4">Score NIS2 por Artigo</h2>
           {results?.nis2Scores ? (
-            <Nis2ScoreChart scores={results.nis2Scores} />
+            <Nis2ScoreChart
+            scores={results.nis2Scores}
+            overallScore={results.overallScore ?? 0}
+          />
           ) : (
             <p className="text-xl text-slate-400">Dados de score não disponíveis para este scan.</p>
           )}
