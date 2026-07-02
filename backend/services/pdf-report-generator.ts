@@ -7,7 +7,7 @@
 
 import PDFDocument from "pdfkit";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getScanById, getVulnerabilitiesByScanId, getOrganizationById } from "../db";
+import { getScanById, getOrganizationById } from "../db";
 
 // ---------------------------------------------------------------------------
 // S3 / Hetzner Object Storage client
@@ -66,61 +66,23 @@ const NIS2_ARTICLES: Record<string, { short: string; desc: string }> = {
 };
 
 // ---------------------------------------------------------------------------
-// Score recalculation — idêntico ao scan-executor (média ponderada só scannáveis)
-// Garante que o PDF usa sempre a mesma fórmula que o ecrã, independentemente
-// do valor overallScore guardado na BD (que pode ser de um scan anterior ao fix).
-// ---------------------------------------------------------------------------
-
-const SCANNABLE_ARTICLES = new Set([
-  "Art. 21(2)(e)", "Art. 21(2)(f)", "Art. 21(2)(h)", "Art. 21(2)(i)", "Art. 21(2)(j)",
-]);
-const ARTICLE_WEIGHTS: Record<string, number> = {
-  "Art. 21(2)(e)": 12, "Art. 21(2)(f)": 5, "Art. 21(2)(h)": 15,
-  "Art. 21(2)(i)": 12, "Art. 21(2)(j)": 10,
-};
-
-function recalcOverall(
-  nis2Scores: Array<{ article: string; score: number | null; scannable?: boolean }>
-): number | null {
-  let wSum = 0, wTotal = 0;
-  for (const s of nis2Scores) {
-    if (s.score === null) continue;
-    if (!SCANNABLE_ARTICLES.has(s.article)) continue;
-    const w = ARTICLE_WEIGHTS[s.article] ?? 10;
-    wSum += s.score * w;
-    wTotal += w;
-  }
-  return wTotal > 0 ? Math.round(wSum / wTotal) : null;
-}
-
-// ---------------------------------------------------------------------------
-// CVE count per port — usa vulns filtrados pelo NVD em vez do array bruto do Shodan.
-// Método 1 (preferido): filtra por v.port quando disponível (vulns da tabela DB).
-// Método 2 (fallback): intersecção com a lista raw p.cves quando port=null.
-// ---------------------------------------------------------------------------
-
-function portFilteredCveCount(
-  port: number,
-  rawCves: string[],
-  vulns: Vuln[]
-): number {
-  const byPort = vulns.filter((v) => v.port === port);
-  if (byPort.length > 0) return byPort.length;
-  // Fallback para scans sem port em DB (vulnerabilidades do scan.results)
-  if (rawCves.length > 0) {
-    const cveSet = new Set(rawCves);
-    return vulns.filter((v) => cveSet.has(v.cveId)).length;
-  }
-  return 0;
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 type Scan = Awaited<ReturnType<typeof getScanById>>;
-type Vuln = Awaited<ReturnType<typeof getVulnerabilitiesByScanId>>[number];
 type Org  = Awaited<ReturnType<typeof getOrganizationById>>;
+
+// Tipo interno normalizado — construído a partir de results.vulnerabilities (JSONB).
+// Fonte única de verdade: o mesmo conjunto que o ecrã (ScanResults.tsx) usa.
+interface PdfVuln {
+  cveId:             string;
+  severity:          string;
+  cvssScore:         string;  // string para compatibilidade com parseFloat() existente
+  description:       string;
+  affectedComponent: string;
+  port:              number | null;
+  remediation:       string | null;
+}
 
 function scoreColor(s: number): string {
   if (s >= 80) return C.success;
@@ -181,19 +143,17 @@ export async function generateReportBuffer(options: {
   if (scan.organizationId !== options.organizationId)
     throw new Error("Sem permissão para aceder a este scan");
 
-  const tableVulns = await getVulnerabilitiesByScanId(options.scanId);
-  const vulns: Vuln[] = tableVulns.length > 0
-    ? tableVulns
-    : ((scan.results as any)?.vulnerabilities ?? []).map((v: any, i: number) => ({
-        id: -(i + 1), scanId: options.scanId,
-        organizationId: options.organizationId,
-        cveId: v.cveId, severity: v.severity,
-        cvssScore: String(v.cvssScore ?? 5),
-        description: v.description,
-        affectedComponent: v.affectedService ?? "unknown",
-        port: null, remediation: v.remediationHint ?? null,
-        createdAt: new Date(),
-      }));
+  // Lê sempre de results.vulnerabilities (JSONB) — fonte única de verdade.
+  // Garante que PDF e ecrã mostram exactamente o mesmo conjunto de vulns (inclui sintéticos).
+  const vulns: PdfVuln[] = ((scan.results as any)?.vulnerabilities ?? []).map((v: any): PdfVuln => ({
+    cveId:             v.cveId,
+    severity:          v.severity,
+    cvssScore:         String(v.cvssScore ?? 5),
+    description:       v.description ?? "",
+    affectedComponent: v.affectedService ?? v.affectedComponent ?? "unknown",
+    port:              v.port ?? null,
+    remediation:       v.remediationHint ?? v.remediation ?? null,
+  }));
 
   return options.type === "executive"
     ? buildExecutiveReport(scan, vulns, org)
@@ -204,7 +164,7 @@ export async function generateReportBuffer(options: {
 // EXECUTIVE REPORT
 // ---------------------------------------------------------------------------
 
-async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promise<Buffer> {
+async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
       info: { Title: "CISPLAN — Relatório Executivo NIS2", Author: "CISPLAN", Creator: "CISPLAN" } });
@@ -216,9 +176,9 @@ async function buildExecutiveReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     const results   = (scan?.results ?? {}) as Record<string, any>;
     const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
       results.nis2Scores ?? [];
-    // Recalcula o overall com a fórmula correcta (média ponderada dos artigos scannáveis).
-    // Não usa o overallScore armazenado — pode ter sido calculado com lógica anterior ao fix.
-    const overall = recalcOverall(nis2Scores) ?? results.overallScore ?? 0;
+    // Usa o overallScore armazenado — calculado pelo scan-executor com a fórmula correcta
+    // (média ponderada dos artigos scannáveis). Fonte única de verdade após este refactor.
+    const overall = (results.overallScore as number | undefined) ?? 0;
     const counts = {
       critical: vulns.filter(v => v.severity === "critical").length,
       high:     vulns.filter(v => v.severity === "high").length,
@@ -448,7 +408,7 @@ function getDnsExample(cveId: string, component: string, target: string): string
 // TECHNICAL REPORT
 // ---------------------------------------------------------------------------
 
-async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promise<Buffer> {
+async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
       info: { Title: "CISPLAN — Relatório Técnico NIS2", Author: "CISPLAN", Creator: "CISPLAN" } });
@@ -460,7 +420,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     const results   = (scan?.results ?? {}) as Record<string, any>;
     const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
       results.nis2Scores ?? [];
-    const overall = recalcOverall(nis2Scores) ?? results.overallScore ?? 0;
+    const overall = (results.overallScore as number | undefined) ?? 0;
     const openPorts: Array<{ port: number; protocol: string; service: string; product?: string; version?: string; cves: string[] }> =
       results.openPorts ?? [];
 
@@ -495,9 +455,9 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
     });
     y += 14;
 
-    // Ports & Services — mostra apenas portos com CVEs filtrados pelo NVD (não raw Shodan).
-    // portFilteredCveCount usa vulns da tabela DB (filtrados) para evitar CVEs impossíveis.
-    const exposedPorts = openPorts.filter(p => portFilteredCveCount(p.port, p.cves ?? [], vulns) > 0);
+    // openPorts.cves já foi filtrado pelo scan-executor (apenas CVEs NVD-confirmados).
+    // Porta exposta = tem pelo menos um CVE confirmado.
+    const exposedPorts = openPorts.filter(p => (p.cves ?? []).length > 0);
     const cleanCount   = openPorts.length - exposedPorts.length;
 
     y = drawSectionTitle(doc, "Portos com Vulnerabilidades Conhecidas", y);
@@ -528,7 +488,7 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
            .text(p.protocol.toUpperCase(), MARGIN + 60, y + 5, { width: 60 });
         doc.fillColor(C.text).text(p.service, MARGIN + 125, y + 5, { width: 100 });
         doc.fillColor(C.muted).text(truncate(`${p.product ?? ""} ${p.version ?? ""}`.trim() || "—", 35), MARGIN + 230, y + 5, { width: 160 });
-        const cveCount = portFilteredCveCount(p.port, p.cves ?? [], vulns);
+        const cveCount = (p.cves ?? []).length;
         doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
         doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
            .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
@@ -662,8 +622,13 @@ async function buildTechnicalReport(scan: Scan, vulns: Vuln[], org: Org): Promis
       const rawFindings = s.findings?.filter(Boolean) ?? [];
       const hasFail = rawFindings.length > 0;
 
-      // Pre-compute enriched findings and their heights for accurate layout
-      const enriched = rawFindings.slice(0, 4).map(enrichFinding);
+      // Enriquecer e deduplicar por texto — múltiplos CVEs do mesmo serviço
+      // enriquecem para o mesmo texto (ex: "Porta 22 Exposta") → mostrar uma vez.
+      const _enrichedAll = rawFindings.slice(0, 8).map(enrichFinding);
+      const _seenEnriched = new Set<string>();
+      const enriched = _enrichedAll
+        .filter(ef => !_seenEnriched.has(ef.text) && (_seenEnriched.add(ef.text), true))
+        .slice(0, 4);
       const findingHeights = enriched.map(ef =>
         doc.fontSize(7.5).font("Helvetica").heightOfString(ef.text, { width: FIND_W }) + 6
       );

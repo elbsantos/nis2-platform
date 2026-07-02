@@ -36,6 +36,12 @@ function conformanceLabel(score: number): string {
   return "Conformidade baixa";
 }
 
+// Pesos regulatórios alinhados com scan-executor.ts (MEASURE_WEIGHTS).
+// Artigos não-scannáveis (a, b, c, d, f, g) têm score=null → excluídos pelo filtro abaixo.
+const NIS2_WEIGHTS: Record<string, number> = {
+  "Art. 21(2)(e)": 12, "Art. 21(2)(h)": 15, "Art. 21(2)(i)": 12, "Art. 21(2)(j)": 10,
+};
+
 export default function Nis2ScoreChart({ scores }: Props) {
   // Radar e overall: apenas artigos com score técnico (scannable, score !== null)
   const scannable = scores.filter((s) => s.score !== null && s.scannable !== false);
@@ -46,9 +52,16 @@ export default function Nis2ScoreChart({ scores }: Props) {
     fullMark: 100,
   }));
 
-  const overall = scannable.length
-    ? Math.round(scannable.reduce((acc, s) => acc + (s.score as number), 0) / scannable.length)
-    : 0;
+  // Média ponderada — mesma fórmula do scan-executor para score global consistente.
+  const overall = (() => {
+    let wSum = 0, wTotal = 0;
+    for (const s of scannable) {
+      const w = NIS2_WEIGHTS[s.article] ?? 10;
+      wSum += (s.score as number) * w;
+      wTotal += w;
+    }
+    return wTotal > 0 ? Math.round(wSum / wTotal) : 0;
+  })();
 
   return (
     <div className="space-y-8">

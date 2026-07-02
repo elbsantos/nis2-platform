@@ -70,6 +70,7 @@ export interface VulnFinding {
   severity: "critical" | "high" | "medium" | "low";
   description: string;
   affectedService: string;
+  port?: number;
   nis2Articles: string[];
   cisControls: string[];
   iso27001Controls: string[];
@@ -141,7 +142,7 @@ const NIS2_ARTICLE_MAP: Record<string, {
     title: "Políticas de avaliação de eficácia das medidas",
     riskPorts: [],
     weight: 5,
-    scannable: true,    // parcial: serviços de monitorização expostos
+    scannable: false,   // organizacional — não observável por scan externo
   },
   "Art. 21(2)(g)": {
     title: "Práticas básicas de ciberhigiene e formação",
@@ -671,7 +672,13 @@ export async function executeAgentlessScan(
             console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
             continue;
           }
-          // Product confirmed by NVD — version filter runs below (same path as non-banner)
+          // Produto confirmado — mas sem intervalo de versões não conseguimos confirmar
+          // que a versão detectada é afectada. Para banner-enriched rejeitamos.
+          if (!nvdInfo.hasRangeData) {
+            console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; banner ${portFinding.port}; versão ${portFinding.version ?? "desconhecida"} não confirmável)`);
+            continue;
+          }
+          // hasRangeData=true garantido — version filter corre abaixo
         }
 
         // Filter by version using NVD ranges — skip CVEs that don't affect the detected version
@@ -684,7 +691,7 @@ export async function executeAgentlessScan(
             }
             console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
           }
-          // If hasRangeData=false: NVD returned no config → conservative include (log nothing)
+          // hasRangeData=false em porto não-banner → conservative include
         }
 
         const severity = (s: number) =>
@@ -701,6 +708,7 @@ export async function executeAgentlessScan(
           severity: severity(cvssScore) as VulnFinding["severity"],
           description,
           affectedService: portFinding.service,
+          port: portFinding.port,
           nis2Articles,
           cisControls:      getCisControls(cveId, nis2Articles, description),
           iso27001Controls: getIso27001Controls(cveId, nis2Articles, description),
@@ -767,6 +775,7 @@ export async function executeAgentlessScan(
             severity:         sv.severity,
             description:      sv.description,
             affectedService,
+            port:             sshResult.port,
             nis2Articles:     sv.nis2Articles,
             cisControls:      sv.cisControls,
             iso27001Controls: sv.iso27001Controls,
@@ -908,6 +917,13 @@ export async function executeAgentlessScan(
     // Mantemos o primeiro encontrado (o que vem do Shodan/NVD tem CVSS mais preciso).
     const _seenCveIds = new Set<string>();
     vulns.splice(0, vulns.length, ...vulns.filter((v) => !_seenCveIds.has(v.cveId) && (_seenCveIds.add(v.cveId), true)));
+
+    // Actualiza openPorts.cves para conter apenas os CVEs que passaram o filtro NVD.
+    // Garante que UI (p.cves.length) e PDF lêem exactamente a mesma contagem.
+    const survivedCves = new Set(vulns.map((v) => v.cveId));
+    for (const port of allPorts) {
+      port.cves = port.cves.filter((id) => survivedCves.has(id));
+    }
 
     const { scores, overall } = calculateNIS2Scores(allPorts, vulns, tlsIssues, extraDeductions);
 
