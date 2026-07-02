@@ -681,17 +681,21 @@ export async function executeAgentlessScan(
           // hasRangeData=true garantido — version filter corre abaixo
         }
 
-        // Filter by version using NVD ranges — skip CVEs that don't affect the detected version
+        // Regra unificada (CORREÇÃO 1+2): CVE só é listado se há intervalo NVD real
+        // que confirme que a versão detetada é afetada. Aplica-se a TODOS os portos;
+        // sem dados de versão reais não inventamos. Banner-enriched já exigiu
+        // hasRangeData=true no bloco anterior, portanto não há duplicação.
         if (hasVersion) {
-          if (nvdInfo?.hasRangeData) {
-            const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
-            if (!inRange) {
-              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
-              continue;
-            }
-            console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
+          if (!nvdInfo?.hasRangeData) {
+            console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; ${portFinding.service} ${portFinding.version} não confirmável)`);
+            continue;
           }
-          // hasRangeData=false em porto não-banner → conservative include
+          const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
+          if (!inRange) {
+            console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
+            continue;
+          }
+          console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
         }
 
         const severity = (s: number) =>
@@ -932,7 +936,8 @@ export async function executeAgentlessScan(
       nis2Scores: scores,
       overallScore: overall,
       isSharedInfra,                                          // flag para UI/PDF
-      vulnerabilitiesFound: vulns.length,
+      // vulnerabilitiesFound gravado em separado foi eliminado (CORREÇÃO 4):
+      // o total é results.vulnerabilities.length — uma única fonte de verdade.
       criticalCount: vulns.filter((v) => v.severity === "critical").length,
       highCount: vulns.filter((v) => v.severity === "high").length,
       mediumCount: vulns.filter((v) => v.severity === "medium").length,
