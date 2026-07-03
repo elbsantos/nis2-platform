@@ -195,6 +195,14 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
     drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
 
     let y = 90;
+    let execPage = 2;
+    const execAddPage = () => {
+      drawRunningFooter(doc, execPage++);
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
+      y = 90;
+    };
+    const execEnsure = (needed: number) => { if (y + needed > 770) execAddPage(); };
 
     // Section title
     y = drawSectionTitle(doc, "Resumo Executivo", y);
@@ -229,38 +237,108 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
        .fillColor(C.text).text(String(vulns.length));
     y += 36;
 
-    // Top risks
-    const top5 = [...vulns].sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore)).slice(0, 5);
-    if (top5.length) {
-      y = drawSectionTitle(doc, "Principais Riscos Identificados", y);
-      // Table header
-      doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(C.navy).fill();
-      doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white);
-      doc.text("ID / Vulnerabilidade",  MARGIN + 6,  y + 5, { width: 230 });
-      doc.text("Componente",            MARGIN + 240, y + 5, { width: 100 });
-      doc.text("CVSS",                  MARGIN + 345, y + 5, { width: 45, align: "center" });
-      doc.text("Severidade",            MARGIN + 395, y + 5, { width: 100, align: "center" });
-      y += 18;
+    // ── Riscos por severidade (linguagem de gestor) ───────────────────────
+    const criticals = vulns.filter(v => v.severity === "critical")
+      .sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
+    const highs     = vulns.filter(v => v.severity === "high")
+      .sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
+    const mediums   = vulns.filter(v => v.severity === "medium")
+      .sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
 
-      top5.forEach((v, i) => {
-        const rowBg = i % 2 === 0 ? C.bg : C.white;
-        doc.rect(MARGIN, y, CONTENT_W, 24).fillColor(rowBg).fill();
-        const sColor = severityColor(v.severity);
-        doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
-           .text(v.cveId, MARGIN + 6, y + 4, { width: 115 });
-        doc.fontSize(7).font("Helvetica").fillColor(C.muted)
-           .text(truncate(v.description, 52), MARGIN + 6, y + 14, { width: 230 });
-        doc.fontSize(8).font("Helvetica").fillColor(C.text)
-           .text(truncate(v.affectedComponent, 22), MARGIN + 240, y + 8, { width: 100 });
-        const cvss = parseFloat(v.cvssScore);
-        doc.fontSize(9).font("Helvetica-Bold").fillColor(cvssColor(cvss))
-           .text(v.cvssScore, MARGIN + 345, y + 7, { width: 45, align: "center" });
-        doc.rect(MARGIN + 400, y + 5, 80, 14).fillColor(sColor).fill();
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
-           .text(severityLabel(v.severity).toUpperCase(), MARGIN + 400, y + 8, { width: 80, align: "center" });
+    if (vulns.length > 0) {
+      execEnsure(60);
+      y = drawSectionTitle(doc, "Riscos Identificados por Severidade", y);
+
+      // CRÍTICAS
+      if (criticals.length > 0) {
+        execEnsure(36);
+        doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fdf4ff").fill();
+        doc.rect(MARGIN, y, 4, 22).fillColor(C.critical).fill();
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(C.critical)
+           .text(
+             `CRÍTICAS (${criticals.length}) — Ação imediata nas próximas 24 a 72 horas`,
+             MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
+           );
         y += 24;
-      });
-      y += 8;
+        criticals.slice(0, 6).forEach((v) => {
+          const enriched = enrichFinding(v.description || v.cveId);
+          const tH = doc.fontSize(8).font("Helvetica").heightOfString(enriched.text, { width: CONTENT_W - 28 });
+          execEnsure(tH + 14);
+          doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(C.critical).fill();
+          doc.fontSize(8).font("Helvetica").fillColor(C.text)
+             .text(enriched.text, MARGIN + 22, y, { width: CONTENT_W - 26 });
+          y += tH + 10;
+        });
+        if (criticals.length > 6) {
+          execEnsure(16);
+          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+             .text(
+               `… e mais ${criticals.length - 6} vulnerabilidades críticas — ver Relatório Técnico.`,
+               MARGIN + 22, y
+             );
+          y += 14;
+        }
+        execEnsure(14);
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+           .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
+        y += 18;
+      }
+
+      // ALTAS
+      if (highs.length > 0) {
+        execEnsure(36);
+        doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fff7f0").fill();
+        doc.rect(MARGIN, y, 4, 22).fillColor(C.danger).fill();
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(C.danger)
+           .text(
+             `ALTAS (${highs.length}) — Resolução recomendada em 7 dias`,
+             MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
+           );
+        y += 24;
+        groupByTheme(highs).forEach(({ theme, count, examples }) => {
+          const enriched = enrichFinding(examples[0].description || examples[0].cveId);
+          const summary  = count > 1
+            ? `${theme} (${count} ocorrências): ${enriched.text}`
+            : enriched.text;
+          const tH = doc.fontSize(8).font("Helvetica").heightOfString(summary, { width: CONTENT_W - 28 });
+          execEnsure(tH + 14);
+          doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(C.danger).fill();
+          doc.fontSize(8).font("Helvetica").fillColor(C.text)
+             .text(summary, MARGIN + 22, y, { width: CONTENT_W - 26 });
+          y += tH + 10;
+        });
+        execEnsure(14);
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+           .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
+        y += 18;
+      }
+
+      // MÉDIAS
+      if (mediums.length > 0) {
+        execEnsure(50);
+        doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fffbeb").fill();
+        doc.rect(MARGIN, y, 4, 22).fillColor(C.warning).fill();
+        doc.fontSize(9).font("Helvetica-Bold").fillColor("#92400e")
+           .text(
+             `MÉDIAS (${mediums.length}) — Resolução recomendada em 30 dias`,
+             MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
+           );
+        y += 24;
+        const medSummary = buildMediumSummary(mediums);
+        const mH = doc.fontSize(8).font("Helvetica").heightOfString(medSummary, { width: CONTENT_W - 28 });
+        execEnsure(mH + 28);
+        doc.fontSize(8).font("Helvetica").fillColor(C.text)
+           .text(medSummary, MARGIN + 22, y, { width: CONTENT_W - 26 });
+        y += mH + 8;
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+           .text(
+             "→ Listagem individual de cada vulnerabilidade no Relatório Técnico.",
+             MARGIN + 22, y
+           );
+        y += 18;
+      }
+
+      y += 6;
     }
 
     // Conformidade NIS2 overview (mini bars)
@@ -291,9 +369,9 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
       y += half * 22 + 10;
     }
 
-    drawRunningFooter(doc, 2);
+    drawRunningFooter(doc, execPage++);
 
-    // ── PAGE 3: PRÓXIMOS PASSOS + METODOLOGIA + REFERÊNCIAS ───────────────
+    // ── PRÓXIMOS PASSOS + METODOLOGIA + REFERÊNCIAS ───────────────────────
     doc.addPage({ size: "A4", margin: 0 });
     drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
     y = 90;
@@ -312,7 +390,7 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
 
     y = drawMethodologySection(doc, y);
     y = drawReferencesSection(doc, y);
-    drawRunningFooter(doc, 3);
+    drawRunningFooter(doc, execPage);
 
     doc.end();
   });
@@ -442,7 +520,7 @@ async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
       ["Início",        fmtFull(scan?.startedAt)],
       ["Conclusão",     fmtFull(scan?.completedAt)],
       ["Score global",  `${overall}/100 — ${scoreLabel(overall)}`],
-      ["Vulnerabilidades", `${vulns.length} (${vulns.filter(v => v.severity === "critical").length} críticas, ${vulns.filter(v => v.severity === "high").length} altas)`],
+      ["Vulnerabilidades", `${vulns.length} (${vulns.filter(v => v.severity === "critical").length} críticas, ${vulns.filter(v => v.severity === "high").length} altas, ${vulns.filter(v => v.severity === "medium").length} médias)`],
     ];
     metaRows.forEach(([label, val], i) => {
       const rowBg = i % 2 === 0 ? C.bg : C.white;
@@ -919,6 +997,62 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// Vulnerability theme classification for executive grouping
+// ---------------------------------------------------------------------------
+
+interface ThemeGroup { theme: string; count: number; examples: PdfVuln[] }
+
+function getVulnTheme(v: PdfVuln): string {
+  const s = `${v.cveId} ${v.affectedComponent} ${v.description}`.toLowerCase();
+  if (/spf|dmarc|dkim/i.test(s))                                        return "Segurança de Email (DNS)";
+  if (/tls|ssl|cert|cipher|nis2-tls/i.test(s))                          return "Configuração TLS/SSL";
+  if (/ssh|nis2-ssh/i.test(s))                                           return "Acesso Remoto SSH";
+  if (/header|csp|hsts|x-frame|referrer|content.type|nis2-header/i.test(s)) return "Cabeçalhos de Segurança HTTP";
+  if (/mongo|mysql|postgres|redis|mssql|27017|3306|5432|6379|1433/i.test(s)) return "Base de Dados Exposta";
+  if (/rdp|3389|remote.desktop/i.test(s))                               return "Acesso Remoto Windows (RDP)";
+  if (/\bftp\b|:21\b|telnet|:23\b/i.test(s))                            return "Protocolo Inseguro";
+  return "Software com Vulnerabilidades Conhecidas";
+}
+
+function groupByTheme(vulnList: PdfVuln[]): ThemeGroup[] {
+  const map = new Map<string, PdfVuln[]>();
+  for (const v of vulnList) {
+    const t = getVulnTheme(v);
+    if (!map.has(t)) map.set(t, []);
+    map.get(t)!.push(v);
+  }
+  return [...map.entries()]
+    .map(([theme, examples]) => ({ theme, count: examples.length, examples }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function buildMediumSummary(mediums: PdfVuln[]): string {
+  const themes = groupByTheme(mediums);
+  const topTwo = themes.slice(0, 2).map(t => t.theme.toLowerCase());
+  const nature = topTwo.length === 1
+    ? `maioritariamente relacionadas com ${topTwo[0]}`
+    : `principalmente relacionadas com ${topTwo[0]} e ${topTwo[1]}`;
+
+  const hasCves   = mediums.some(v => /^CVE-/i.test(v.cveId));
+  const hasConfig = mediums.some(v => !/^CVE-/i.test(v.cveId));
+  const effort    = hasCves && hasConfig
+    ? "baixo a médio — combinação de actualizações de software e ajustes de configuração"
+    : hasCves
+      ? "baixo — actualizações de software e aplicação de patches disponíveis"
+      : "baixo — ajustes de configuração nos sistemas afectados";
+
+  const n = mediums.length;
+  return (
+    `${n} vulnerabilidade${n > 1 ? "s" : ""} de severidade média detectada${n > 1 ? "s" : ""}, ` +
+    `${nature}. ` +
+    `O nível de risco é moderado — não representam exposição imediata, mas aumentam a superfície de ataque ` +
+    `caso não sejam corrigidas. ` +
+    `Esforço de correcção estimado: ${effort}. ` +
+    `Resolução recomendada no prazo de 30 dias.`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Next steps builder
 // ---------------------------------------------------------------------------
 
@@ -936,6 +1070,8 @@ function buildNextSteps(
     steps.push(`Patcha ${counts.critical} vulnerabilidade(s) crítica(s) identificadas — janela recomendada: 24 a 72 horas.`);
   if (counts.high > 0)
     steps.push(`Resolve ${counts.high} vulnerabilidade(s) de severidade alta — janela recomendada: 7 dias.`);
+  if (counts.medium > 0)
+    steps.push(`Agenda a correcção de ${counts.medium} vulnerabilidade(s) de severidade média — esforço estimado baixo a médio, resolução em 30 dias.`);
   steps.push("Completa o Questionário NIS2 (42 controlos Art. 21(2)) na plataforma para um score de conformidade completo.");
   steps.push("Gera e implementa os Planos de Remediação por IA disponíveis na plataforma para cada vulnerabilidade.");
   if (overall >= 60)
