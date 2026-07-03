@@ -7,7 +7,13 @@
 
 import PDFDocument from "pdfkit";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getScanById, getOrganizationById } from "../db";
+import { getScanById, getOrganizationById, getLatestCompletedQuestionnaireForOrg } from "../db";
+import {
+  combinedNis2Scores,
+  overallCombinedScore,
+  type CombinedArticleScore,
+} from "../utils/combined-score";
+import type { NIS2ArticleScore } from "./scan-executor";
 
 // ---------------------------------------------------------------------------
 // S3 / Hetzner Object Storage client
@@ -155,16 +161,31 @@ export async function generateReportBuffer(options: {
     remediation:       v.remediationHint ?? v.remediation ?? null,
   }));
 
+  // Score combinado (scan + questionário) — fonte única via combined-score.ts.
+  const nis2Scores = ((scan.results as any)?.nis2Scores ?? []) as NIS2ArticleScore[];
+  const qSession   = await getLatestCompletedQuestionnaireForOrg(options.organizationId);
+  const qScores    = (qSession?.articleScores as Record<string, number> | null) ?? null;
+  const combined   = combinedNis2Scores(nis2Scores, qScores);
+  const scanOverall   = (scan.results as any)?.overallScore as number ?? 0;
+  const displayOverall = qScores !== null ? overallCombinedScore(combined) : scanOverall;
+
   return options.type === "executive"
-    ? buildExecutiveReport(scan, vulns, org)
-    : buildTechnicalReport(scan, vulns, org);
+    ? buildExecutiveReport(scan, vulns, org, combined, displayOverall, qScores !== null)
+    : buildTechnicalReport(scan, vulns, org, combined, displayOverall, qScores !== null);
 }
 
 // ---------------------------------------------------------------------------
 // EXECUTIVE REPORT
 // ---------------------------------------------------------------------------
 
-async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Promise<Buffer> {
+async function buildExecutiveReport(
+  scan: Scan,
+  vulns: PdfVuln[],
+  org: Org,
+  combined: CombinedArticleScore[],
+  displayOverall: number,
+  hasQuestionnaire: boolean
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
       info: { Title: "CISPLAN — Relatório Executivo NIS2", Author: "CISPLAN", Creator: "CISPLAN" } });
@@ -173,12 +194,9 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const results   = (scan?.results ?? {}) as Record<string, any>;
-    const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
-      results.nis2Scores ?? [];
-    // Usa o overallScore armazenado — calculado pelo scan-executor com a fórmula correcta
-    // (média ponderada dos artigos scannáveis). Fonte única de verdade após este refactor.
-    const overall = (results.overallScore as number | undefined) ?? 0;
+    // Usa scores combinados (scan + questionário) — calculados em generateReportBuffer.
+    // displayOverall já reflecte o score combinado quando questionário disponível.
+    const overall = displayOverall;
     const counts = {
       critical: vulns.filter(v => v.severity === "critical").length,
       high:     vulns.filter(v => v.severity === "high").length,
@@ -341,12 +359,12 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
       y += 6;
     }
 
-    // Conformidade NIS2 overview (mini bars)
-    if (nis2Scores.length) {
+    // Conformidade NIS2 overview (mini bars — usa scores combinados)
+    if (combined.length) {
       y = drawSectionTitle(doc, "Score por Artigo NIS2 (Art. 21(2))", y);
-      const half = Math.ceil(nis2Scores.length / 2);
+      const half = Math.ceil(combined.length / 2);
       const colW = CONTENT_W / 2 - 10;
-      nis2Scores.forEach((s, idx) => {
+      combined.forEach((s, idx) => {
         const col  = idx < half ? 0 : 1;
         const row  = idx < half ? idx : idx - half;
         const bx   = MARGIN + col * (colW + 20);
@@ -355,15 +373,14 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
         doc.rect(bx + 20, by + 6, colW - 55, 8).fillColor(C.border).fill();
         doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.muted)
            .text(art, bx, by + 5, { width: 18, align: "right" });
-        if (s.score === null) {
-          // Medida não avaliável por scan — barra vazia + texto "N/A"
+        if (s.combinedScore === null) {
           doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
              .text("N/A", bx + colW - 30, by + 5, { width: 28, align: "right" });
         } else {
-          const fill = Math.round((s.score / 100) * (colW - 55));
-          doc.rect(bx + 20, by + 6, Math.max(2, fill), 8).fillColor(scoreColor(s.score)).fill();
-          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(scoreColor(s.score))
-             .text(`${s.score}`, bx + colW - 30, by + 5, { width: 28, align: "right" });
+          const fill = Math.round((s.combinedScore / 100) * (colW - 55));
+          doc.rect(bx + 20, by + 6, Math.max(2, fill), 8).fillColor(scoreColor(s.combinedScore)).fill();
+          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(scoreColor(s.combinedScore))
+             .text(`${s.combinedScore}`, bx + colW - 30, by + 5, { width: 28, align: "right" });
         }
       });
       y += half * 22 + 10;
@@ -377,7 +394,7 @@ async function buildExecutiveReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
     y = 90;
 
     y = drawSectionTitle(doc, "Próximos Passos Recomendados", y);
-    const steps = buildNextSteps(overall, results, counts);
+    const steps = buildNextSteps(overall, counts);
     steps.forEach((step, i) => {
       doc.rect(MARGIN, y, 20, 20).fillColor(C.brand).fill();
       doc.fontSize(9).font("Helvetica-Bold").fillColor(C.white)
@@ -486,7 +503,10 @@ function getDnsExample(cveId: string, component: string, target: string): string
 // TECHNICAL REPORT
 // ---------------------------------------------------------------------------
 
-async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Promise<Buffer> {
+async function buildTechnicalReport(
+  scan: Scan, vulns: PdfVuln[], org: Org,
+  combined: CombinedArticleScore[], displayOverall: number, hasQuestionnaire: boolean
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
       info: { Title: "CISPLAN — Relatório Técnico NIS2", Author: "CISPLAN", Creator: "CISPLAN" } });
@@ -496,9 +516,7 @@ async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
     doc.on("error", reject);
 
     const results   = (scan?.results ?? {}) as Record<string, any>;
-    const nis2Scores: Array<{ article: string; title: string; score: number | null; scannable?: boolean; findings: string[] }> =
-      results.nis2Scores ?? [];
-    const overall = (results.overallScore as number | undefined) ?? 0;
+    const overall   = displayOverall;
     const openPorts: Array<{ port: number; protocol: string; service: string; product?: string; version?: string; cves: string[] }> =
       results.openPorts ?? [];
 
@@ -519,7 +537,7 @@ async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
       ["Estado",        ({ completed: "Concluído", running: "Em execução", pending: "Na fila", failed: "Falhou" } as Record<string, string>)[scan?.status ?? ""] ?? scan?.status ?? "—"],
       ["Início",        fmtFull(scan?.startedAt)],
       ["Conclusão",     fmtFull(scan?.completedAt)],
-      ["Score global",  `${overall}/100 — ${scoreLabel(overall)}`],
+      ["Score global",  `${overall}/100 — ${scoreLabel(overall)}${hasQuestionnaire ? " (combinado scan + questionário)" : " (scan)"}`],
       ["Vulnerabilidades", `${vulns.length} (${vulns.filter(v => v.severity === "critical").length} críticas, ${vulns.filter(v => v.severity === "high").length} altas, ${vulns.filter(v => v.severity === "medium").length} médias)`],
     ];
     metaRows.forEach(([label, val], i) => {
@@ -696,7 +714,7 @@ async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
 
     let techPage = 4;
     const FIND_W = CONTENT_W - 52;
-    nis2Scores.forEach((s) => {
+    combined.forEach((s) => {
       const rawFindings = s.findings?.filter(Boolean) ?? [];
       const hasFail = rawFindings.length > 0;
 
@@ -721,14 +739,15 @@ async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
       }
       const artInfo = NIS2_ARTICLES[s.article];
       const BAR_MAX = 160;
-      const isNonScannable = s.score === null;
-      const barFill = isNonScannable ? 0 : Math.max(2, Math.round((s.score! / 100) * BAR_MAX));
-      const col = isNonScannable ? C.muted : scoreColor(s.score!);
+      const displayScore = s.combinedScore;
+      const isNull = displayScore === null;
+      const barFill = isNull ? 0 : Math.max(2, Math.round((displayScore! / 100) * BAR_MAX));
+      const col = isNull ? C.muted : scoreColor(displayScore!);
 
-      // Score circle (small) — "N/A" para medidas não avaliáveis por scan
+      // Score circle (small) — "N/A" para medidas sem score disponível
       doc.circle(MARGIN + 16, y + 16, 14).fillColor(col).fill();
       doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white)
-         .text(isNonScannable ? "N/A" : String(s.score), MARGIN + 4, y + 11, { width: 24, align: "center" });
+         .text(isNull ? "N/A" : String(displayScore), MARGIN + 4, y + 11, { width: 24, align: "center" });
 
       // Article + short title
       doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
@@ -754,14 +773,23 @@ async function buildTechnicalReport(scan: Scan, vulns: PdfVuln[], org: Org): Pro
              .text(ef.text, MARGIN + 48, fy, { width: FIND_W });
           fy += findingHeights[fi];
         });
-      } else if (isNonScannable) {
-        // Medida organizacional — não avaliável por scan externo
+      } else if (isNull && !s.scannable) {
+        // Medida organizacional sem questionário preenchido
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
         doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
            .text(
              "Não avaliável por scan — requer questionário de autoavaliação (medida organizacional não observável externamente).",
              MARGIN + 48, y + 30, { width: FIND_W }
            );
+      } else if (isNull) {
+        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+           .text("Sem dados suficientes para avaliação.", MARGIN + 48, y + 30, { width: FIND_W });
+      } else if (!s.scannable && s.source === "questionnaire") {
+        // Score obtido exclusivamente via questionário (medida organizacional)
+        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.brand).fill();
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+           .text("Score obtido via Questionário NIS2 (medida organizacional).", MARGIN + 48, y + 30, { width: FIND_W });
       } else {
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.success).fill();
         doc.fontSize(7.5).font("Helvetica").fillColor(C.success)
@@ -1058,7 +1086,6 @@ function buildMediumSummary(mediums: PdfVuln[]): string {
 
 function buildNextSteps(
   overall: number,
-  results: Record<string, any>,
   counts: { critical: number; high: number; medium: number; low: number }
 ): string[] {
   const steps: string[] = [];

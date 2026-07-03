@@ -8,7 +8,9 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { freeProcedure } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, isIpAddress } from "../services/scan-executor";
-import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan } from "../db";
+import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan, getLatestCompletedQuestionnaireForOrg } from "../db";
+import { combinedNis2Scores, overallCombinedScore } from "../utils/combined-score";
+import type { NIS2ArticleScore } from "../services/scan-executor";
 import { getRedisClient } from "../middlewares/rateLimit";
 import { isSafeTarget } from "../middlewares/security";
 
@@ -346,5 +348,35 @@ export const scanRouter = {
     .input(z.object({ batchId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       return getScansByBatchId(ctx.org.id, input.batchId);
+    }),
+
+  /**
+   * Score combinado (scan + questionário) para o gráfico "Score NIS2 por Artigo".
+   * Fonte única: combinedNis2Scores() de backend/utils/combined-score.ts.
+   * Consumido pelo ecrã (ScanResults) e pelos PDFs (pdf-report-generator).
+   */
+  combinedArticleScores: freeProcedure
+    .input(z.object({ scanId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const scan = await getScanById(input.scanId);
+      if (!scan) throw new TRPCError({ code: "NOT_FOUND", message: "Scan não encontrado" });
+      if (scan.organizationId !== ctx.org.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão" });
+      }
+
+      const nis2Scores = ((scan.results as any)?.nis2Scores ?? []) as NIS2ArticleScore[];
+      const qSession   = await getLatestCompletedQuestionnaireForOrg(ctx.org.id);
+      const qScores    = (qSession?.articleScores as Record<string, number> | null) ?? null;
+
+      const combined      = combinedNis2Scores(nis2Scores, qScores);
+      const scanOverall   = (scan.results as any)?.overallScore as number ?? 0;
+      const overallCombined = qScores !== null ? overallCombinedScore(combined) : scanOverall;
+
+      return {
+        combined,
+        overallCombined,
+        hasQuestionnaire: qScores !== null,
+        questionnaireCompletedAt: qSession?.completedAt ?? null,
+      };
     }),
 };

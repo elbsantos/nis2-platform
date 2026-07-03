@@ -26,6 +26,14 @@ export default function ScanResults() {
     }
   );
 
+  // Score combinado (scan + questionário) — calculado no backend (fonte única).
+  // Só activa quando o scan está concluído.
+  const scanDone = scan?.status === "completed";
+  const { data: combinedData } = trpc.scan.combinedArticleScores.useQuery(
+    { scanId: id },
+    { enabled: !isNaN(id) && scanDone }
+  );
+
   if (isNaN(id)) {
     navigate("/scan/history", { replace: true });
     return null;
@@ -154,9 +162,12 @@ export default function ScanResults() {
           <h2 className="text-2xl font-semibold text-white mb-4">Score NIS2 por Artigo</h2>
           {results?.nis2Scores ? (
             <Nis2ScoreChart
-            scores={results.nis2Scores}
-            overallScore={results.overallScore ?? 0}
-          />
+              scores={results.nis2Scores}
+              overallScore={results.overallScore ?? 0}
+              combined={combinedData?.combined}
+              overallCombined={combinedData?.overallCombined}
+              hasQuestionnaire={combinedData?.hasQuestionnaire ?? false}
+            />
           ) : (
             <p className="text-xl text-slate-400">Dados de score não disponíveis para este scan.</p>
           )}

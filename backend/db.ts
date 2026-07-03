@@ -483,6 +483,25 @@ export async function getQuestionnaireSessionsByOrgId(orgId: number) {
     .orderBy(desc(questionnaireSessions.createdAt));
 }
 
+export async function getLatestCompletedQuestionnaireForOrg(orgId: number) {
+  const rows = await getDb()
+    .select({
+      id:           questionnaireSessions.id,
+      articleScores: questionnaireSessions.articleScores,
+      completedAt:  questionnaireSessions.completedAt,
+    })
+    .from(questionnaireSessions)
+    .where(
+      and(
+        eq(questionnaireSessions.organizationId, orgId),
+        eq(questionnaireSessions.status, "completed")
+      )
+    )
+    .orderBy(desc(questionnaireSessions.completedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function updateQuestionnaireSession(
   sessionId: number,
   data: {
