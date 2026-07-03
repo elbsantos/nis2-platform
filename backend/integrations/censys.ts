@@ -152,7 +152,7 @@ export async function lookupHost(
   const cacheKey = `censys:${target}`;
 
   try {
-    const cached = await getCached(cacheKey);
+    const cached = process.env.DEV_CACHE_DISABLED === "true" ? null : await getCached(cacheKey);
     if (cached) {
       console.log(`[Censys] Cache hit for ${target}`);
       return cached;

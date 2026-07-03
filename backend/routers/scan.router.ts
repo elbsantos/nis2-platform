@@ -14,6 +14,9 @@ import { isSafeTarget } from "../middlewares/security";
 
 const SCAN_CACHE_TTL_HOURS     = parseInt(process.env.SCAN_CACHE_TTL_HOURS     ?? "24", 10);
 const MAX_FORCE_RESCANS_PER_DAY = parseInt(process.env.MAX_FORCE_RESCANS_PER_DAY ?? "3",  10);
+// DEV ONLY — ignora TODAS as camadas de cache do scan (DB + Redis Shodan/Censys/NVD).
+// Nunca ligar em produção: cada scan consome créditos de API reais.
+const DEV_CACHE_DISABLED = process.env.DEV_CACHE_DISABLED === "true";
 
 function formatScannedAgo(completedAt: Date): string {
   const hours = Math.floor((Date.now() - completedAt.getTime()) / 3_600_000);
@@ -88,7 +91,15 @@ export const scanRouter = {
       }
 
       // ── TTL cache — fast-path for recently scanned targets (OBJETIVO 2+4) ──
-      const recentScan = await getRecentCompletedScan(ctx.org.id, input.target, SCAN_CACHE_TTL_HOURS);
+      // DEV_CACHE_DISABLED ignora completamente o cache DB e as camadas Redis
+      // (Shodan/Censys/NVD ignoram a leitura de cache nos seus próprios módulos).
+      if (DEV_CACHE_DISABLED) {
+        console.warn(`[Scan] DEV_CACHE_DISABLED=true — cache DB e Redis ignorados para ${input.target}`);
+      }
+
+      const recentScan = DEV_CACHE_DISABLED
+        ? null
+        : await getRecentCompletedScan(ctx.org.id, input.target, SCAN_CACHE_TTL_HOURS);
 
       if (recentScan && !input.force) {
         return {
@@ -98,8 +109,8 @@ export const scanRouter = {
         };
       }
 
-      // ── Force-rescan rate limit ────────────────────────────────────────────
-      if (recentScan && input.force) {
+      // ── Force-rescan rate limit (ignorado em modo dev) ────────────────────
+      if (!DEV_CACHE_DISABLED && recentScan && input.force) {
         const today    = new Date().toISOString().slice(0, 10);
         const forceKey = `force-rescan:org:${ctx.org.id}:${today}`;
         try {
