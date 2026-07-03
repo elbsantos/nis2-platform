@@ -28,6 +28,7 @@ export interface NvdCveInfo {
 // ---------------------------------------------------------------------------
 
 async function getCached(cveId: string): Promise<NvdCveInfo | null> {
+  if (process.env.DEV_CACHE_DISABLED === "true") return null;
   try {
     const redis = await getRedisClient();
     const raw = await redis.get(`nvd:cve:${cveId}`);

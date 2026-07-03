@@ -165,7 +165,7 @@ export async function lookupHost(
     const ip = await resolveToIp(target);
     const cacheKey = `shodan:${ip}`;
 
-    const cached = await getCached(cacheKey);
+    const cached = process.env.DEV_CACHE_DISABLED === "true" ? null : await getCached(cacheKey);
     if (cached) {
       console.log(`[Shodan] Cache hit for ${ip}`);
       return cached;
