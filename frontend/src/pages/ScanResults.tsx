@@ -117,6 +117,7 @@ export default function ScanResults() {
     ?? 0;
   const critical  = results?.criticalCount ?? 0;
   const high      = results?.highCount ?? 0;
+  const medium    = results?.mediumCount ?? 0;
 
   return (
     <div className="min-h-screen bg-[#0f1e38]">
@@ -139,12 +140,13 @@ export default function ScanResults() {
           </div>
         </div>
 
-        {/* Summary cards — 4 colunas alinhadas com os cards de vulnerabilidades */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* Summary cards — 5 colunas: total + 3 severidades + duração */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <SummaryCard label="Vulnerabilidades" value={String(vulnCount)} accent={vulnCount > 0} />
           <SummaryCard label="Críticas" value={String(critical)} accent={critical > 0} danger />
-          <SummaryCard label="Altas" value={String(high)} accent={high > 0} warn />
-          <SummaryCard label="Duração" value={scan.completedAt ? elapsedLabel(scan.startedAt, scan.completedAt) : "—"} />
+          <SummaryCard label="Altas"    value={String(high)}     accent={high > 0}     warn />
+          <SummaryCard label="Médias"   value={String(medium)}   accent={medium > 0}   mediumSev />
+          <SummaryCard label="Duração"  value={scan.completedAt ? elapsedLabel(scan.startedAt, scan.completedAt) : "—"} />
         </div>
 
         {/* NIS2 Score chart */}
@@ -252,13 +254,14 @@ function Spinner({ size = "md" }: { size?: "md" | "lg" }) {
 }
 
 function SummaryCard({
-  label, value, accent = false, danger = false, warn = false,
+  label, value, accent = false, danger = false, warn = false, mediumSev = false,
 }: {
-  label: string; value: string; accent?: boolean; danger?: boolean; warn?: boolean;
+  label: string; value: string; accent?: boolean; danger?: boolean; warn?: boolean; mediumSev?: boolean;
 }) {
-  const color = danger && accent ? "text-red-400"
-    : warn && accent ? "text-orange-400"
-    : accent ? "text-amber-400"
+  const color = danger && accent    ? "text-red-400"
+    : warn && accent       ? "text-orange-400"
+    : mediumSev && accent  ? "text-yellow-400"
+    : accent               ? "text-amber-400"
     : "text-white";
   return (
     <div className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-5 text-center">
@@ -407,15 +410,18 @@ function severityLabel(s: string) {
 }
 
 function VulnerabilityListFromScan({ results }: { results: any }) {
-  if (!results?.vulnerabilitiesFound) {
+  // Fonte única: results.vulnerabilities (array, pós-consolidação).
+  // Fallback vulnerabilitiesFound para retrocompatibilidade com scans antigos.
+  const vulns: VulnSummary[] = results?.vulnerabilities ?? [];
+  const hasAnyVulns = vulns.length > 0 || (results?.vulnerabilitiesFound ?? 0) > 0;
+
+  if (!hasAnyVulns) {
     return (
       <p className="text-xl text-slate-400 text-center py-8">
         Nenhuma vulnerabilidade registada.
       </p>
     );
   }
-
-  const vulns: VulnSummary[] = results.vulnerabilities ?? [];
 
   if (!vulns.length) {
     return (
