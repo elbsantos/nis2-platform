@@ -96,14 +96,15 @@ export const scanRouter = {
       }
 
       // ── TTL cache — fast-path for recently scanned targets (OBJETIVO 2+4) ──
-      // DEV_CACHE_DISABLED ignora completamente o cache DB e as camadas Redis
+      // DEV_CACHE_DISABLED bypassa a tranca das 24h (DB) E as camadas Redis
       // (Shodan/Censys/NVD ignoram a leitura de cache nos seus próprios módulos).
+      // Ver DIAGNOSTICO-RESCAN.md para análise completa.
       if (isDevCacheDisabled()) {
-        console.warn(`[Scan] DEV_CACHE_DISABLED=true — cache DB e Redis ignorados para ${input.target}`);
+        console.warn(`[Scan] DEV_CACHE_DISABLED=true — tranca 24h e caches Redis ignorados para ${input.target}`);
       }
 
       const recentScan = isDevCacheDisabled()
-        ? null
+        ? null   // ← bypassa a tranca das 24h: recentScan=null → linha seguinte nunca devolve cached
         : await getRecentCompletedScan(ctx.org.id, input.target, SCAN_CACHE_TTL_HOURS);
 
       if (recentScan && !input.force) {
@@ -144,6 +145,18 @@ export const scanRouter = {
         } catch { /* Redis indisponível — scan usa dados em cache se existirem */ }
       }
 
+      // ── Dev: invalida Redis explicitamente (defesa em profundidade) ───────
+      // Com DEV_CACHE_DISABLED, recentScan=null → o bloco force-rescan acima nunca corre.
+      // As integrações já ignoram a leitura do Redis, mas entradas antigas ficam.
+      // Removê-las garante que ao desligar o flag não reaparecem dados obsoletos.
+      if (isDevCacheDisabled()) {
+        const { invalidateCache: invalidateShodan } = await import("../integrations/shodan");
+        await invalidateShodan(input.target).catch(() => {});
+        getRedisClient()
+          .then((redis) => redis.del(`censys:${input.target}`))
+          .catch(() => {});
+      }
+
       // Create scan record
       const scan = await createScan({
         organizationId: ctx.org.id,
@@ -151,6 +164,11 @@ export const scanRouter = {
         mode:   input.mode,
         status: "pending",
       });
+
+      console.log(
+        `[Scan] Scan fresco iniciado — scanId=${scan.id}, target=${input.target}` +
+        (isDevCacheDisabled() ? " [DEV_CACHE_DISABLED — tranca 24h ignorada]" : "")
+      );
 
       // Monthly credit counter (OBJETIVO 5)
       const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
