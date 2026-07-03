@@ -291,10 +291,61 @@ interface ExtraDeduction {
   deduction: number;
 }
 
+// Converts a TlsIssueFinding to a VulnFinding so TLS problems appear in
+// results.vulnerabilities and are visible to the user (CORREÇÃO 5).
+// ID is stable per port+condition — dedup handles duplicates across sources.
+function tlsIssueToVulnFinding(tls: TlsIssueFinding): VulnFinding {
+  const issue = tls.issue;
+  const port  = tls.port;
+
+  let slug: string;
+  let remediationHint: string;
+
+  if (/expirado/i.test(issue)) {
+    slug = "CERT-EXPIRED";
+    remediationHint = "Renova o certificado TLS imediatamente (certbot renew ou equivalente).";
+  } else if (/expira/i.test(issue)) {
+    slug = "CERT-EXPIRING";
+    remediationHint = "Renova o certificado TLS antes da expiração (certbot renew ou equivalente).";
+  } else if (/auto-assinado/i.test(issue)) {
+    slug = "CERT-SELFSIGNED";
+    remediationHint = "Substitui o certificado auto-assinado por um emitido por uma CA pública (ex.: Let's Encrypt).";
+  } else if (/obsoleto|TLSv1\.|SSLv/i.test(issue)) {
+    slug = "PROTOCOL-OBSOLETE";
+    remediationHint = "Desactiva TLS 1.0/1.1 e SSL 2/3 na configuração do servidor; usa apenas TLS 1.2+.";
+  } else if (/cifra|fraca|RC4|DES|EXPORT|NULL|anon/i.test(issue)) {
+    slug = "CIPHER-WEAK";
+    remediationHint = "Remove cifras fracas (RC4, DES, 3DES, EXPORT, NULL) da configuração TLS do servidor.";
+  } else if (/não acessível/i.test(issue)) {
+    slug = "PORT-CLOSED";
+    remediationHint = "Instala certificado TLS e abre o porto 443 (HTTPS).";
+  } else {
+    slug = "ISSUE";
+    remediationHint = "Verifica a configuração TLS do servidor.";
+  }
+
+  const cveId = `NIS2-TLS-${port}-${slug}`;
+  const cvssScore = tls.severity === "critical" ? 8.0 : tls.severity === "high" ? 6.5 : 5.0;
+  const nis2 = [tls.nis2Article] as string[];
+
+  return {
+    cveId,
+    cvssScore,
+    severity: tls.severity,
+    description: issue,
+    affectedService: "tls",
+    port,
+    nis2Articles: nis2,
+    cisControls:      getCisControls(cveId, nis2),
+    iso27001Controls: getIso27001Controls(cveId, nis2),
+    nistCsfControls:  getNistCsfControls(cveId, nis2),
+    remediationHint,
+  };
+}
+
 function calculateNIS2Scores(
   ports: PortFinding[],
   vulns: VulnFinding[],
-  tlsIssues: TlsIssueFinding[],
   extraDeductions: ExtraDeduction[] = []
 ): { scores: NIS2ArticleScore[]; overall: number } {
   const openPortSet = new Set(ports.map((p) => p.port));
@@ -324,20 +375,13 @@ function calculateNIS2Scores(
       }
     }
 
-    // CVE-based deductions (cada CVE conta uma vez por artigo)
+    // CVE + synthetic vuln deductions (cada achado conta uma vez por artigo).
+    // TLS issues chegam aqui como VulnFinding (tlsIssueToVulnFinding) — fonte única.
     for (const vuln of vulns) {
       if (vuln.nis2Articles.includes(article) && !seenCves.has(vuln.cveId)) {
         seenCves.add(vuln.cveId);
         findings.push(`${vuln.cveId} (CVSS ${vuln.cvssScore.toFixed(1)}) — ${vuln.description}`);
         deduction += Math.min(vuln.cvssScore * 3, 25);
-      }
-    }
-
-    // TLS issues (apenas Art. 21(2)(h))
-    if (article === "Art. 21(2)(h)") {
-      for (const tls of tlsIssues) {
-        findings.push(`Porto ${tls.port}: ${tls.issue}`);
-        deduction += tls.severity === "critical" ? 20 : 15;
       }
     }
 
@@ -916,6 +960,15 @@ export async function executeAgentlessScan(
       }
     }
 
+    // ── 8b. Converter TlsIssueFindings em VulnFindings (CORREÇÃO 5) ──────────
+    // TLS issues afectam o score de Art. 21(2)(h) mas ficavam invisíveis na lista
+    // de achados. Convertê-los em VulnFindings garante coerência: o cliente vê a
+    // causa do score baixar. Os IDs são estáveis (porto+condição) — o dedup abaixo
+    // elimina duplicados se Censys e direct-tls reportarem a mesma condição.
+    for (const tls of tlsIssues) {
+      vulns.push(tlsIssueToVulnFinding(tls));
+    }
+
     // ── 8. Calculate NIS2 scores ───────────────────────────────────────────
     // Dedup vulns: mesmo CVE pode vir de múltiplas fontes (Shodan + SSH check + dark web).
     // Mantemos o primeiro encontrado (o que vem do Shodan/NVD tem CVSS mais preciso).
@@ -929,7 +982,7 @@ export async function executeAgentlessScan(
       port.cves = port.cves.filter((id) => survivedCves.has(id));
     }
 
-    const { scores, overall } = calculateNIS2Scores(allPorts, vulns, tlsIssues, extraDeductions);
+    const { scores, overall } = calculateNIS2Scores(allPorts, vulns, extraDeductions);
 
     // ── 9. Mark scan complete ──────────────────────────────────────────────
     await updateScanStatus(options.scanId, "completed", undefined, new Date(), {
