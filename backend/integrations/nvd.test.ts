@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Redis mock — lookupCveVersionRanges lê DEV_CACHE_DISABLED e chama getRedisClient
+// Redis mock — lookupCveVersionRanges chama getRedisClient para cache NVD (sempre activo)
 vi.mock("../middlewares/rateLimit", () => ({
   getRedisClient: vi.fn().mockResolvedValue({
     get:   vi.fn().mockResolvedValue(null),  // cache miss — vai à API
@@ -72,6 +72,24 @@ describe("lookupCveVersionRanges", () => {
     expect(info.nvdUnavailable).toBeUndefined();
     expect(info.hasRangeData).toBe(true);
     expect(info.affectedProducts).toContain("apache:http_server");
+  });
+
+  // ── Teste 1b ─────────────────────────────────────────────────────────────
+  it("getCached lê Redis mesmo com DEV_CACHE_DISABLED=true (flag de re-scan não afecta cache NVD)", async () => {
+    process.env.DEV_CACHE_DISABLED = "true";
+
+    // Configurar o mock Redis para devolver um hit na leitura
+    const { getRedisClient } = await import("../middlewares/rateLimit");
+    const redis = await (getRedisClient as ReturnType<typeof vi.fn>)();
+    const cachedInfo = { cveId: "CVE-CACHE-HIT", ranges: [], hasRangeData: true, affectedProducts: ["apache:http_server"] };
+    (redis.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(JSON.stringify(cachedInfo));
+
+    const result = await lookupCveVersionRanges("CVE-CACHE-HIT");
+
+    // Cache hit: resultado correcto e NVD não foi consultado
+    expect(result.cveId).toBe("CVE-CACHE-HIT");
+    expect(result.hasRangeData).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   // ── Teste 2 ──────────────────────────────────────────────────────────────

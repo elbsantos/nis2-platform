@@ -96,11 +96,11 @@ export const scanRouter = {
       }
 
       // ── TTL cache — fast-path for recently scanned targets (OBJETIVO 2+4) ──
-      // DEV_CACHE_DISABLED bypassa a tranca das 24h (DB) E as camadas Redis
-      // (Shodan/Censys/NVD ignoram a leitura de cache nos seus próprios módulos).
-      // Ver DIAGNOSTICO-RESCAN.md para análise completa.
+      // DEV_CACHE_DISABLED bypassa APENAS a tranca das 24h (DB).
+      // A cache de dados (NVD/Shodan/Censys) é gerida independentemente em cada
+      // integração e NÃO é afectada por esta flag.
       if (isDevCacheDisabled()) {
-        console.warn(`[Scan] DEV_CACHE_DISABLED=true — tranca 24h e caches Redis ignorados para ${input.target}`);
+        console.warn(`[Scan] DEV_CACHE_DISABLED=true — tranca 24h ignorada para ${input.target}`);
       }
 
       const recentScan = isDevCacheDisabled()
