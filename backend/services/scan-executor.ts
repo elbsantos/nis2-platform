@@ -703,43 +703,53 @@ export async function executeAgentlessScan(
         // Strict mode for banner-enriched ports (CVEs came from host-level Shodan, not per-port).
         // Without NVD product confirmation we cannot verify the CVE applies to this service.
         // "Conservative include" would reintroduce the 120-CVE regression; be explicit instead.
+        // Excepção: NVD indisponível (429 esgotado) → INDETERMINADO, não excluir.
         if (bannerEnrichedPorts.has(portFinding.port)) {
-          if (!nvdInfo || nvdInfo.affectedProducts.length === 0) {
-            // No NVD data or no product info → cannot confirm → exclude
+          if (nvdInfo?.nvdUnavailable) {
+            // NVD não respondeu — não temos dados, mas não podemos descartar.
+            // Incluir conservadoramente e sinalizar nos logs para visibilidade.
+            console.log(`[CVE filter] ${cveId} — INDETERMINADO (NVD indisponível após retries; banner ${portFinding.port})`);
+          } else if (!nvdInfo || nvdInfo.affectedProducts.length === 0) {
+            // NVD respondeu mas sem dados de produto → não conseguimos confirmar → excluir.
             console.log(`[CVE filter] ${cveId} — excluído (sem dados NVD de produto; porto banner ${portFinding.port})`);
             continue;
+          } else {
+            const productMatch = nvdInfo.affectedProducts.some(
+              (ap) => cpeMatchesService(ap, portFinding.service)
+            );
+            if (!productMatch) {
+              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
+              continue;
+            }
+            // Produto confirmado — mas sem intervalo de versões não conseguimos confirmar
+            // que a versão detectada é afectada. Para banner-enriched rejeitamos.
+            if (!nvdInfo.hasRangeData) {
+              console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; banner ${portFinding.port}; versão ${portFinding.version ?? "desconhecida"} não confirmável)`);
+              continue;
+            }
+            // hasRangeData=true garantido — version filter corre abaixo
           }
-          const productMatch = nvdInfo.affectedProducts.some(
-            (ap) => cpeMatchesService(ap, portFinding.service)
-          );
-          if (!productMatch) {
-            console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
-            continue;
-          }
-          // Produto confirmado — mas sem intervalo de versões não conseguimos confirmar
-          // que a versão detectada é afectada. Para banner-enriched rejeitamos.
-          if (!nvdInfo.hasRangeData) {
-            console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; banner ${portFinding.port}; versão ${portFinding.version ?? "desconhecida"} não confirmável)`);
-            continue;
-          }
-          // hasRangeData=true garantido — version filter corre abaixo
         }
 
         // Regra unificada (CORREÇÃO 1+2): CVE só é listado se há intervalo NVD real
         // que confirme que a versão detetada é afetada. Aplica-se a TODOS os portos;
         // sem dados de versão reais não inventamos. Banner-enriched já exigiu
         // hasRangeData=true no bloco anterior, portanto não há duplicação.
+        // Excepção: NVD indisponível → INDETERMINADO, incluir conservadoramente.
         if (hasVersion) {
-          if (!nvdInfo?.hasRangeData) {
+          if (nvdInfo?.nvdUnavailable) {
+            console.log(`[CVE filter] ${cveId} — INDETERMINADO (NVD indisponível após retries; ${portFinding.service} ${portFinding.version})`);
+          } else if (!nvdInfo?.hasRangeData) {
             console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; ${portFinding.service} ${portFinding.version} não confirmável)`);
             continue;
+          } else {
+            const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
+            if (!inRange) {
+              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
+              continue;
+            }
+            console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
           }
-          const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
-          if (!inRange) {
-            console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
-            continue;
-          }
-          console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
         }
 
         const severity = (s: number) =>

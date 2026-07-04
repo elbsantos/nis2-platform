@@ -14,6 +14,11 @@ export { isVersionInNvdRanges };
 const NVD_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0";
 const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days
 const MAX_CONCURRENT = 4;
+const MAX_RETRIES = 3;
+
+// 429, 502, 503 são erros transitórios — fazem retry com backoff.
+// 400, 404, etc. são permanentes — retornam imediatamente com cache.
+const RETRYABLE_STATUS = new Set([429, 502, 503]);
 
 export interface NvdCveInfo {
   cveId: string;
@@ -21,6 +26,10 @@ export interface NvdCveInfo {
   hasRangeData: boolean; // false = NVD returned no CPE config → conservative include
   affectedProducts: string[]; // "vendor:product" pairs from CPE criteria, e.g. ["apache:http_server"]
   cvssScore?: number; // CVSS v3.1 preferred > v3.0 > v2; absent = NVD not scored yet
+  // true quando NVD não respondeu após todos os retries (429/rede).
+  // Distinto de hasRangeData=false: aqui não temos dados por indisponibilidade, não por ausência real.
+  // Nunca gravado no cache — o próximo scan tenta de novo.
+  nvdUnavailable?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,35 +153,64 @@ function parseNvdResponse(data: unknown, cveId: string): NvdCveInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Single CVE lookup
+// Single CVE lookup (com retry para erros transitórios)
 // ---------------------------------------------------------------------------
+
+// Backoff exponencial com jitter: tentativa 1 → ~1 s, tentativa 2 → ~2 s.
+function jitteredBackoffMs(attempt: number): number {
+  return attempt * 1000 + Math.random() * 500;
+}
 
 export async function lookupCveVersionRanges(cveId: string): Promise<NvdCveInfo> {
   const cached = await getCached(cveId);
   if (cached) return cached;
 
-  try {
-    const url = `${NVD_BASE}?cveId=${encodeURIComponent(cveId)}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "NIS2-Scanner/1.0 (+https://nis2.pt)" },
-      signal: AbortSignal.timeout(10_000),
-    });
+  const url = `${NVD_BASE}?cveId=${encodeURIComponent(cveId)}`;
 
-    if (!res.ok) {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": "NIS2-Scanner/1.0 (+https://nis2.pt)" },
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const info = parseNvdResponse(data, cveId);
+        await setCache(info);
+        return info;
+      }
+
+      if (RETRYABLE_STATUS.has(res.status)) {
+        console.warn(`[NVD] ${cveId} → HTTP ${res.status} (tentativa ${attempt + 1}/${MAX_RETRIES})`);
+        if (attempt < MAX_RETRIES - 1) {
+          // Respeita Retry-After se presente e razoável (< 2 min); caso contrário backoff próprio.
+          const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
+          const delay = !isNaN(retryAfterSec) && retryAfterSec > 0 && retryAfterSec < 120
+            ? retryAfterSec * 1000
+            : jitteredBackoffMs(attempt + 1);
+          await new Promise((r) => setTimeout(r, delay));
+        }
+        continue;
+      }
+
+      // Erro permanente (400, 404…) — gravar no cache para evitar repetição.
       console.warn(`[NVD] ${cveId} → HTTP ${res.status}`);
       const info: NvdCveInfo = { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };
       await setCache(info);
       return info;
-    }
 
-    const data = await res.json();
-    const info = parseNvdResponse(data, cveId);
-    await setCache(info);
-    return info;
-  } catch (err) {
-    console.warn(`[NVD] ${cveId} fetch error:`, err instanceof Error ? err.message : err);
-    return { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };
+    } catch (err) {
+      console.warn(`[NVD] ${cveId} fetch error (tentativa ${attempt + 1}/${MAX_RETRIES}):`, err instanceof Error ? err.message : err);
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((r) => setTimeout(r, jitteredBackoffMs(attempt + 1)));
+      }
+    }
   }
+
+  // Todos os retries esgotados — NVD indisponível. NÃO gravar no cache: o próximo scan tenta de novo.
+  console.warn(`[NVD] ${cveId} → NVD indisponível após ${MAX_RETRIES} tentativas`);
+  return { cveId, ranges: [], hasRangeData: false, affectedProducts: [], nvdUnavailable: true };
 }
 
 // ---------------------------------------------------------------------------
