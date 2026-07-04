@@ -843,6 +843,15 @@ export async function executeAgentlessScan(
             remediation:      sv.remediationHint,
           }).catch((e) => console.error(`[Scanner] DB persist SSH ${sv.cveId}:`, e));
         }
+
+        // Propaga os IDs dos CVEs SSH para port22.cves em allPorts.
+        // allPorts é guardado em results.openPorts (linha updateScanStatus).
+        // Sem isto, a tabela de portos filtra exposedPorts = cves.length > 0
+        // e porta 22 aparece limpa mesmo com CVEs SSH na lista de vulnerabilidades.
+        if (sshResult.vulns.length > 0 && port22) {
+          const sshCveIds = sshResult.vulns.map((v) => v.cveId);
+          port22.cves = [...new Set([...port22.cves, ...sshCveIds])];
+        }
       }
     }
 
