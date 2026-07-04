@@ -38,12 +38,22 @@ export interface NIS2ArticleScore {
   findings: string[];
 }
 
+// CVE que não pôde ser confirmado nem excluído porque o NVD estava indisponível.
+// Não entra em vulnerabilities nem afecta o score — guardado para apresentação futura.
+export interface IndeterminateCveFinding {
+  cveId: string;
+  port: number;
+  service: string;
+  reason: "nvd_unavailable";
+}
+
 export interface AgentlessScanResult {
   scanId: number;
   success: boolean;
   target: string;
   openPorts: PortFinding[];
   vulnerabilities: VulnFinding[];
+  indeterminateCves: IndeterminateCveFinding[];
   tlsIssues: TlsIssueFinding[];
   nis2Scores: NIS2ArticleScore[];
   overallScore: number;
@@ -646,6 +656,7 @@ export async function executeAgentlessScan(
 
     // ── 4. Build vulnerability list ────────────────────────────────────────
     const vulns: VulnFinding[] = [];
+    const indeterminateCves: IndeterminateCveFinding[] = [];
     const { createVulnerability } = await import("../db");
     const currentYear = new Date().getFullYear();
 
@@ -700,56 +711,55 @@ export async function executeAgentlessScan(
           continue;
         }
 
-        // Strict mode for banner-enriched ports (CVEs came from host-level Shodan, not per-port).
-        // Without NVD product confirmation we cannot verify the CVE applies to this service.
-        // "Conservative include" would reintroduce the 120-CVE regression; be explicit instead.
-        // Excepção: NVD indisponível (429 esgotado) → INDETERMINADO, não excluir.
-        if (bannerEnrichedPorts.has(portFinding.port)) {
-          if (nvdInfo?.nvdUnavailable) {
-            // NVD não respondeu — não temos dados, mas não podemos descartar.
-            // Incluir conservadoramente e sinalizar nos logs para visibilidade.
-            console.log(`[CVE filter] ${cveId} — INDETERMINADO (NVD indisponível após retries; banner ${portFinding.port})`);
-          } else if (!nvdInfo || nvdInfo.affectedProducts.length === 0) {
-            // NVD respondeu mas sem dados de produto → não conseguimos confirmar → excluir.
-            console.log(`[CVE filter] ${cveId} — excluído (sem dados NVD de produto; porto banner ${portFinding.port})`);
-            continue;
-          } else {
-            const productMatch = nvdInfo.affectedProducts.some(
-              (ap) => cpeMatchesService(ap, portFinding.service)
-            );
-            if (!productMatch) {
-              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
-              continue;
-            }
-            // Produto confirmado — mas sem intervalo de versões não conseguimos confirmar
-            // que a versão detectada é afectada. Para banner-enriched rejeitamos.
-            if (!nvdInfo.hasRangeData) {
-              console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; banner ${portFinding.port}; versão ${portFinding.version ?? "desconhecida"} não confirmável)`);
-              continue;
-            }
-            // hasRangeData=true garantido — version filter corre abaixo
-          }
+        // Gate 0 — NVD indisponível: ponto único de decisão antes dos dois gates.
+        // nvdUnavailable=true significa que o NVD não respondeu após todos os retries
+        // (429 persistente). Sem dados de produto nem de versão não conseguimos confirmar
+        // nem excluir — o CVE fica INDETERMINADO e sai do fluxo de vulns.push.
+        // Um único log aqui substitui os dois logs dos gates anteriores (fix do log duplo).
+        if (nvdInfo?.nvdUnavailable) {
+          console.log(`[CVE filter] ${cveId} — INDETERMINADO (NVD indisponível após retries; ${portFinding.service} ${portFinding.port})`);
+          indeterminateCves.push({ cveId, port: portFinding.port, service: portFinding.service, reason: "nvd_unavailable" });
+          continue;
         }
 
-        // Regra unificada (CORREÇÃO 1+2): CVE só é listado se há intervalo NVD real
-        // que confirme que a versão detetada é afetada. Aplica-se a TODOS os portos;
-        // sem dados de versão reais não inventamos. Banner-enriched já exigiu
-        // hasRangeData=true no bloco anterior, portanto não há duplicação.
-        // Excepção: NVD indisponível → INDETERMINADO, incluir conservadoramente.
+        // Gate 1 — Strict mode para portos banner-enriched (CVEs vêm do Shodan host-level,
+        // não por porto). Sem confirmação de produto pelo NVD não podemos verificar que o
+        // CVE se aplica a este serviço. "Conservative include" reintroduziria a regressão
+        // dos 120 CVEs; exigimos confirmação explícita.
+        if (bannerEnrichedPorts.has(portFinding.port)) {
+          if (!nvdInfo || nvdInfo.affectedProducts.length === 0) {
+            console.log(`[CVE filter] ${cveId} — excluído (sem dados NVD de produto; porto banner ${portFinding.port})`);
+            continue;
+          }
+          const productMatch = nvdInfo.affectedProducts.some(
+            (ap) => cpeMatchesService(ap, portFinding.service)
+          );
+          if (!productMatch) {
+            console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service}: produto NVD [${nvdInfo.affectedProducts.join(", ")}] não corresponde)`);
+            continue;
+          }
+          // Produto confirmado — mas sem intervalo de versões não conseguimos confirmar
+          // que a versão detectada é afectada. Para banner-enriched rejeitamos.
+          if (!nvdInfo.hasRangeData) {
+            console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; banner ${portFinding.port}; versão ${portFinding.version ?? "desconhecida"} não confirmável)`);
+            continue;
+          }
+          // hasRangeData=true garantido — gate 2 (version range) corre abaixo
+        }
+
+        // Gate 2 — Confirmação por intervalo de versão. Aplica-se a todos os portos com
+        // versão conhecida. Banner-enriched já exigiu hasRangeData=true no gate 1.
         if (hasVersion) {
-          if (nvdInfo?.nvdUnavailable) {
-            console.log(`[CVE filter] ${cveId} — INDETERMINADO (NVD indisponível após retries; ${portFinding.service} ${portFinding.version})`);
-          } else if (!nvdInfo?.hasRangeData) {
+          if (!nvdInfo?.hasRangeData) {
             console.log(`[CVE filter] ${cveId} — excluído (sem intervalo NVD; ${portFinding.service} ${portFinding.version} não confirmável)`);
             continue;
-          } else {
-            const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
-            if (!inRange) {
-              console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
-              continue;
-            }
-            console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
           }
+          const inRange = isVersionInNvdRanges(portFinding.version!, nvdInfo.ranges);
+          if (!inRange) {
+            console.log(`[CVE filter] ${cveId} — excluído (${portFinding.service} ${portFinding.version}; fora do intervalo NVD)`);
+            continue;
+          }
+          console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
         }
 
         const severity = (s: number) =>
@@ -1015,6 +1025,7 @@ export async function executeAgentlessScan(
       mediumCount: vulns.filter((v) => v.severity === "medium").length,
       lowCount: vulns.filter((v) => v.severity === "low").length,
       vulnerabilities: vulns,
+      indeterminateCves,
       openPorts: allPorts,
       tlsIssues,
       emailSecurity: emailSecurity ?? undefined,
@@ -1029,6 +1040,7 @@ export async function executeAgentlessScan(
       target: options.target,
       openPorts: allPorts,
       vulnerabilities: vulns,
+      indeterminateCves,
       tlsIssues,
       nis2Scores: scores,
       overallScore: overall,
@@ -1051,6 +1063,7 @@ export async function executeAgentlessScan(
       target: options.target,
       openPorts: [],
       vulnerabilities: [],
+      indeterminateCves: [],
       tlsIssues: [],
       nis2Scores: [],
       overallScore: 0,
