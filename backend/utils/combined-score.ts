@@ -28,7 +28,7 @@ export interface CombinedArticleScore {
   questionnaireScore: number | null;   // null se questionário não foi preenchido
   combinedScore:      number | null;   // score resultante (regra acima)
   source:             CombinedSource;
-  divergent:          boolean;         // true quando ambas fontes discordam > DIVERGENCE_THRESHOLD
+  divergent:          boolean;         // true: diff ≥ 10, ou q=100 e scan<100 (ver ADR-003)
   scannable:          boolean;
   findings:           string[];        // findings do scan (para detalhe no relatório técnico)
 }
@@ -38,7 +38,10 @@ export interface CombinedArticleScore {
 // ---------------------------------------------------------------------------
 
 const ORGANIZATIONAL_SLUGS = new Set(["a", "b", "c", "d", "g"]);
-const DIVERGENCE_THRESHOLD = 20;
+
+// Limiar geral de divergência — ver ADR-003 §3.
+// 10 pontos: captura diferenças relevantes sem sinalizar ruído de 1-9 pontos.
+const DIVERGENCE_THRESHOLD = 10;
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -86,10 +89,25 @@ export function combinedNis2Scores(
       }
     }
 
-    const divergent =
+    // Regra geral: diferença absoluta >= limiar (ADR-003 §3).
+    const thresholdDivergent =
       scanScore !== null &&
       qScore    !== null &&
       Math.abs(scanScore - qScore) >= DIVERGENCE_THRESHOLD;
+
+    // Regra especial (ADR-003 §2): autoavaliação = 100 com scan < 100 sinaliza sempre,
+    // independentemente da diferença numérica.
+    // A assimetria é deliberada — "declarar perfeição e ser desmentido pelo mundo real"
+    // é o cenário-bandeira da plataforma e merece destaque mesmo com diff < 10.
+    // O inverso (scan=100, q<100) não tem regra especial: não há declaração optimista
+    // desmentida, e casos relevantes estouram o limiar geral de qualquer forma.
+    // Caso-limite (100, 100): scanScore < 100 é false → não sinaliza. Correcto.
+    const declaredPerfectButDisproved =
+      scanScore !== null &&
+      qScore    === 100 &&
+      scanScore < 100;
+
+    const divergent = thresholdDivergent || declaredPerfectButDisproved;
 
     return {
       article:            s.article,
