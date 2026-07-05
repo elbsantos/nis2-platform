@@ -78,6 +78,7 @@ export interface NvdCveInfo {
   hasRangeData: boolean; // false = NVD returned no CPE config → conservative include
   affectedProducts: string[]; // "vendor:product" pairs from CPE criteria, e.g. ["apache:http_server"]
   cvssScore?: number; // CVSS v3.1 preferred > v3.0 > v2; absent = NVD not scored yet
+  description?: string; // English description from NVD descriptions[]; absent when NVD omits it
   // true quando NVD não respondeu após todos os retries (429/rede).
   // Distinto de hasRangeData=false: aqui não temos dados por indisponibilidade, não por ausência real.
   // Nunca gravado no cache — o próximo scan tenta de novo.
@@ -191,12 +192,17 @@ function parseNvdResponse(data: unknown, cveId: string): NvdCveInfo {
       metrics.cvssMetricV30?.[0]?.cvssData?.baseScore ??
       metrics.cvssMetricV2?.[0]?.cvssData?.baseScore;
 
+    // Extract English description (NVD always provides "en"; skip others)
+    const descItems: any[] = item.descriptions ?? [];
+    const description = descItems.find((d: any) => d.lang === "en")?.value as string | undefined;
+
     return {
       cveId,
       ranges,
       hasRangeData: ranges.length > 0,
       affectedProducts: [...productSet],
       cvssScore,
+      description,
     };
   } catch {
     return { cveId, ranges: [], hasRangeData: false, affectedProducts: [] };

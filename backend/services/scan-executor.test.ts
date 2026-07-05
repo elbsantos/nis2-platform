@@ -349,6 +349,7 @@ describe("executeAgentlessScan", () => {
     affectedProducts?: string[];
     nvdUnavailable?: boolean;
     cvssScore?: number;
+    description?: string;
   };
 
   function makeNvdMap(entries: Array<[string, NvdPartial]>) {
@@ -601,6 +602,123 @@ describe("executeAgentlessScan", () => {
     expect(ignoredLog).toBeUndefined();
 
     logSpy.mockRestore();
+  });
+
+  // ── Testes da descrição real do NVD ──────────────────────────────────────────
+
+  it("CVE com descrição NVD real usa-a em vez do template genérico", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: ["example.com"],
+      tags: [],
+      cpes: ["cpe:/a:apache:http_server:2.4.7"],
+      vulns: ["CVE-DESC-REAL"],
+      ports: [{ port: 443, transport: "tcp" }], // porto 443 — não interfere com regex porta.*80
+    });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [], score: 50, url: "https://example.com",
+      serverBanner: "Apache/2.4.7",
+    });
+
+    const realDesc = "A use-after-free in Apache HTTP Server mod_ssl allows an attacker to cause a denial of service.";
+
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(makeNvdMap([
+      ["CVE-DESC-REAL", {
+        hasRangeData: true,
+        affectedProducts: ["apache:http_server"],
+        ranges: [{ versionStartIncluding: "2.4.0", versionEndExcluding: "2.4.50" }],
+        description: realDesc,
+      }],
+    ]));
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    const vuln = result.vulnerabilities.find((v) => v.cveId === "CVE-DESC-REAL");
+    expect(vuln).toBeDefined();
+    // Descrição real presente — sem texto de template
+    expect(vuln?.description).toBe(realDesc);
+    expect(vuln?.description).not.toContain("Vulnerabilidade CVE-DESC-REAL detectada");
+  });
+
+  it("CVE sem descrição NVD usa fallback neutro (sem 'porto N' — não colapsa em 'Porta 80')", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: ["example.com"],
+      tags: [],
+      cpes: ["cpe:/a:apache:http_server:2.4.7"],
+      vulns: ["CVE-NO-DESC"],
+      ports: [{ port: 80, transport: "tcp" }],
+    });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [], score: 50, url: "http://example.com",
+      serverBanner: "Apache/2.4.7",
+    });
+
+    // NVD sem description (campo ausente — como os antigos entries em cache)
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(makeNvdMap([
+      ["CVE-NO-DESC", {
+        hasRangeData: true,
+        affectedProducts: ["apache:http_server"],
+        ranges: [{ versionStartIncluding: "2.4.0", versionEndExcluding: "2.4.50" }],
+        // sem description → undefined
+      }],
+    ]));
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    const vuln = result.vulnerabilities.find((v) => v.cveId === "CVE-NO-DESC");
+    expect(vuln).toBeDefined();
+    // Fallback neutro — NÃO contém "(porto 80)" que dispararia enrichFinding porta.*80
+    expect(vuln?.description).not.toMatch(/\(porto\s+\d+\)/i);
+    // Sem o padrão do template antigo
+    expect(vuln?.description).not.toContain("Vulnerabilidade CVE-NO-DESC detectada no serviço");
+    // É o fallback esperado (contém o cveId e o produto)
+    expect(vuln?.description).toContain("CVE-NO-DESC");
+    expect(vuln?.description).toContain("apache");
+  });
+
+  it("descrição NVD real com keyword TLS mapeia CVE a Art. 21(2)(h) em vez do fallback (e)", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: ["example.com"],
+      tags: [],
+      cpes: ["cpe:/a:apache:http_server:2.4.7"],
+      vulns: ["CVE-TLS-MAP"],
+      ports: [{ port: 443, transport: "tcp" }],
+    });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [], score: 50, url: "https://example.com",
+      serverBanner: "Apache/2.4.7",
+    });
+
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(makeNvdMap([
+      ["CVE-TLS-MAP", {
+        hasRangeData: true,
+        affectedProducts: ["apache:http_server"],
+        ranges: [{ versionStartIncluding: "2.4.0", versionEndExcluding: "2.4.50" }],
+        description: "SSL/TLS weak cipher negotiation in Apache HTTP Server exposes sessions to MITM attacks.",
+      }],
+    ]));
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    const vuln = result.vulnerabilities.find((v) => v.cveId === "CVE-TLS-MAP");
+    expect(vuln).toBeDefined();
+    // Descrição real com "TLS" → mapCveToNIS2Articles retorna (h) em vez do fallback (e)
+    expect(vuln?.nis2Articles).toContain("Art. 21(2)(h)");
+    expect(vuln?.nis2Articles).not.toContain("Art. 21(2)(e)");
   });
 
   it("um único log por CVE indeterminado (gate 0 emite uma vez e faz continue)", async () => {

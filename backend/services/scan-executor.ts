@@ -775,9 +775,12 @@ export async function executeAgentlessScan(
 
         const severity = (s: number) =>
           s >= 9 ? "critical" : s >= 7 ? "high" : s >= 4 ? "medium" : "low";
-        const sevPT = (s: number) =>
-          s >= 9 ? "crítica" : s >= 7 ? "alta" : s >= 4 ? "média" : "baixa";
-        const description = `Vulnerabilidade ${cveId} detectada no serviço ${portFinding.service} (porto ${portFinding.port}). Gravidade ${sevPT(cvssScore)} com pontuação CVSS ${cvssScore.toFixed(1)}. Actualiza o serviço para corrigir esta exposição.`;
+
+        // Prefer real NVD description (English). Fallback deliberately avoids "(porto N)"
+        // to prevent enrichFinding's porta.*80 regex from collapsing all apache CVEs
+        // into "Porta 80 Aberta" when the real description is not available.
+        const description = nvdInfo?.description ??
+          `${cveId} — ${portFinding.service} ${portFinding.version ?? "versão desconhecida"}: consulte NVD para detalhes (CVSS ${cvssScore.toFixed(1)}).`;
 
         const nis2Articles = mapCveToNIS2Articles(cveId, description);
 

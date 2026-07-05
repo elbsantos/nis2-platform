@@ -297,3 +297,96 @@ describe("FASE 2: API key + throttle + teto de tempo", () => {
     expect([...result.values()].some((v) => v.hasRangeData)).toBe(false);
   }, 10_000);
 });
+
+// ── FASE 3: descrição real do NVD ─────────────────────────────────────────────
+
+describe("FASE 3: descrição real do NVD extraída de descriptions[]", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    process.env.NVD_MIN_INTERVAL_MS = "0";
+    _resetNvdRateLimiter();
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+    delete process.env.NVD_API_KEY;
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    vi.clearAllMocks();
+    delete process.env.NVD_MIN_INTERVAL_MS;
+  });
+
+  // ── Teste 10: extrai descrição EN quando presente ────────────────────────────
+  it("extrai descrição EN da resposta NVD quando presente", async () => {
+    const responseWithDesc = {
+      vulnerabilities: [{
+        cve: {
+          descriptions: [
+            { lang: "es", value: "Desbordamiento de búfer en Apache..." },
+            { lang: "en", value: "A buffer overflow in Apache HTTP Server allows remote code execution." },
+          ],
+          configurations: [],
+          metrics: {
+            cvssMetricV31: [{ cvssData: { baseScore: 9.8 } }],
+          },
+        },
+      }],
+    };
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify(responseWithDesc), { status: 200 })
+    );
+
+    const info = await lookupCveVersionRanges("CVE-DESC-EN");
+
+    expect(info.description).toBe(
+      "A buffer overflow in Apache HTTP Server allows remote code execution."
+    );
+    expect(info.cvssScore).toBe(9.8);
+  });
+
+  // ── Teste 11: description undefined quando descriptions ausente ──────────────
+  it("description é undefined quando campo descriptions ausente na resposta", async () => {
+    const responseNoDesc = {
+      vulnerabilities: [{
+        cve: {
+          // sem campo descriptions
+          configurations: [],
+          metrics: {},
+        },
+      }],
+    };
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify(responseNoDesc), { status: 200 })
+    );
+
+    const info = await lookupCveVersionRanges("CVE-DESC-ABSENT");
+
+    expect(info.description).toBeUndefined();
+  });
+
+  // ── Teste 12: description undefined quando só idioma não-EN presente ─────────
+  it("description é undefined quando descriptions[] não inclui lang='en'", async () => {
+    const responseNonEn = {
+      vulnerabilities: [{
+        cve: {
+          descriptions: [
+            { lang: "es", value: "Vulnerabilidad en Apache..." },
+            { lang: "fr", value: "Vulnérabilité dans Apache..." },
+          ],
+          configurations: [],
+          metrics: {},
+        },
+      }],
+    };
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify(responseNonEn), { status: 200 })
+    );
+
+    const info = await lookupCveVersionRanges("CVE-DESC-NOEN");
+
+    expect(info.description).toBeUndefined();
+  });
+});
