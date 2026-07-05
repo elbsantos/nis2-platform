@@ -509,31 +509,37 @@ export async function executeAgentlessScan(
       ) as Promise<HttpHeadersResult | null>,
     ]);
 
-    // ── 3. Detect shared/anycast infrastructure ────────────────────────────
-    // Railway, Vercel, Netlify, Cloudflare et al. use anycast IPs shared across
-    // tenants — Shodan sees all 200+ ports of the platform, not the app's ports.
-    const SHARED_INFRA_PROVIDERS = [
-      "railway", "vercel", "netlify", "cloudflare", "fastly", "akamai",
-      "digitalocean", "render", "fly.io", "heroku", "azurewebsites",
+    // ── 3. Detectar infraestrutura PaaS/CDN genuinamente partilhada ──────────
+    // Critério: reverse DNS (Shodan hostnames) com sufixo de PaaS/CDN conhecido.
+    // Plataformas PaaS partilham IPs anycast entre tenants; o reverse DNS é o
+    // único sinal fiável. NÃO classificar por ASN/tags genéricas de cloud:
+    // Linode/Hetzner/OVH/DigitalOcean são VPS dedicados — tags como "cloud" ou
+    // "hosting" também lhes são atribuídas e causam falsos positivos.
+    const PAAS_CDN_SUFFIXES = [
+      "railway.app",
+      "herokuapp.com",
+      "vercel.app", "now.sh",
+      "netlify.app",
+      "pages.dev",         // Cloudflare Pages
+      "azurewebsites.net",
+      "fly.dev", "fly.io",
+      "render.com", "onrender.com",
     ];
-    const SHARED_INFRA_TAGS = ["cloud", "hosting", "cdn", "proxy", "anycast"];
-    const shodanPortCount  = shodanData?.ports?.length ?? 0;
-    const shodanTags       = (shodanData?.tags ?? []).map(t => t.toLowerCase());
-    const shodanHostnames  = (shodanData?.hostnames ?? []).map(h => h.toLowerCase());
-    const isSharedInfra = isDomain && (
-      shodanPortCount > 40 ||
-      shodanTags.some(t => SHARED_INFRA_TAGS.includes(t)) ||
-      shodanHostnames.some(h => SHARED_INFRA_PROVIDERS.some(p => h.includes(p)))
+    const shodanHostnames = (shodanData?.hostnames ?? []).map(h => h.toLowerCase());
+    const sharedInfraMatch = shodanHostnames.find(h =>
+      PAAS_CDN_SUFFIXES.some(s => h === s || h.endsWith(`.${s}`))
     );
+    const isSharedInfra = isDomain && Boolean(sharedInfraMatch);
 
     if (isSharedInfra) {
-      const providerHint = shodanHostnames.find(h => SHARED_INFRA_PROVIDERS.some(p => h.includes(p))) ?? "infraestrutura cloud partilhada";
-      console.log(`[Scanner] ${options.target} → IP partilhado (${providerHint}, ${shodanPortCount} portos) — portos Shodan ignorados para CVEs`);
+      console.log(
+        `[Scanner] ${options.target} → PaaS/CDN partilhado detectado (${sharedInfraMatch}) — ` +
+        `portos podem ser da plataforma; CVEs avaliados normalmente pelo filtro CPE`
+      );
     }
 
     // ── Merge port findings ────────────────────────────────────────────────
-    // If shared infra detected, strip CVEs from Shodan ports (they belong to
-    // the platform, not the target app). Keep ports for informational display.
+    // O filtro CPE (gates 1/2) é a única autoridade sobre que CVEs entram.
     const openPorts: PortFinding[] =
       shodanData?.ports?.map((p) => ({
         port: p.port,
@@ -541,7 +547,7 @@ export async function executeAgentlessScan(
         service: p.product ?? p._shodan?.module ?? "unknown",
         product: p.product,
         version: p.version,
-        cves: isSharedInfra ? [] : Object.keys(p.vulns ?? {}),
+        cves: Object.keys(p.vulns ?? {}),
       })) ?? [];
 
     // ── Enrich HTTP ports with Server: banner + CPE-based CVE assignment ──────

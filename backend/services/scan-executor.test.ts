@@ -488,6 +488,91 @@ describe("executeAgentlessScan", () => {
     expect(indetCves).toHaveLength(2);
   });
 
+  // ── Testes da heurística de IP partilhado ─────────────────────────────────
+
+  it("VPS dedicado com tags cloud não é classificado como PaaS (sem falso positivo)", async () => {
+    // scanme.nmap.org está em PUBLIC_TEST_TARGETS — ownership bypass automático
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "45.33.32.156",
+      hostnames: ["scanme.nmap.org"],  // sem sufixo PaaS
+      tags: ["cloud", "hosting"],       // tags genéricas que antes disparavam isSharedInfra
+      cpes: ["cpe:/a:apache:http_server:2.4.7"],
+      vulns: ["CVE-VPS-TEST"],
+      ports: [{ port: 80, transport: "tcp" }],
+    });
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "45.33.32.156", services: [], tlsIssues: [] });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [], score: 50, url: "http://scanme.nmap.org", serverBanner: "Apache/2.4.7",
+    });
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(makeNvdMap([
+      ["CVE-VPS-TEST", {
+        hasRangeData: true, affectedProducts: ["apache:http_server"],
+        ranges: [{ versionStartIncluding: "2.4.0", versionEndExcluding: "2.4.50" }],
+      }],
+    ]));
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "scanme.nmap.org", mode: "sme",
+    });
+
+    // CVE processado normalmente — tags genéricas não suprimem nada
+    expect(result.vulnerabilities.find(v => v.cveId === "CVE-VPS-TEST")).toBeDefined();
+    // Sem log de PaaS/CDN partilhado
+    const paasLog = logSpy.mock.calls.find(
+      args => typeof args[0] === "string" && args[0].includes("PaaS/CDN partilhado")
+    );
+    expect(paasLog).toBeUndefined();
+
+    logSpy.mockRestore();
+  });
+
+  it("hostname PaaS (*.railway.app) → rotulado mas CVEs não suprimidos", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: ["myapp.up.railway.app"],  // sufixo PaaS → isSharedInfra=true
+      tags: [],
+      cpes: ["cpe:/a:apache:http_server:2.4.7"],
+      vulns: ["CVE-PAAS-TEST"],
+      ports: [{ port: 80, transport: "tcp" }],
+    });
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "1.2.3.4", services: [], tlsIssues: [] });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [], score: 50, url: "http://myapp.up.railway.app", serverBanner: "Apache/2.4.7",
+    });
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(makeNvdMap([
+      ["CVE-PAAS-TEST", {
+        hasRangeData: true, affectedProducts: ["apache:http_server"],
+        ranges: [{ versionStartIncluding: "2.4.0", versionEndExcluding: "2.4.50" }],
+      }],
+    ]));
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "myapp.up.railway.app", mode: "sme",
+    });
+
+    // CVE avaliado normalmente pelo filtro CPE (não suprimido)
+    expect(result.vulnerabilities.find(v => v.cveId === "CVE-PAAS-TEST")).toBeDefined();
+    // Log informativo presente
+    const paasLog = logSpy.mock.calls.find(
+      args => typeof args[0] === "string" && args[0].includes("PaaS/CDN partilhado")
+    );
+    expect(paasLog).toBeDefined();
+    // Sem "ignorados para CVEs" — a supressão foi removida
+    const ignoredLog = logSpy.mock.calls.find(
+      args => typeof args[0] === "string" && args[0].includes("ignorados para CVEs")
+    );
+    expect(ignoredLog).toBeUndefined();
+
+    logSpy.mockRestore();
+  });
+
   it("um único log por CVE indeterminado (gate 0 emite uma vez e faz continue)", async () => {
     vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
     vi.mocked(shodanLookup).mockResolvedValue(shodanApache());
