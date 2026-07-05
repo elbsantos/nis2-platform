@@ -287,7 +287,7 @@ async function buildExecutiveReport(
            );
         y += 24;
         criticals.slice(0, 6).forEach((v) => {
-          const enriched = enrichFinding(v.description || v.cveId);
+          const enriched = enrichFinding(v.description || v.cveId, v.cveId);
           const tH = doc.fontSize(8).font("Helvetica").heightOfString(enriched.text, { width: CONTENT_W - 28 });
           execEnsure(tH + 14);
           doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(C.critical).fill();
@@ -322,7 +322,7 @@ async function buildExecutiveReport(
            );
         y += 24;
         groupByTheme(highs).forEach(({ theme, count, examples }) => {
-          const enriched = enrichFinding(examples[0].description || examples[0].cveId);
+          const enriched = enrichFinding(examples[0].description || examples[0].cveId, examples[0].cveId);
           const summary  = count > 1
             ? `${theme} (${count} ocorrências): ${enriched.text}`
             : enriched.text;
@@ -424,9 +424,23 @@ async function buildExecutiveReport(
 // ---------------------------------------------------------------------------
 // Finding enrichment: translates raw scanner output into plain-language
 // business impact descriptions, with severity classification.
+//
+// PRINCÍPIO: enrichFinding NUNCA reescreve descrições NVD reais.
+// Uma descrição vinda do NVD é a verdade final. O enriquecimento existe
+// apenas para findings SINTÉTICOS nossos (NIS2-*, deduções de porto,
+// headers, email) que não têm descrição de utilizador.
 // ---------------------------------------------------------------------------
 
-function enrichFinding(raw: string): { critical: boolean; text: string } {
+export function enrichFinding(raw: string, cveId?: string): { critical: boolean; text: string } {
+  // Guard: CVE real com descrição — devolve intocado.
+  // Fonte estrutural preferida (cveId param); fallback: texto começa com "CVE-NNNN-NNNNN"
+  // (formato de findings[] do scan-executor: "CVE-XXXX-N (CVSS N.N) — descrição").
+  // raw !== structuralCveId garante que há descrição real (não só o cveId como fallback).
+  const structuralCveId = cveId ?? (raw.match(/^(CVE-\d{4}-\d+)\b/)?.[1]);
+  if (structuralCveId && /^CVE-\d{4}-\d+$/.test(structuralCveId) && raw !== structuralCveId) {
+    return { critical: false, text: raw };
+  }
+
   const r = raw.toLowerCase();
 
   if (/dmarc/i.test(raw))
@@ -453,9 +467,11 @@ function enrichFinding(raw: string): { critical: boolean; text: string } {
     return { critical: false, text: "Porta 80 Aberta (HTTP Inseguro): O servidor web aceita ligações sem encriptação (texto limpo). Configure o redirecionamento automático obrigatório para HTTPS (porta 443)." };
   if (/3389|rdp|remote.desktop/i.test(raw))
     return { critical: true,  text: "Porta 3389 Exposta (Acesso Remoto Windows/RDP): Painel de controlo remoto exposto — alvo preferencial de ataques de força bruta e ransomware." };
-  if (/21\b|ftp/i.test(r))
+  // Âncoras de contexto: exige "porto 21" / "port 21" ou a palavra isolada "ftp".
+  // Evita falsos positivos em versões NVD como "2.4.21" que disparariam /21\b/.
+  if (/\bporto?\s+21\b|\bftp\b/i.test(r))
     return { critical: false, text: "Porta 21 Aberta (FTP): Protocolo de transferência de ficheiros sem encriptação exposto. Substitua por SFTP (porta 22) ou FTPS." };
-  if (/23\b|telnet/i.test(r))
+  if (/\bporto?\s+23\b|\btelnet\b/i.test(r))
     return { critical: true,  text: "Porta 23 Aberta (Telnet): Protocolo obsoleto e sem encriptação — substitua imediatamente por SSH." };
 
   if (/csp|content.security/i.test(raw))
@@ -475,6 +491,10 @@ function enrichFinding(raw: string): { critical: boolean; text: string } {
   const isCritical = /crítico|critical|grave|high|critical/i.test(raw);
   return { critical: isCritical, text: raw };
 }
+
+// TODO(getVulnTheme): os padrões /telnet/ e /:23\b/ em getVulnTheme são uma família
+// diferente (determinam apenas CATEGORIA, não reescrevem texto) — não causam o mesmo
+// bug mas merecem revisão separada se produzirem categorias erradas em CVEs futuros.
 
 // ---------------------------------------------------------------------------
 // DNS record examples for email-related vulnerabilities
