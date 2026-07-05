@@ -169,9 +169,14 @@ export async function generateReportBuffer(options: {
   const scanOverall   = (scan.results as any)?.overallScore as number ?? 0;
   const displayOverall = qScores !== null ? overallCombinedScore(combined) : scanOverall;
 
+  // Fontes que efectivamente correram neste scan (gravadas pelo scan-executor).
+  // Fallback para scans antigos (sem campo): assume fontes base sem Censys.
+  const dataSources: string[] = (scan.results as any)?.dataSources ??
+    ["shodan", "directTls", "emailSecurity", "httpHeaders", "darkWeb", "nvd"];
+
   return options.type === "executive"
-    ? buildExecutiveReport(scan, vulns, org, combined, displayOverall, qScores !== null)
-    : buildTechnicalReport(scan, vulns, org, combined, displayOverall, qScores !== null);
+    ? buildExecutiveReport(scan, vulns, org, combined, displayOverall, qScores !== null, dataSources)
+    : buildTechnicalReport(scan, vulns, org, combined, displayOverall, qScores !== null, dataSources);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +189,8 @@ async function buildExecutiveReport(
   org: Org,
   combined: CombinedArticleScore[],
   displayOverall: number,
-  hasQuestionnaire: boolean
+  hasQuestionnaire: boolean,
+  dataSources: string[]
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
@@ -405,7 +411,7 @@ async function buildExecutiveReport(
     });
     y += 10;
 
-    y = drawMethodologySection(doc, y);
+    y = drawMethodologySection(doc, y, dataSources);
     y = drawReferencesSection(doc, y);
     drawRunningFooter(doc, execPage);
 
@@ -505,7 +511,8 @@ function getDnsExample(cveId: string, component: string, target: string): string
 
 async function buildTechnicalReport(
   scan: Scan, vulns: PdfVuln[], org: Org,
-  combined: CombinedArticleScore[], displayOverall: number, hasQuestionnaire: boolean
+  combined: CombinedArticleScore[], displayOverall: number, hasQuestionnaire: boolean,
+  dataSources: string[]
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
@@ -809,7 +816,7 @@ async function buildTechnicalReport(
       drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
       y = 90;
     }
-    y = drawMethodologySection(doc, y);
+    y = drawMethodologySection(doc, y, dataSources);
     y = drawReferencesSection(doc, y);
     drawRunningFooter(doc, techPage);
 
@@ -941,7 +948,7 @@ function drawScoreCircle(doc: PDFKit.PDFDocument, score: number, x: number, y: n
      .text("/ 100", cx - 20, cy + 10, { width: 40, align: "center" });
 }
 
-function drawMethodologySection(doc: PDFKit.PDFDocument, y: number): number {
+function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[]): number {
   y = drawSectionTitle(doc, "Metodologia & Limitações Técnicas", y);
 
   const intro =
@@ -953,10 +960,22 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number): number {
      .text(intro, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
   y += doc.heightOfString(intro, { width: CONTENT_W, lineGap: 2 }) + 8;
 
+  const hasCensys = dataSources.includes("censys");
+  const hasNvd    = dataSources.includes("nvd");
+
+  const perimeterDetail = hasCensys
+    ? "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) através das plataformas Shodan InternetDB e Censys."
+    : "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) via Shodan InternetDB" +
+      (hasNvd ? "; validação de versões e intervalos de afectação via NVD (National Vulnerability Database)." : ".");
+
+  const tlsDetail = hasCensys
+    ? "Avaliação de certificados digitais e cifras TLS/SSL nas portas normalizadas (443, 8443), combinando dados Censys com verificação directa TCP/TLS."
+    : "Verificação directa TCP/TLS de certificados digitais, cifras e configurações de segurança nas portas normalizadas (443, 8443).";
+
   const categories: Array<{ label: string; detail: string }> = [
-    { label: "Mapeamento de Perímetro",      detail: "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) através de plataformas de inteligência de Internet (Shodan e Censys)." },
+    { label: "Mapeamento de Perímetro",      detail: perimeterDetail },
     { label: "Segurança de Identidade",      detail: "Verificação de fugas de credenciais corporativas associadas ao domínio na base de dados Have I Been Pwned (HIBP)." },
-    { label: "Encriptação em Trânsito",      detail: "Avaliação direta dos certificados digitais e cifras TLS/SSL nas portas normalizadas de segurança (ex.: 443, 8443)." },
+    { label: "Encriptação em Trânsito",      detail: tlsDetail },
     { label: "Validação de Email e DNS",     detail: "Análise das configurações DNS públicas do domínio (registos SPF, DMARC e DKIM) e verificação dos cabeçalhos de segurança HTTP." },
   ];
 
@@ -997,6 +1016,7 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
     ["Autoridade Nacional",    "CNCS (Centro Nacional de Cibersegurança) — Autoridade nacional competente para supervisão, regulamentação e aplicação das obrigações NIS2 em Portugal (cncs.gov.pt)."],
     ["Agência Europeia",       "ENISA (European Union Agency for Cybersecurity) — Entidade responsável pelas orientações técnicas e boas práticas europeias (enisa.europa.eu)."],
     ["Obrigação de Notificação", "Em conformidade com o DL n.º 125/2025, qualquer incidente com impacto significativo deve ser notificado ao CNCS no prazo de 24 horas (alerta inicial) e detalhado em relatório completo em 72 horas."],
+    ["NVD (Dados CVE)",        "This product uses the NVD API but is not endorsed or certified by the NVD — National Vulnerability Database, NIST (nvd.nist.gov)."],
   ];
 
   refs.forEach(([label, val], i) => {

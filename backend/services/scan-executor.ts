@@ -492,13 +492,18 @@ export async function executeAgentlessScan(
     // ── 2. Shodan + Censys + Direct TLS + HTTP headers (parallel) ──────────
     // HTTP headers fetched here (not in step 6) so the Server: banner is
     // available to enrich port 80/443 service/version before the CVE loop.
+    // Censys requer CENSYS_ENABLED=true; por omissão a análise TLS é feita
+    // integralmente via directTls (verificação directa TCP/TLS).
+    const censysEnabled = process.env.CENSYS_ENABLED === "true";
     const [shodanData, censysData, directTls, httpHeaders] = await Promise.all([
       import("../integrations/shodan").then((m) =>
         m.lookupHost(options.target).catch(() => null)
       ) as Promise<ShodanHostResult | null>,
-      import("../integrations/censys").then((m) =>
-        m.lookupHost(options.target).catch(() => null)
-      ) as Promise<CensysHostResult | null>,
+      censysEnabled
+        ? import("../integrations/censys").then((m) =>
+            m.lookupHost(options.target).catch(() => null)
+          ) as Promise<CensysHostResult | null>
+        : Promise.resolve(null as CensysHostResult | null),
       isDomain
         ? import("../integrations/direct-tls").then((m) =>
             m.checkDirectTls(options.target).catch(() => null)
@@ -1017,6 +1022,17 @@ export async function executeAgentlessScan(
       port.cves = port.cves.filter((id) => survivedCves.has(id));
     }
 
+    // Fontes activas neste scan — gravadas no JSONB results para que o PDF
+    // possa gerar a secção de metodologia de forma honesta (sem mencionar
+    // integrações que não correram).
+    const dataSources: string[] = ["shodan"];
+    if (censysData !== null) dataSources.push("censys");
+    if (directTls !== null) dataSources.push("directTls");
+    if (emailSecurity !== null) dataSources.push("emailSecurity");
+    if (httpHeaders !== null) dataSources.push("httpHeaders");
+    if (darkWeb !== null) dataSources.push("darkWeb");
+    if (allCveIds.length > 0) dataSources.push("nvd");
+
     const { scores, overall } = calculateNIS2Scores(allPorts, vulns, extraDeductions);
 
     // ── 9. Mark scan complete ──────────────────────────────────────────────
@@ -1024,6 +1040,7 @@ export async function executeAgentlessScan(
       nis2Scores: scores,
       overallScore: overall,
       isSharedInfra,                                          // flag para UI/PDF
+      dataSources,                                            // integrações que efectivamente correram
       // vulnerabilitiesFound gravado em separado foi eliminado (CORREÇÃO 4):
       // o total é results.vulnerabilities.length — uma única fonte de verdade.
       criticalCount: vulns.filter((v) => v.severity === "critical").length,

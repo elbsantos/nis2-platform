@@ -12,8 +12,16 @@
 import { getRedisClient } from "../middlewares/rateLimit";
 
 const CENSYS_API_KEY = process.env.CENSYS_API_KEY ?? "";
+export const CENSYS_ENABLED = process.env.CENSYS_ENABLED === "true";
 const CENSYS_BASE = "https://search.censys.io/api/v2";
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
+
+// Log único no arranque do módulo (não por scan)
+if (!CENSYS_ENABLED) {
+  console.log(
+    "[Censys] desactivado (CENSYS_ENABLED não definido) — análise TLS via verificação directa"
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -144,8 +152,10 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
 export async function lookupHost(
   target: string
 ): Promise<CensysHostResult | null> {
+  if (!CENSYS_ENABLED) return null; // silencioso — log emitido no arranque do módulo
+
   if (!CENSYS_API_KEY) {
-    console.warn("[Censys] CENSYS_API_KEY não configurado — análise TLS desactivada");
+    console.warn("[Censys] CENSYS_ENABLED=true mas CENSYS_API_KEY ausente — análise TLS desactivada");
     return null;
   }
 

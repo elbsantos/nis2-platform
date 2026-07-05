@@ -4,7 +4,7 @@
  * Unit tests for the NIS2 scanner.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
 
@@ -94,6 +94,11 @@ describe("verifyOwnership", () => {
 describe("executeAgentlessScan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.CENSYS_ENABLED;
+  });
+
+  afterEach(() => {
+    delete process.env.CENSYS_ENABLED;
   });
 
   it("fails if ownership verification fails", async () => {
@@ -110,6 +115,7 @@ describe("executeAgentlessScan", () => {
   });
 
   it("completes successfully with Shodan + Censys data", async () => {
+    process.env.CENSYS_ENABLED = "true"; // activar explicitamente para testar o caminho Censys
     vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
 
     const shodanData: ShodanHostResult = {
@@ -167,6 +173,30 @@ describe("executeAgentlessScan", () => {
     expect(result.nis2Scores.length).toBe(10); // 10 articles
     expect(result.overallScore).toBeGreaterThanOrEqual(0);
     expect(result.overallScore).toBeLessThanOrEqual(100);
+    expect(vi.mocked(censysLookup)).toHaveBeenCalledTimes(1); // CENSYS_ENABLED=true → deve ser chamado
+  });
+
+  it("Censys desactivado por omissão — lookupHost não é invocado por scan", async () => {
+    // CENSYS_ENABLED não definido (beforeEach garante isso)
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: [],
+      tags: [],
+      cpes: [],
+      vulns: [],
+      ports: [{ port: 443, transport: "tcp" }],
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1,
+      organizationId: 1,
+      target: "example.com",
+      mode: "sme",
+    });
+
+    expect(result.success).toBe(true);
+    expect(vi.mocked(censysLookup)).not.toHaveBeenCalled();
   });
 
   it("detects plain HTTP without HTTPS as NIS2-TLS-001", async () => {
