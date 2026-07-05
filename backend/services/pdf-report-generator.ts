@@ -749,7 +749,7 @@ async function buildTechnicalReport(
 
       // Enriquecer e deduplicar por texto — múltiplos CVEs do mesmo serviço
       // enriquecem para o mesmo texto (ex: "Porta 22 Exposta") → mostrar uma vez.
-      const _enrichedAll = rawFindings.slice(0, 8).map(enrichFinding);
+      const _enrichedAll = rawFindings.slice(0, 8).map((f) => enrichFinding(f));
       const _seenEnriched = new Set<string>();
       const enriched = _enrichedAll
         .filter(ef => !_seenEnriched.has(ef.text) && (_seenEnriched.add(ef.text), true))
