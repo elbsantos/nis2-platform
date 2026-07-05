@@ -14,7 +14,8 @@ import { CHECK_ISO27001, CHECK_NIST } from "../utils/framework-mapping";
 
 export interface HttpHeaderCheck {
   name: string;
-  status: "pass" | "warn" | "fail";
+  /** "unverified" = target unreachable; no deduction, not counted as a verified source */
+  status: "pass" | "warn" | "fail" | "unverified";
   detail: string;
   nis2Article: string;
   cisControls?: string[];
@@ -24,7 +25,8 @@ export interface HttpHeaderCheck {
 
 export interface HttpHeadersResult {
   checks: HttpHeaderCheck[];
-  score: number;
+  /** null when target was unreachable and no checks could be performed */
+  score: number | null;
   url: string;
   serverBanner?: string; // value of the Server: response header, e.g. "Apache/2.4.7 (Ubuntu)"
 }
@@ -48,6 +50,9 @@ function fetchHeaders(url: string, redirectsLeft = 3): Promise<IncomingHttpHeade
           return;
         }
         res.destroy();
+        // TODO(Issue-D): HTTP error responses (403, 500, …) resolve here with their headers,
+        // which may lack security headers the server sends for normal 2xx responses → false positives.
+        // Fix: only resolve if statusCode is 2xx (or redirect already handled above).
         resolve(res.headers);
       }
     );
@@ -191,14 +196,14 @@ function checkReferrerPolicy(headers: IncomingHttpHeaders): HttpHeaderCheck {
   };
 }
 
-// Site inacessível = warn (não fail) — ausência de resposta HTTP não confirma ausência dos headers;
-// pode ser firewall, CDN ou down temporário. Não gera vulnerabilidades no pipeline.
+// Site inacessível = unverified — ausência de resposta não confirma ausência dos headers;
+// pode ser firewall, CDN ou down temporário. Não deduz score, não conta como fonte verificada.
 const UNREACHABLE_CHECKS: HttpHeaderCheck[] = [
-  { name: "HSTS",                  status: "warn", detail: "Site inacessível — não foi possível verificar headers de segurança HTTP.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["HSTS"] ?? [], iso27001Controls: CHECK_ISO27001["HSTS"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["HSTS"] ?? ["NIST PR.PS-01"] },
-  { name: "CSP",                   status: "warn", detail: "Site inacessível — não foi possível verificar headers de segurança HTTP.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["CSP"] ?? [], iso27001Controls: CHECK_ISO27001["CSP"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["CSP"] ?? ["NIST PR.PS-01"] },
-  { name: "X-Frame-Options",       status: "warn", detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Frame-Options"] ?? [], iso27001Controls: CHECK_ISO27001["X-Frame-Options"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["X-Frame-Options"] ?? ["NIST PR.PS-01"] },
-  { name: "X-Content-Type-Options",status: "warn", detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Content-Type-Options"] ?? [], iso27001Controls: CHECK_ISO27001["X-Content-Type-Options"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["X-Content-Type-Options"] ?? ["NIST PR.PS-01"] },
-  { name: "Referrer-Policy",       status: "warn", detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["Referrer-Policy"] ?? [], iso27001Controls: CHECK_ISO27001["Referrer-Policy"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["Referrer-Policy"] ?? ["NIST PR.PS-01"] },
+  { name: "HSTS",                  status: "unverified", detail: "Site inacessível — não foi possível verificar headers de segurança HTTP.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["HSTS"] ?? [], iso27001Controls: CHECK_ISO27001["HSTS"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["HSTS"] ?? ["NIST PR.PS-01"] },
+  { name: "CSP",                   status: "unverified", detail: "Site inacessível — não foi possível verificar headers de segurança HTTP.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["CSP"] ?? [], iso27001Controls: CHECK_ISO27001["CSP"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["CSP"] ?? ["NIST PR.PS-01"] },
+  { name: "X-Frame-Options",       status: "unverified", detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Frame-Options"] ?? [], iso27001Controls: CHECK_ISO27001["X-Frame-Options"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["X-Frame-Options"] ?? ["NIST PR.PS-01"] },
+  { name: "X-Content-Type-Options",status: "unverified", detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(e)", cisControls: CHECK_CIS["X-Content-Type-Options"] ?? [], iso27001Controls: CHECK_ISO27001["X-Content-Type-Options"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["X-Content-Type-Options"] ?? ["NIST PR.PS-01"] },
+  { name: "Referrer-Policy",       status: "unverified", detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(h)", cisControls: CHECK_CIS["Referrer-Policy"] ?? [], iso27001Controls: CHECK_ISO27001["Referrer-Policy"] ?? ["ISO A.8.26"], nistCsfControls: CHECK_NIST["Referrer-Policy"] ?? ["NIST PR.PS-01"] },
 ];
 
 export async function checkHttpHeaders(target: string): Promise<HttpHeadersResult> {
@@ -217,7 +222,7 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
       usedUrl = httpUrl;
       isHttps = false;
     } catch {
-      return { checks: UNREACHABLE_CHECKS, score: 0, url: httpsUrl };
+      return { checks: UNREACHABLE_CHECKS, score: null, url: httpsUrl };
     }
   }
 

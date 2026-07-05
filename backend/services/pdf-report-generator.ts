@@ -173,10 +173,11 @@ export async function generateReportBuffer(options: {
   // Fallback para scans antigos (sem campo): assume fontes base sem Censys.
   const dataSources: string[] = (scan.results as any)?.dataSources ??
     ["shodan", "directTls", "emailSecurity", "httpHeaders", "darkWeb", "nvd"];
+  const scanLimitations: string[] = (scan.results as any)?.scanLimitations ?? [];
 
   return options.type === "executive"
-    ? buildExecutiveReport(scan, vulns, org, combined, displayOverall, qScores !== null, dataSources)
-    : buildTechnicalReport(scan, vulns, org, combined, displayOverall, qScores !== null, dataSources);
+    ? buildExecutiveReport(scan, vulns, org, combined, displayOverall, qScores !== null, dataSources, scanLimitations)
+    : buildTechnicalReport(scan, vulns, org, combined, displayOverall, qScores !== null, dataSources, scanLimitations);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +191,8 @@ async function buildExecutiveReport(
   combined: CombinedArticleScore[],
   displayOverall: number,
   hasQuestionnaire: boolean,
-  dataSources: string[]
+  dataSources: string[],
+  scanLimitations: string[]
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
@@ -411,7 +413,7 @@ async function buildExecutiveReport(
     });
     y += 10;
 
-    y = drawMethodologySection(doc, y, dataSources);
+    y = drawMethodologySection(doc, y, dataSources, scanLimitations);
     y = drawReferencesSection(doc, y);
     drawRunningFooter(doc, execPage);
 
@@ -512,7 +514,7 @@ function getDnsExample(cveId: string, component: string, target: string): string
 async function buildTechnicalReport(
   scan: Scan, vulns: PdfVuln[], org: Org,
   combined: CombinedArticleScore[], displayOverall: number, hasQuestionnaire: boolean,
-  dataSources: string[]
+  dataSources: string[], scanLimitations: string[]
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
@@ -816,7 +818,7 @@ async function buildTechnicalReport(
       drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
       y = 90;
     }
-    y = drawMethodologySection(doc, y, dataSources);
+    y = drawMethodologySection(doc, y, dataSources, scanLimitations);
     y = drawReferencesSection(doc, y);
     drawRunningFooter(doc, techPage);
 
@@ -948,7 +950,7 @@ function drawScoreCircle(doc: PDFKit.PDFDocument, score: number, x: number, y: n
      .text("/ 100", cx - 20, cy + 10, { width: 40, align: "center" });
 }
 
-function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[]): number {
+function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[], scanLimitations: string[]): number {
   y = drawSectionTitle(doc, "Metodologia & Limitações Técnicas", y);
 
   const intro =
@@ -1003,7 +1005,22 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
 
   doc.fontSize(8).font("Helvetica").fillColor(C.muted)
      .text(limits, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
-  y += doc.heightOfString(limits, { width: CONTENT_W, lineGap: 2 }) + 18;
+  y += doc.heightOfString(limits, { width: CONTENT_W, lineGap: 2 }) + 6;
+
+  if (scanLimitations.length > 0) {
+    doc.fontSize(8).font("Helvetica-Bold").fillColor(C.warning)
+       .text("Limitações específicas deste scan:", MARGIN, y);
+    y += 12;
+    for (const lim of scanLimitations) {
+      doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+         .text(`• ${lim}`, MARGIN + 8, y, { width: CONTENT_W - 8, lineGap: 2 });
+      y += doc.heightOfString(lim, { width: CONTENT_W - 8, lineGap: 2 }) + 4;
+    }
+    y += 6;
+  } else {
+    y += 12;
+  }
+
   return y;
 }
 

@@ -58,6 +58,7 @@ import { checkHttpHeaders } from "../integrations/http-headers";
 import { batchLookupCveVersionRanges, isVersionInNvdRanges } from "../integrations/nvd";
 import { checkSsh } from "../integrations/ssh-check";
 import { resolveTxt } from "dns/promises";
+import { updateScanStatus } from "../db";
 
 describe("verifyOwnership", () => {
   beforeEach(() => {
@@ -719,6 +720,117 @@ describe("executeAgentlessScan", () => {
     // Descrição real com "TLS" → mapCveToNIS2Articles retorna (h) em vez do fallback (e)
     expect(vuln?.nis2Articles).toContain("Art. 21(2)(h)");
     expect(vuln?.nis2Articles).not.toContain("Art. 21(2)(e)");
+  });
+
+  // ── Testes de status "unverified" em headers HTTP (issues A, B, C) ─────────
+
+  const UNVERIFIED_CHECKS = [
+    { name: "HSTS",                   status: "unverified" as const, detail: "Site inacessível — não foi possível verificar headers de segurança HTTP.", nis2Article: "Art. 21(2)(h)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+    { name: "CSP",                    status: "unverified" as const, detail: "Site inacessível — não foi possível verificar headers de segurança HTTP.", nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+    { name: "X-Frame-Options",        status: "unverified" as const, detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+    { name: "X-Content-Type-Options", status: "unverified" as const, detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+    { name: "Referrer-Policy",        status: "unverified" as const, detail: "Site inacessível — verificação de headers não concluída.", nis2Article: "Art. 21(2)(h)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+  ];
+
+  it("alvo inacessível (todos unverified) — zero findings, zero dedução em (e)/(h), httpHeaders fora de dataSources, scanLimitations presente", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: [], tags: [], cpes: [], vulns: [],
+      ports: [{ port: 443, transport: "tcp" }],
+    });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: UNVERIFIED_CHECKS,
+      score: null,
+      url: "https://unreachable.example",
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "unreachable.example", mode: "sme",
+    });
+
+    // Sem findings NIS2-HEADER-*
+    expect(result.vulnerabilities.filter((v) => v.cveId.startsWith("NIS2-HEADER-"))).toHaveLength(0);
+
+    // Sem achado de "inacessível" nas medidas (e) e (h)
+    const artE = result.nis2Scores.find((s) => s.article === "Art. 21(2)(e)");
+    const artH = result.nis2Scores.find((s) => s.article === "Art. 21(2)(h)");
+    expect(artE?.findings.some((f) => f.includes("inacessível"))).toBe(false);
+    expect(artH?.findings.some((f) => f.includes("inacessível"))).toBe(false);
+
+    // updateScanStatus chamado com dataSources sem "httpHeaders" e scanLimitations correcto
+    const dbMock = vi.mocked(updateScanStatus);
+    expect(dbMock).toHaveBeenCalled();
+    const stored = dbMock.mock.calls[dbMock.mock.calls.length - 1][4];
+    expect(stored?.dataSources).not.toContain("httpHeaders");
+    expect(stored?.scanLimitations).toContain(
+      "Verificação de cabeçalhos HTTP não concluída — alvo não respondeu em HTTPS/HTTP."
+    );
+  });
+
+  it("headers verificados com warn (Referrer-Policy permissivo) continuam a deduzir 4 pts (regressão warn)", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: [], tags: [], cpes: [], vulns: [],
+      ports: [{ port: 443, transport: "tcp" }],
+    });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [
+        { name: "HSTS",                   status: "pass", detail: "HSTS activo", nis2Article: "Art. 21(2)(h)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "CSP",                    status: "pass", detail: "CSP configurado", nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "X-Frame-Options",        status: "pass", detail: "XFO presente", nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "X-Content-Type-Options", status: "pass", detail: "XCTO presente", nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "Referrer-Policy",        status: "warn", detail: "Referrer-Policy permissivo (unsafe-url)", nis2Article: "Art. 21(2)(h)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+      ],
+      score: 95,
+      url: "https://example.com",
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    // Sem findings NIS2-HEADER-* (apenas warns, não fails)
+    expect(result.vulnerabilities.filter((v) => v.cveId.startsWith("NIS2-HEADER-"))).toHaveLength(0);
+    // Warn de Referrer-Policy gera extraDeduction em Art. 21(2)(h)
+    const artH = result.nis2Scores.find((s) => s.article === "Art. 21(2)(h)");
+    expect(artH?.findings.some((f) => f.includes("Referrer-Policy"))).toBe(true);
+    // "httpHeaders" em dataSources (houve verificação real)
+    const stored = vi.mocked(updateScanStatus).mock.calls[vi.mocked(updateScanStatus).mock.calls.length - 1][4];
+    expect(stored?.dataSources).toContain("httpHeaders");
+    expect(stored?.scanLimitations ?? []).toHaveLength(0);
+  });
+
+  it("headers verificados com fail criam NIS2-HEADER-* e 'httpHeaders' em dataSources (regressão fail)", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: [], tags: [], cpes: [], vulns: [],
+      ports: [{ port: 80, transport: "tcp" }],
+    });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [
+        { name: "HSTS",                   status: "fail", detail: "Strict-Transport-Security ausente", nis2Article: "Art. 21(2)(h)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "CSP",                    status: "fail", detail: "Content-Security-Policy ausente",   nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "X-Frame-Options",        status: "fail", detail: "X-Frame-Options ausente",          nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "X-Content-Type-Options", status: "fail", detail: "X-Content-Type-Options ausente",   nis2Article: "Art. 21(2)(e)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+        { name: "Referrer-Policy",        status: "warn", detail: "Referrer-Policy ausente",          nis2Article: "Art. 21(2)(h)", cisControls: [], iso27001Controls: [], nistCsfControls: [] },
+      ],
+      score: 35,
+      url: "http://example.com",
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    // 4 findings NIS2-HEADER-* (um por cada fail)
+    const headerVulns = result.vulnerabilities.filter((v) => v.cveId.startsWith("NIS2-HEADER-"));
+    expect(headerVulns).toHaveLength(4);
+    expect(headerVulns.map((v) => v.cveId)).toContain("NIS2-HEADER-CSP");
+    expect(headerVulns.map((v) => v.cveId)).toContain("NIS2-HEADER-HSTS");
+    // "httpHeaders" em dataSources
+    const stored = vi.mocked(updateScanStatus).mock.calls[vi.mocked(updateScanStatus).mock.calls.length - 1][4];
+    expect(stored?.dataSources).toContain("httpHeaders");
+    expect(stored?.scanLimitations ?? []).toHaveLength(0);
   });
 
   it("um único log por CVE indeterminado (gate 0 emite uma vez e faz continue)", async () => {

@@ -330,7 +330,7 @@ function PdfButton({ scanId, type, label }: { scanId: number; type: "executive" 
 
 interface SecurityCheck {
   name: string;
-  status: "pass" | "warn" | "fail";
+  status: "pass" | "warn" | "fail" | "unverified";
   detail: string;
   nis2Article: string;
   cisControls?: string[];
@@ -356,11 +356,13 @@ function FrameworkTags({ cis, iso, nist }: { cis?: string[]; iso?: string[]; nis
 }
 
 function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
-  const badge = (status: "pass" | "warn" | "fail") => {
+  const badge = (status: "pass" | "warn" | "fail" | "unverified") => {
     if (status === "pass")
       return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">OK</span>;
     if (status === "warn")
       return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-amber-900/40 text-amber-400 border border-amber-700">Aviso</span>;
+    if (status === "unverified")
+      return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-slate-700/60 text-slate-400 border border-slate-600">Não verificado</span>;
     return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-red-900/40 text-red-400 border border-red-700">Falha</span>;
   };
 

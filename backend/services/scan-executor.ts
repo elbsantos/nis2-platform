@@ -1032,9 +1032,20 @@ export async function executeAgentlessScan(
     if (censysData !== null) dataSources.push("censys");
     if (directTls !== null) dataSources.push("directTls");
     if (emailSecurity !== null) dataSources.push("emailSecurity");
-    if (httpHeaders !== null) dataSources.push("httpHeaders");
+    // httpHeaders só conta como fonte verificada quando houve pelo menos uma verificação real
+    // (algum check com pass/fail/warn). Alvo inacessível → todos unverified → não conta.
+    const headersVerified = httpHeaders !== null &&
+      httpHeaders.checks.some((c) => c.status !== "unverified");
+    if (headersVerified) dataSources.push("httpHeaders");
     if (darkWeb !== null) dataSources.push("darkWeb");
     if (allCveIds.length > 0) dataSources.push("nvd");
+
+    const scanLimitations: string[] = [];
+    if (httpHeaders !== null && !headersVerified) {
+      scanLimitations.push(
+        "Verificação de cabeçalhos HTTP não concluída — alvo não respondeu em HTTPS/HTTP."
+      );
+    }
 
     const { scores, overall } = calculateNIS2Scores(allPorts, vulns, extraDeductions);
 
@@ -1044,6 +1055,7 @@ export async function executeAgentlessScan(
       overallScore: overall,
       isSharedInfra,                                          // flag para UI/PDF
       dataSources,                                            // integrações que efectivamente correram
+      scanLimitations,                                        // limitações de verificação deste scan
       // vulnerabilitiesFound gravado em separado foi eliminado (CORREÇÃO 4):
       // o total é results.vulnerabilities.length — uma única fonte de verdade.
       criticalCount: vulns.filter((v) => v.severity === "critical").length,
