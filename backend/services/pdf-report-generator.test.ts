@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { enrichFinding } from "./pdf-report-generator";
+import { enrichFinding, buildMethodologyBullets } from "./pdf-report-generator";
 
 describe("enrichFinding — guard: descrições NVD não são reescritas", () => {
   it("descrição NVD com número de versão '2.4.23' não dispara o regex do Telnet", () => {
@@ -82,5 +82,52 @@ describe("enrichFinding — findings sintéticos continuam enriquecidos", () => 
     const result = enrichFinding(synthetic, "NIS2-EMAIL-DMARC");
     expect(result.text).toContain("DMARC");
     expect(result.critical).toBe(true);
+  });
+});
+
+describe("buildMethodologyBullets — bullet de headers derivada de dataSources", () => {
+  it("scan #63 (alvo morto, sem httpHeaders em dataSources) → sem bullet de headers", () => {
+    // Reproduz dataSources do scan #63: emailSecurity correu (DNS), httpHeaders não (alvo inacessível)
+    const dataSources = ["shodan", "emailSecurity"];
+    const bullets = buildMethodologyBullets(dataSources);
+    const labels = bullets.map((b) => b.label);
+    expect(labels).not.toContain("Cabeçalhos de Segurança HTTP");
+    expect(labels).toContain("Validação de Email e DNS");
+  });
+
+  it("scan #62 (scanme, httpHeaders verificados) → bullet de headers presente", () => {
+    const dataSources = ["shodan", "directTls", "emailSecurity", "httpHeaders", "nvd"];
+    const bullets = buildMethodologyBullets(dataSources);
+    const labels = bullets.map((b) => b.label);
+    expect(labels).toContain("Cabeçalhos de Segurança HTTP");
+    const headerBullet = bullets.find((b) => b.label === "Cabeçalhos de Segurança HTTP")!;
+    expect(headerBullet.detail).toContain("HSTS");
+    expect(headerBullet.detail).toContain("CSP");
+  });
+
+  it("bullet de email sempre presente independentemente de httpHeaders", () => {
+    // Email é DNS-only — corre mesmo quando o alvo não serve HTTP
+    const withoutHeaders = buildMethodologyBullets(["shodan", "emailSecurity"]);
+    const withHeaders    = buildMethodologyBullets(["shodan", "emailSecurity", "httpHeaders"]);
+    expect(withoutHeaders.map((b) => b.label)).toContain("Validação de Email e DNS");
+    expect(withHeaders.map((b) => b.label)).toContain("Validação de Email e DNS");
+  });
+
+  it("bullet de email não menciona cabeçalhos HTTP no seu texto", () => {
+    const bullets = buildMethodologyBullets(["shodan", "emailSecurity", "httpHeaders"]);
+    const emailBullet = bullets.find((b) => b.label === "Validação de Email e DNS")!;
+    expect(emailBullet.detail).not.toContain("cabeçalhos");
+    expect(emailBullet.detail).toContain("SPF");
+    expect(emailBullet.detail).toContain("DMARC");
+    expect(emailBullet.detail).toContain("DKIM");
+  });
+
+  it("perimeter bullet menciona Censys quando presente em dataSources", () => {
+    const withCensys    = buildMethodologyBullets(["shodan", "censys"]);
+    const withoutCensys = buildMethodologyBullets(["shodan"]);
+    const pWith    = withCensys.find((b) => b.label === "Mapeamento de Perímetro")!;
+    const pWithout = withoutCensys.find((b) => b.label === "Mapeamento de Perímetro")!;
+    expect(pWith.detail).toContain("Censys");
+    expect(pWithout.detail).not.toContain("Censys");
   });
 });

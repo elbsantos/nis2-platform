@@ -970,6 +970,30 @@ function drawScoreCircle(doc: PDFKit.PDFDocument, score: number, x: number, y: n
      .text("/ 100", cx - 20, cy + 10, { width: 40, align: "center" });
 }
 
+/** Exported for testing: builds the methodology bullet list from dataSources. */
+export function buildMethodologyBullets(dataSources: string[]): Array<{ label: string; detail: string }> {
+  const hasCensys      = dataSources.includes("censys");
+  const hasNvd         = dataSources.includes("nvd");
+  const hasHttpHeaders = dataSources.includes("httpHeaders");
+
+  const perimeterDetail = hasCensys
+    ? "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) através das plataformas Shodan InternetDB e Censys."
+    : "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) via Shodan InternetDB" +
+      (hasNvd ? "; validação de versões e intervalos de afectação via NVD (National Vulnerability Database)." : ".");
+
+  const tlsDetail = hasCensys
+    ? "Avaliação de certificados digitais e cifras TLS/SSL nas portas normalizadas (443, 8443), combinando dados Censys com verificação directa TCP/TLS."
+    : "Verificação directa TCP/TLS de certificados digitais, cifras e configurações de segurança nas portas normalizadas (443, 8443).";
+
+  return [
+    { label: "Mapeamento de Perímetro",      detail: perimeterDetail },
+    { label: "Segurança de Identidade",      detail: "Verificação de fugas de credenciais corporativas associadas ao domínio na base de dados Have I Been Pwned (HIBP)." },
+    { label: "Encriptação em Trânsito",      detail: tlsDetail },
+    { label: "Validação de Email e DNS",     detail: "Análise das configurações DNS públicas do domínio (registos SPF, DMARC e DKIM)." },
+    ...(hasHttpHeaders ? [{ label: "Cabeçalhos de Segurança HTTP", detail: "Verificação dos cabeçalhos de segurança HTTP (HSTS, CSP, X-Frame-Options, X-Content-Type-Options) na resposta do servidor web." }] : []),
+  ];
+}
+
 function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[], scanLimitations: string[]): number {
   y = drawSectionTitle(doc, "Metodologia & Limitações Técnicas", y);
 
@@ -982,24 +1006,7 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
      .text(intro, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
   y += doc.heightOfString(intro, { width: CONTENT_W, lineGap: 2 }) + 8;
 
-  const hasCensys = dataSources.includes("censys");
-  const hasNvd    = dataSources.includes("nvd");
-
-  const perimeterDetail = hasCensys
-    ? "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) através das plataformas Shodan InternetDB e Censys."
-    : "Identificação de portas abertas, serviços ativos e vulnerabilidades conhecidas (CVEs) via Shodan InternetDB" +
-      (hasNvd ? "; validação de versões e intervalos de afectação via NVD (National Vulnerability Database)." : ".");
-
-  const tlsDetail = hasCensys
-    ? "Avaliação de certificados digitais e cifras TLS/SSL nas portas normalizadas (443, 8443), combinando dados Censys com verificação directa TCP/TLS."
-    : "Verificação directa TCP/TLS de certificados digitais, cifras e configurações de segurança nas portas normalizadas (443, 8443).";
-
-  const categories: Array<{ label: string; detail: string }> = [
-    { label: "Mapeamento de Perímetro",      detail: perimeterDetail },
-    { label: "Segurança de Identidade",      detail: "Verificação de fugas de credenciais corporativas associadas ao domínio na base de dados Have I Been Pwned (HIBP)." },
-    { label: "Encriptação em Trânsito",      detail: tlsDetail },
-    { label: "Validação de Email e DNS",     detail: "Análise das configurações DNS públicas do domínio (registos SPF, DMARC e DKIM) e verificação dos cabeçalhos de segurança HTTP." },
-  ];
+  const categories = buildMethodologyBullets(dataSources);
 
   categories.forEach((cat) => {
     doc.rect(MARGIN, y, 3, 12).fillColor(C.brand).fill();
