@@ -14,6 +14,12 @@ import {
   type CombinedArticleScore,
 } from "../utils/combined-score";
 import type { NIS2ArticleScore } from "./scan-executor";
+import {
+  aggregateByRootCause,
+  buildMediumIndividualsSummary,
+  type RootCauseGroup,
+  type RcaVuln,
+} from "./root-cause-aggregation";
 
 // ---------------------------------------------------------------------------
 // S3 / Hetzner Object Storage client
@@ -263,19 +269,53 @@ async function buildExecutiveReport(
        .fillColor(C.text).text(String(vulns.length));
     y += 36;
 
-    // ── Riscos por severidade (linguagem de gestor) ───────────────────────
-    const criticals = vulns.filter(v => v.severity === "critical")
-      .sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
-    const highs     = vulns.filter(v => v.severity === "high")
-      .sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
-    const mediums   = vulns.filter(v => v.severity === "medium")
-      .sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
+    // ── Riscos por severidade — agregação por causa raiz ─────────────────
+    const execOpenPorts: Array<{ port: number; service?: string; version?: string }> =
+      ((scan?.results ?? {}) as Record<string, any>).openPorts ?? [];
+    const rcaResult = aggregateByRootCause(vulns, execOpenPorts);
+
+    const criticals = vulns.filter(v => v.severity === "critical");
+    const highs     = vulns.filter(v => v.severity === "high");
+    const mediums   = vulns.filter(v => v.severity === "medium");
+
+    // Renderiza um grupo de causa raiz numa secção de severidade específica.
+    // Mostra a contagem da secção e o total do grupo para contexto.
+    const drawExecGroup = (group: RootCauseGroup, sColor: string, sev: "critical" | "high" | "medium" | "low") => {
+      const secCount = group.counts[sev];
+      const secLabels: Record<string, string> = { critical: "críticas", high: "altas", medium: "médias", low: "baixas" };
+      const titleLine = `${group.title} — ${secCount} ${secLabels[sev]} (${group.counts.total} no total)`;
+      const titleH   = doc.fontSize(8).font("Helvetica-Bold").heightOfString(titleLine,     { width: CONTENT_W - 28 });
+      const summaryH = doc.fontSize(8).font("Helvetica")     .heightOfString(group.summary, { width: CONTENT_W - 28 });
+      const actionH  = doc.fontSize(7.5).font("Helvetica")   .heightOfString(`→ ${group.action}`, { width: CONTENT_W - 28 });
+      execEnsure(titleH + summaryH + actionH + 22);
+      doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(sColor).fill();
+      doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
+         .text(titleLine, MARGIN + 22, y, { width: CONTENT_W - 26 });
+      y += titleH + 2;
+      doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+         .text(group.summary, MARGIN + 22, y, { width: CONTENT_W - 26 });
+      y += summaryH + 4;
+      doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+         .text(`→ ${group.action}`, MARGIN + 22, y, { width: CONTENT_W - 26 });
+      y += actionH + 10;
+    };
+
+    // Renderiza um finding individual (sintético ou CVE não agrupado).
+    const drawExecIndividual = (v: RcaVuln, sColor: string) => {
+      const enriched = enrichFinding(v.description || v.cveId, v.cveId);
+      const tH = doc.fontSize(8).font("Helvetica").heightOfString(enriched.text, { width: CONTENT_W - 28 });
+      execEnsure(tH + 14);
+      doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(sColor).fill();
+      doc.fontSize(8).font("Helvetica").fillColor(C.text)
+         .text(enriched.text, MARGIN + 22, y, { width: CONTENT_W - 26 });
+      y += tH + 10;
+    };
 
     if (vulns.length > 0) {
       execEnsure(60);
       y = drawSectionTitle(doc, "Riscos Identificados por Severidade", y);
 
-      // CRÍTICAS
+      // CRÍTICAS — grupos com criticals + individuais críticos
       if (criticals.length > 0) {
         execEnsure(36);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fdf4ff").fill();
@@ -286,31 +326,17 @@ async function buildExecutiveReport(
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
            );
         y += 24;
-        criticals.slice(0, 6).forEach((v) => {
-          const enriched = enrichFinding(v.description || v.cveId, v.cveId);
-          const tH = doc.fontSize(8).font("Helvetica").heightOfString(enriched.text, { width: CONTENT_W - 28 });
-          execEnsure(tH + 14);
-          doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(C.critical).fill();
-          doc.fontSize(8).font("Helvetica").fillColor(C.text)
-             .text(enriched.text, MARGIN + 22, y, { width: CONTENT_W - 26 });
-          y += tH + 10;
-        });
-        if (criticals.length > 6) {
-          execEnsure(16);
-          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
-             .text(
-               `… e mais ${criticals.length - 6} vulnerabilidades críticas — ver Relatório Técnico.`,
-               MARGIN + 22, y
-             );
-          y += 14;
-        }
+        rcaResult.groups.filter(g => g.counts.critical > 0)
+          .forEach(g => drawExecGroup(g, C.critical, "critical"));
+        rcaResult.individuals.filter(i => i.severity === "critical")
+          .forEach(v => drawExecIndividual(v, C.critical));
         execEnsure(14);
         doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
         y += 18;
       }
 
-      // ALTAS
+      // ALTAS — grupos com highs + individuais altos
       if (highs.length > 0) {
         execEnsure(36);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fff7f0").fill();
@@ -321,25 +347,17 @@ async function buildExecutiveReport(
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
            );
         y += 24;
-        groupByTheme(highs).forEach(({ theme, count, examples }) => {
-          const enriched = enrichFinding(examples[0].description || examples[0].cveId, examples[0].cveId);
-          const summary  = count > 1
-            ? `${theme} (${count} ocorrências): ${enriched.text}`
-            : enriched.text;
-          const tH = doc.fontSize(8).font("Helvetica").heightOfString(summary, { width: CONTENT_W - 28 });
-          execEnsure(tH + 14);
-          doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(C.danger).fill();
-          doc.fontSize(8).font("Helvetica").fillColor(C.text)
-             .text(summary, MARGIN + 22, y, { width: CONTENT_W - 26 });
-          y += tH + 10;
-        });
+        rcaResult.groups.filter(g => g.counts.high > 0)
+          .forEach(g => drawExecGroup(g, C.danger, "high"));
+        rcaResult.individuals.filter(i => i.severity === "high")
+          .forEach(v => drawExecIndividual(v, C.danger));
         execEnsure(14);
         doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
         y += 18;
       }
 
-      // MÉDIAS
+      // MÉDIAS — grupos com mediums + parágrafo para individuais
       if (mediums.length > 0) {
         execEnsure(50);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fffbeb").fill();
@@ -350,12 +368,18 @@ async function buildExecutiveReport(
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
            );
         y += 24;
-        const medSummary = buildMediumSummary(mediums);
-        const mH = doc.fontSize(8).font("Helvetica").heightOfString(medSummary, { width: CONTENT_W - 28 });
-        execEnsure(mH + 28);
-        doc.fontSize(8).font("Helvetica").fillColor(C.text)
-           .text(medSummary, MARGIN + 22, y, { width: CONTENT_W - 26 });
-        y += mH + 8;
+        rcaResult.groups.filter(g => g.counts.medium > 0)
+          .forEach(g => drawExecGroup(g, C.warning, "medium"));
+        const medIndividuals = rcaResult.individuals.filter(i => i.severity === "medium");
+        if (medIndividuals.length > 0) {
+          const medSummary = buildMediumIndividualsSummary(medIndividuals);
+          const mH = doc.fontSize(8).font("Helvetica").heightOfString(medSummary, { width: CONTENT_W - 28 });
+          execEnsure(mH + 28);
+          doc.fontSize(8).font("Helvetica").fillColor(C.text)
+             .text(medSummary, MARGIN + 22, y, { width: CONTENT_W - 26 });
+          y += mH + 8;
+        }
+        execEnsure(14);
         doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
            .text(
              "→ Listagem individual de cada vulnerabilidade no Relatório Técnico.",
@@ -492,9 +516,7 @@ export function enrichFinding(raw: string, cveId?: string): { critical: boolean;
   return { critical: isCritical, text: raw };
 }
 
-// TODO(getVulnTheme): os padrões /telnet/ e /:23\b/ em getVulnTheme são uma família
-// diferente (determinam apenas CATEGORIA, não reescrevem texto) — não causam o mesmo
-// bug mas merecem revisão separada se produzirem categorias erradas em CVEs futuros.
+
 
 // ---------------------------------------------------------------------------
 // DNS record examples for email-related vulnerabilities
@@ -644,6 +666,47 @@ async function buildTechnicalReport(
     y = 90;
 
     y = drawSectionTitle(doc, `Vulnerabilidades Encontradas (${vulns.length})`, y);
+
+    // ── Resumo por Causa Raiz (síntese antes da lista individual) ─────────
+    if (vulns.length > 0) {
+      const techRca = aggregateByRootCause(vulns, openPorts);
+      if (techRca.groups.length > 0) {
+        doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
+           .text("Resumo por causa raiz:", MARGIN, y);
+        y += 14;
+        techRca.groups.forEach((g) => {
+          const line = `${g.service}${g.version ? ` ${g.version}` : ""}${g.port !== null ? ` (porto ${g.port})` : ""}: ` +
+            `${g.counts.total} CVEs — ` +
+            [
+              g.counts.critical > 0 ? `${g.counts.critical} crít.` : "",
+              g.counts.high     > 0 ? `${g.counts.high} alt.`      : "",
+              g.counts.medium   > 0 ? `${g.counts.medium} méd.`    : "",
+              g.counts.low      > 0 ? `${g.counts.low} baixa${g.counts.low !== 1 ? "s" : ""}` : "",
+            ].filter(Boolean).join(" · ");
+          const lH = doc.fontSize(7.5).font("Helvetica").heightOfString(line, { width: CONTENT_W - 16 });
+          if (y + lH > 760) {
+            drawRunningFooter(doc, 3);
+            doc.addPage({ size: "A4", margin: 0 });
+            drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
+            y = 90;
+          }
+          doc.rect(MARGIN, y + 2, 3, lH).fillColor(severityColor(g.topSeverity)).fill();
+          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+             .text(line, MARGIN + 8, y, { width: CONTENT_W - 12 });
+          y += lH + 4;
+        });
+        if (techRca.individuals.length > 0) {
+          const indLine = `${techRca.individuals.length} finding${techRca.individuals.length !== 1 ? "s" : ""} individual${techRca.individuals.length !== 1 ? "is" : ""} (sintéticos de configuração e serviços isolados)`;
+          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+             .text(indLine, MARGIN + 8, y, { width: CONTENT_W - 12 });
+          y += 14;
+        }
+        doc.moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y)
+           .strokeColor(C.border).lineWidth(0.4).stroke();
+        y += 12;
+      }
+    }
+
     if (vulns.length > 0) {
       const sorted = [...vulns].sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
       let pageNum = 3;
@@ -1088,61 +1151,8 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
   return y + h + 10;
 }
 
-// ---------------------------------------------------------------------------
-// Vulnerability theme classification for executive grouping
-// ---------------------------------------------------------------------------
-
-interface ThemeGroup { theme: string; count: number; examples: PdfVuln[] }
-
-function getVulnTheme(v: PdfVuln): string {
-  const s = `${v.cveId} ${v.affectedComponent} ${v.description}`.toLowerCase();
-  if (/spf|dmarc|dkim/i.test(s))                                        return "Segurança de Email (DNS)";
-  if (/tls|ssl|cert|cipher|nis2-tls/i.test(s))                          return "Configuração TLS/SSL";
-  if (/ssh|nis2-ssh/i.test(s))                                           return "Acesso Remoto SSH";
-  if (/header|csp|hsts|x-frame|referrer|content.type|nis2-header/i.test(s)) return "Cabeçalhos de Segurança HTTP";
-  if (/mongo|mysql|postgres|redis|mssql|27017|3306|5432|6379|1433/i.test(s)) return "Base de Dados Exposta";
-  if (/rdp|3389|remote.desktop/i.test(s))                               return "Acesso Remoto Windows (RDP)";
-  if (/\bftp\b|:21\b|telnet|:23\b/i.test(s))                            return "Protocolo Inseguro";
-  return "Software com Vulnerabilidades Conhecidas";
-}
-
-function groupByTheme(vulnList: PdfVuln[]): ThemeGroup[] {
-  const map = new Map<string, PdfVuln[]>();
-  for (const v of vulnList) {
-    const t = getVulnTheme(v);
-    if (!map.has(t)) map.set(t, []);
-    map.get(t)!.push(v);
-  }
-  return [...map.entries()]
-    .map(([theme, examples]) => ({ theme, count: examples.length, examples }))
-    .sort((a, b) => b.count - a.count);
-}
-
-function buildMediumSummary(mediums: PdfVuln[]): string {
-  const themes = groupByTheme(mediums);
-  const topTwo = themes.slice(0, 2).map(t => t.theme.toLowerCase());
-  const nature = topTwo.length === 1
-    ? `maioritariamente relacionadas com ${topTwo[0]}`
-    : `principalmente relacionadas com ${topTwo[0]} e ${topTwo[1]}`;
-
-  const hasCves   = mediums.some(v => /^CVE-/i.test(v.cveId));
-  const hasConfig = mediums.some(v => !/^CVE-/i.test(v.cveId));
-  const effort    = hasCves && hasConfig
-    ? "baixo a médio — combinação de actualizações de software e ajustes de configuração"
-    : hasCves
-      ? "baixo — actualizações de software e aplicação de patches disponíveis"
-      : "baixo — ajustes de configuração nos sistemas afectados";
-
-  const n = mediums.length;
-  return (
-    `${n} vulnerabilidade${n > 1 ? "s" : ""} de severidade média detectada${n > 1 ? "s" : ""}, ` +
-    `${nature}. ` +
-    `O nível de risco é moderado — não representam exposição imediata, mas aumentam a superfície de ataque ` +
-    `caso não sejam corrigidas. ` +
-    `Esforço de correcção estimado: ${effort}. ` +
-    `Resolução recomendada no prazo de 30 dias.`
-  );
-}
+// groupByTheme, getVulnTheme, buildMediumSummary removidos em 0.6:
+// substituídos por aggregateByRootCause (root-cause-aggregation.ts)
 
 // ---------------------------------------------------------------------------
 // Next steps builder
