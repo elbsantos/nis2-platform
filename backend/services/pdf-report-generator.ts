@@ -322,6 +322,42 @@ async function buildExecutiveReport(
       execEnsure(60);
       y = drawSectionTitle(doc, "Riscos Identificados por Severidade", y);
 
+      // Grupos multi-severidade aparecem em várias secções.
+      // Regra: 1ª ocorrência = bloco completo; ocorrências seguintes = linha compacta.
+      const renderedGroups = new Set<string>();
+      const topSevSection: Record<string, string> = {
+        critical: "CRÍTICAS", high: "ALTAS", medium: "MÉDIAS", low: "BAIXAS",
+      };
+
+      // Linha compacta para 2ª+ ocorrência do mesmo grupo.
+      const drawExecGroupCompact = (group: RootCauseGroup, sColor: string, sev: "critical" | "high" | "medium" | "low") => {
+        const secCount = group.counts[sev];
+        const secSingular: Record<string, string> = { critical: "crítica", high: "alta", medium: "média", low: "baixa" };
+        const secPlural:   Record<string, string> = { critical: "críticas", high: "altas", medium: "médias", low: "baixas" };
+        const sevLbl = secCount === 1 ? secSingular[sev] : secPlural[sev];
+        const sshT = group.service.match(/^SSH \(OpenSSH_(\S+)/i);
+        const dTitle = sshT
+          ? `Software OpenSSH ${sshT[1]} desatualizado${group.port !== null ? ` (porto ${group.port})` : ""}`
+          : group.title;
+        const cLine = `${dTitle} — ${secCount} ${sevLbl} (${group.counts.total} no total) — ver secção ${topSevSection[group.topSeverity]}`;
+        const cH = doc.fontSize(8).font("Helvetica").heightOfString(cLine, { width: CONTENT_W - 28 });
+        execEnsure(cH + 14);
+        doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(sColor).fill();
+        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+           .text(cLine, MARGIN + 22, y, { width: CONTENT_W - 26 });
+        y += cH + 10;
+      };
+
+      // Wrapper: bloco completo na 1ª ocorrência, compacto nas seguintes.
+      const drawGroup = (group: RootCauseGroup, sColor: string, sev: "critical" | "high" | "medium" | "low") => {
+        if (renderedGroups.has(group.key)) {
+          drawExecGroupCompact(group, sColor, sev);
+        } else {
+          renderedGroups.add(group.key);
+          drawExecGroup(group, sColor, sev);
+        }
+      };
+
       // CRÍTICAS — grupos com criticals + individuais críticos
       if (criticals.length > 0) {
         execEnsure(36);
@@ -334,7 +370,7 @@ async function buildExecutiveReport(
            );
         y += 24;
         rcaResult.groups.filter(g => g.counts.critical > 0)
-          .forEach(g => drawExecGroup(g, C.critical, "critical"));
+          .forEach(g => drawGroup(g, C.critical, "critical"));
         rcaResult.individuals.filter(i => i.severity === "critical")
           .forEach(v => drawExecIndividual(v, C.critical));
         execEnsure(14);
@@ -355,7 +391,7 @@ async function buildExecutiveReport(
            );
         y += 24;
         rcaResult.groups.filter(g => g.counts.high > 0)
-          .forEach(g => drawExecGroup(g, C.danger, "high"));
+          .forEach(g => drawGroup(g, C.danger, "high"));
         rcaResult.individuals.filter(i => i.severity === "high")
           .forEach(v => drawExecIndividual(v, C.danger));
         execEnsure(14);
@@ -376,7 +412,7 @@ async function buildExecutiveReport(
            );
         y += 24;
         rcaResult.groups.filter(g => g.counts.medium > 0)
-          .forEach(g => drawExecGroup(g, C.warning, "medium"));
+          .forEach(g => drawGroup(g, C.warning, "medium"));
         const medIndividuals = rcaResult.individuals.filter(i => i.severity === "medium");
         if (medIndividuals.length > 0) {
           const medSummary = buildMediumIndividualsSummary(medIndividuals);
@@ -407,7 +443,7 @@ async function buildExecutiveReport(
            );
         y += 24;
         rcaResult.groups.filter(g => g.counts.low > 0)
-          .forEach(g => drawExecGroup(g, C.success, "low"));
+          .forEach(g => drawGroup(g, C.success, "low"));
         rcaResult.individuals.filter(i => i.severity === "low")
           .forEach(v => drawExecIndividual(v, C.success));
         execEnsure(14);
