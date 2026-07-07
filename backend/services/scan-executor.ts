@@ -883,7 +883,9 @@ export async function executeAgentlessScan(
         // Sem isto, a tabela de portos filtra exposedPorts = cves.length > 0
         // e porta 22 aparece limpa mesmo com CVEs SSH na lista de vulnerabilidades.
         if (sshResult.vulns.length > 0 && port22) {
-          const sshCveIds = sshResult.vulns.map((v) => v.cveId);
+          const sshCveIds = sshResult.vulns
+            .filter((v) => !v.cveId.startsWith("NIS2-"))
+            .map((v) => v.cveId);
           port22.cves = [...new Set([...port22.cves, ...sshCveIds])];
         }
       }

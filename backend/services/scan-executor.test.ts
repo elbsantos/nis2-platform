@@ -274,6 +274,60 @@ describe("executeAgentlessScan", () => {
     expect(sshVuln?.nis2Articles).toContain("Art. 21(2)(i)");
   });
 
+  it("port22.cves contém apenas CVEs reais — NIS2-SSH-OUTDATED não é propagado para port.cves", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4",
+      hostnames: [],
+      tags: [],
+      cpes: [],
+      vulns: [],
+      ports: [{ port: 22, transport: "tcp" }],
+    });
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "1.2.3.4", services: [], tlsIssues: [] });
+
+    // 4 CVEs reais + 1 sintético — reproduz OpenSSH 6.6.1 no scanme
+    vi.mocked(checkSsh).mockResolvedValue({
+      port: 22,
+      banner: "SSH-2.0-OpenSSH_6.6.1p1",
+      software: "OpenSSH_6.6.1p1",
+      version: "6.6.1",
+      vulns: [
+        { cveId: "CVE-2023-51385", cvssScore: 9.8, severity: "critical" as const, description: "d1", nis2Articles: ["Art. 21(2)(i)"], cisControls: [], iso27001Controls: [], nistCsfControls: [], remediationHint: "" },
+        { cveId: "CVE-2021-41617", cvssScore: 7.0, severity: "high"     as const, description: "d2", nis2Articles: ["Art. 21(2)(i)"], cisControls: [], iso27001Controls: [], nistCsfControls: [], remediationHint: "" },
+        { cveId: "CVE-2018-15473", cvssScore: 5.3, severity: "medium"   as const, description: "d3", nis2Articles: ["Art. 21(2)(i)"], cisControls: [], iso27001Controls: [], nistCsfControls: [], remediationHint: "" },
+        { cveId: "CVE-2016-0777",  cvssScore: 8.1, severity: "high"     as const, description: "d4", nis2Articles: ["Art. 21(2)(i)"], cisControls: [], iso27001Controls: [], nistCsfControls: [], remediationHint: "" },
+        // sintético — NÃO deve entrar em port22.cves
+        { cveId: "NIS2-SSH-OUTDATED", cvssScore: 7.5, severity: "high"  as const, description: "OpenSSH 6.6.1 desactualizado", nis2Articles: ["Art. 21(2)(i)"], cisControls: [], iso27001Controls: [], nistCsfControls: [], remediationHint: "" },
+      ],
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1,
+      organizationId: 1,
+      target: "example.com",
+      mode: "sme",
+    });
+
+    expect(result.success).toBe(true);
+
+    const port22 = result.openPorts.find((p) => p.port === 22);
+    expect(port22).toBeDefined();
+
+    // Tabela de portos conta apenas os 4 CVEs reais
+    expect(port22!.cves).toHaveLength(4);
+    expect(port22!.cves).not.toContain("NIS2-SSH-OUTDATED");
+    expect(port22!.cves).toContain("CVE-2023-51385");
+    expect(port22!.cves).toContain("CVE-2021-41617");
+    expect(port22!.cves).toContain("CVE-2018-15473");
+    expect(port22!.cves).toContain("CVE-2016-0777");
+
+    // Sintético continua presente no pipeline de findings
+    const outdated = result.vulnerabilities.find((v) => v.cveId === "NIS2-SSH-OUTDATED");
+    expect(outdated).toBeDefined();
+  });
+
   it("enriquece porto 80 com banner Server e CVEs via CPE quando InternetDB nao tem versao", async () => {
     vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
 
