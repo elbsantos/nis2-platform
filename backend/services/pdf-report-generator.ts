@@ -283,8 +283,14 @@ async function buildExecutiveReport(
     // Mostra a contagem da secção e o total do grupo para contexto.
     const drawExecGroup = (group: RootCauseGroup, sColor: string, sev: "critical" | "high" | "medium" | "low") => {
       const secCount = group.counts[sev];
-      const secLabels: Record<string, string> = { critical: "críticas", high: "altas", medium: "médias", low: "baixas" };
-      const titleLine = `${group.title} — ${secCount} ${secLabels[sev]} (${group.counts.total} no total)`;
+      const secSingular: Record<string, string> = { critical: "crítica",  high: "alta",  medium: "média",  low: "baixa"  };
+      const secPlural:   Record<string, string> = { critical: "críticas", high: "altas", medium: "médias", low: "baixas" };
+      const sevLbl = secCount === 1 ? secSingular[sev] : secPlural[sev];
+      const sshTitle = group.service.match(/^SSH \(OpenSSH_(\S+)/i);
+      const displayTitle = sshTitle
+        ? `Software OpenSSH ${sshTitle[1]} desatualizado${group.port !== null ? ` (porto ${group.port})` : ""}`
+        : group.title;
+      const titleLine = `${displayTitle} — ${secCount} ${sevLbl} (${group.counts.total} no total)`;
       const titleH   = doc.fontSize(8).font("Helvetica-Bold").heightOfString(titleLine,     { width: CONTENT_W - 28 });
       const summaryH = doc.fontSize(8).font("Helvetica")     .heightOfString(group.summary, { width: CONTENT_W - 28 });
       const actionH  = doc.fontSize(7.5).font("Helvetica")   .heightOfString(`→ ${group.action}`, { width: CONTENT_W - 28 });
@@ -697,7 +703,10 @@ async function buildTechnicalReport(
            .text("Resumo por causa raiz:", MARGIN, y);
         y += 14;
         techRca.groups.forEach((g) => {
-          const line = `${g.service}${g.version ? ` ${g.version}` : ""}${g.port !== null ? ` (porto ${g.port})` : ""}: ` +
+          const sshM = g.service.match(/^SSH \(OpenSSH_(\S+)/i);
+          const dispSvc = sshM ? `OpenSSH ${sshM[1]}` : g.service;
+          const dispVer = sshM ? null : g.version;
+          const line = `${dispSvc}${dispVer ? ` ${dispVer}` : ""}${g.port !== null ? ` (porto ${g.port})` : ""}: ` +
             `${g.counts.total} CVEs — ` +
             [
               g.counts.critical > 0 ? `${g.counts.critical} crít.` : "",
@@ -718,7 +727,7 @@ async function buildTechnicalReport(
           y += lH + 4;
         });
         if (techRca.individuals.length > 0) {
-          const indLine = `${techRca.individuals.length} finding${techRca.individuals.length !== 1 ? "s" : ""} individual${techRca.individuals.length !== 1 ? "is" : ""} (sintéticos de configuração e serviços isolados)`;
+          const indLine = `${techRca.individuals.length} finding${techRca.individuals.length !== 1 ? "s" : ""} individu${techRca.individuals.length !== 1 ? "ais" : "al"} (sintéticos de configuração e serviços isolados)`;
           doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
              .text(indLine, MARGIN + 8, y, { width: CONTENT_W - 12 });
           y += 14;
