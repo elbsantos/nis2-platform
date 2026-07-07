@@ -341,7 +341,7 @@ function tlsIssueToVulnFinding(tls: TlsIssueFinding): VulnFinding {
   return {
     cveId,
     cvssScore,
-    severity: tls.severity,
+    severity: (cvssScore >= 9 ? "critical" : cvssScore >= 7 ? "high" : cvssScore >= 4 ? "medium" : "low") as VulnFinding["severity"],
     description: issue,
     affectedService: "tls",
     port,

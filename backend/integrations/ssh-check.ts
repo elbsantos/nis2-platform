@@ -102,7 +102,7 @@ const OPENSSH_RULES: VulnRule[] = [
     maxVersion: "9.8",
     minVersion: "8.5",
     cvssScore: 8.1,
-    severity: "critical",
+    severity: "high",
     description:
       'OpenSSH "regreSSHion" (CVE-2024-6387) — race condition no signal handler permite execução remota de código não autenticado em servidores Linux com glibc. Afecta OpenSSH 8.5p1–9.7p1.',
     nis2Articles: ["Art. 21(2)(i)"],  // RCE SSH → controlo de acessos (i)
