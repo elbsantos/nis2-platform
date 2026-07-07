@@ -277,6 +277,7 @@ async function buildExecutiveReport(
     const criticals = vulns.filter(v => v.severity === "critical");
     const highs     = vulns.filter(v => v.severity === "high");
     const mediums   = vulns.filter(v => v.severity === "medium");
+    const lows      = vulns.filter(v => v.severity === "low");
 
     // Renderiza um grupo de causa raiz numa secção de severidade específica.
     // Mostra a contagem da secção e o total do grupo para contexto.
@@ -385,6 +386,27 @@ async function buildExecutiveReport(
              "→ Listagem individual de cada vulnerabilidade no Relatório Técnico.",
              MARGIN + 22, y
            );
+        y += 18;
+      }
+
+      // BAIXAS — grupos com lows + individuais baixos
+      if (lows.length > 0) {
+        execEnsure(36);
+        doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#f0fdf4").fill();
+        doc.rect(MARGIN, y, 4, 22).fillColor(C.success).fill();
+        doc.fontSize(9).font("Helvetica-Bold").fillColor("#166534")
+           .text(
+             `BAIXAS (${lows.length}) — Resolução recomendada em 90 dias`,
+             MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
+           );
+        y += 24;
+        rcaResult.groups.filter(g => g.counts.low > 0)
+          .forEach(g => drawExecGroup(g, C.success, "low"));
+        rcaResult.individuals.filter(i => i.severity === "low")
+          .forEach(v => drawExecIndividual(v, C.success));
+        execEnsure(14);
+        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+           .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
         y += 18;
       }
 

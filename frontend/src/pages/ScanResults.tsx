@@ -126,6 +126,7 @@ export default function ScanResults() {
   const critical  = results?.criticalCount ?? 0;
   const high      = results?.highCount ?? 0;
   const medium    = results?.mediumCount ?? 0;
+  const low       = results?.lowCount ?? 0;
 
   return (
     <div className="min-h-screen bg-[#0f1e38]">
@@ -148,12 +149,13 @@ export default function ScanResults() {
           </div>
         </div>
 
-        {/* Summary cards — 5 colunas: total + 3 severidades + duração */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {/* Summary cards — 6 colunas: total + 4 severidades + duração */}
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
           <SummaryCard label="Vulnerabilidades" value={String(vulnCount)} accent={vulnCount > 0} />
           <SummaryCard label="Críticas" value={String(critical)} accent={critical > 0} danger />
           <SummaryCard label="Altas"    value={String(high)}     accent={high > 0}     warn />
           <SummaryCard label="Médias"   value={String(medium)}   accent={medium > 0}   mediumSev />
+          <SummaryCard label="Baixas"   value={String(low)}      accent={low > 0}      lowSev />
           <SummaryCard label="Duração"  value={scan.completedAt ? elapsedLabel(scan.startedAt, scan.completedAt) : "—"} />
         </div>
 
@@ -265,13 +267,14 @@ function Spinner({ size = "md" }: { size?: "md" | "lg" }) {
 }
 
 function SummaryCard({
-  label, value, accent = false, danger = false, warn = false, mediumSev = false,
+  label, value, accent = false, danger = false, warn = false, mediumSev = false, lowSev = false,
 }: {
-  label: string; value: string; accent?: boolean; danger?: boolean; warn?: boolean; mediumSev?: boolean;
+  label: string; value: string; accent?: boolean; danger?: boolean; warn?: boolean; mediumSev?: boolean; lowSev?: boolean;
 }) {
   const color = danger && accent    ? "text-red-400"
     : warn && accent       ? "text-orange-400"
     : mediumSev && accent  ? "text-yellow-400"
+    : lowSev && accent     ? "text-blue-400"
     : accent               ? "text-amber-400"
     : "text-white";
   return (
