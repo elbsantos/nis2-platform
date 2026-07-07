@@ -625,16 +625,16 @@ async function buildTechnicalReport(
     y += 14;
 
     // openPorts.cves já foi filtrado pelo scan-executor (apenas CVEs NVD-confirmados).
-    // Porta exposta = tem pelo menos um CVE confirmado.
-    const exposedPorts = openPorts.filter(p => (p.cves ?? []).length > 0);
-    const cleanCount   = openPorts.length - exposedPorts.length;
+    // Mostrar TODOS os portos: badge vermelho com contagem para os que têm CVEs; "—" para os limpos.
+    const withCvesCount    = openPorts.filter(p => (p.cves ?? []).length > 0).length;
+    const withoutCvesCount = openPorts.length - withCvesCount;
 
-    y = drawSectionTitle(doc, "Portos com Vulnerabilidades Conhecidas", y);
-    if (exposedPorts.length > 0) {
+    y = drawSectionTitle(doc, "Portos Analisados", y);
+    if (openPorts.length > 0) {
       // Summary line
       doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
          .text(
-           `${openPorts.length} porta(s) analisada(s) · ${cleanCount} sem CVEs conhecidas (ocultadas) · ${exposedPorts.length} com vulnerabilidades listadas abaixo.`,
+           `${openPorts.length} porta(s) analisada(s) · ${withCvesCount} com vulnerabilidades · ${withoutCvesCount} sem CVEs conhecidos.`,
            MARGIN, y + 1, { width: CONTENT_W }
          );
       y += 16;
@@ -647,7 +647,7 @@ async function buildTechnicalReport(
       doc.text("Produto / Versão", MARGIN + 230, y + 5, { width: 160 });
       doc.text("CVEs",             MARGIN + 395, y + 5, { width: 60, align: "center" });
       y += 18;
-      exposedPorts.slice(0, 20).forEach((p, i) => {
+      openPorts.slice(0, 20).forEach((p, i) => {
         if (y > 730) { doc.addPage({ size: "A4", margin: 0 }); drawRunningHeader(doc, scan?.target ?? "—", "Técnico"); y = 90; }
         const rowBg = i % 2 === 0 ? C.bg : C.white;
         doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
@@ -658,21 +658,21 @@ async function buildTechnicalReport(
         doc.fillColor(C.text).text(p.service, MARGIN + 125, y + 5, { width: 100 });
         doc.fillColor(C.muted).text(truncate(`${p.product ?? ""} ${p.version ?? ""}`.trim() || "—", 35), MARGIN + 230, y + 5, { width: 160 });
         const cveCount = (p.cves ?? []).length;
-        doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
-           .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
+        if (cveCount > 0) {
+          doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
+          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
+             .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
+        } else {
+          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+             .text("—", MARGIN + 398, y + 6, { width: 48, align: "center" });
+        }
         y += 18;
       });
-      if (exposedPorts.length > 20) {
+      if (openPorts.length > 20) {
         doc.fontSize(8).font("Helvetica").fillColor(C.muted)
-           .text(`+ ${exposedPorts.length - 20} porto(s) com CVEs adicionais — ver detalhe completo na plataforma.`, MARGIN, y + 4);
+           .text(`+ ${openPorts.length - 20} porto(s) adicionais — ver detalhe completo na plataforma.`, MARGIN, y + 4);
         y += 18;
       }
-    } else if (openPorts.length > 0) {
-      doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
-      doc.fontSize(9).font("Helvetica").fillColor(C.success)
-         .text(`✓ ${openPorts.length} porta(s) analisada(s) — nenhuma com CVEs conhecidas.`, MARGIN + 10, y + 10);
-      y += 30;
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
       doc.fontSize(9).font("Helvetica").fillColor(C.success)
