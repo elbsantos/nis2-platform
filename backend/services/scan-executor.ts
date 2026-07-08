@@ -92,6 +92,7 @@ export interface VulnFinding {
 export interface TlsIssueFinding {
   port: number;
   issue: string;
+  cvssScore: number;
   severity: "critical" | "high" | "medium";
   nis2Article: "Art. 21(2)(h)";
 }
@@ -336,7 +337,7 @@ function tlsIssueToVulnFinding(tls: TlsIssueFinding): VulnFinding {
   }
 
   const cveId = `NIS2-TLS-${port}-${slug}`;
-  const cvssScore = tls.severity === "critical" ? 8.0 : tls.severity === "high" ? 6.5 : 5.0;
+  const cvssScore = tls.cvssScore;
   const nis2 = [tls.nis2Article] as string[];
 
   return {
@@ -659,6 +660,7 @@ export async function executeAgentlessScan(
     const directTlsIssues: TlsIssueFinding[] = (directTls?.tlsIssues ?? []).map((i) => ({
       port: 443,
       issue: i.issue,
+      cvssScore: i.cvssScore,
       severity: i.severity,
       nis2Article: i.nis2Article,
     }));

@@ -32,6 +32,7 @@ export interface DirectTlsCertificate {
 
 export interface DirectTlsIssue {
   issue: string;
+  cvssScore: number;
   severity: "critical" | "high" | "medium";
   nis2Article: "Art. 21(2)(h)";
 }
@@ -206,18 +207,21 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
         if (daysUntilExpiry < 0) {
           result.tlsIssues.push({
             issue: `Certificado TLS expirado há ${Math.abs(daysUntilExpiry)} dias (${validTo.toLocaleDateString("pt-PT")})`,
+            cvssScore: 8.0,
             severity: "critical",
             nis2Article: "Art. 21(2)(h)",
           });
         } else if (daysUntilExpiry < 7) {
           result.tlsIssues.push({
             issue: `Certificado TLS expira em ${daysUntilExpiry} dias — renovação urgente`,
+            cvssScore: 8.0,
             severity: "critical",
             nis2Article: "Art. 21(2)(h)",
           });
         } else if (daysUntilExpiry < 30) {
           result.tlsIssues.push({
             issue: `Certificado TLS expira em ${daysUntilExpiry} dias (${validTo.toLocaleDateString("pt-PT")})`,
+            cvssScore: 6.5,
             severity: "high",
             nis2Article: "Art. 21(2)(h)",
           });
@@ -226,6 +230,7 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
         if (isSelfSigned) {
           result.tlsIssues.push({
             issue: "Certificado TLS auto-assinado — browsers e clientes não confiam automaticamente",
+            cvssScore: 7.4,
             severity: "high",
             nis2Article: "Art. 21(2)(h)",
           });
@@ -234,6 +239,7 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
         if (/TLSv1\.0|TLSv1\.1|SSLv2|SSLv3/.test(protocol)) {
           result.tlsIssues.push({
             issue: `Protocolo TLS obsoleto "${protocol}" — vulnerável a BEAST/POODLE/DROWN`,
+            cvssScore: 7.4,
             severity: "high",
             nis2Article: "Art. 21(2)(h)",
           });
@@ -243,6 +249,7 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
         if (/RC4|DES|3DES|EXPORT|NULL|anon/i.test(cipherName)) {
           result.tlsIssues.push({
             issue: `Cifra fraca "${cipherName}" — dados em trânsito podem ser decifrados`,
+            cvssScore: 7.5,
             severity: "high",
             nis2Article: "Art. 21(2)(h)",
           });
@@ -283,6 +290,7 @@ export async function checkDirectTls(domain: string): Promise<DirectTlsResult> {
       tlsIssues: [
         {
           issue: "Porto 443 (HTTPS) não acessível — sem encriptação TLS",
+          cvssScore: 8.0,
           severity: "critical",
           nis2Article: "Art. 21(2)(h)",
         },

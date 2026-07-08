@@ -56,6 +56,7 @@ export interface CensysHostResult {
 export interface TlsIssue {
   port: number;
   issue: string;
+  cvssScore: number;
   nis2Article: "Art. 21(2)(h)";
   severity: "critical" | "high" | "medium";
 }
@@ -109,6 +110,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
       issues.push({
         port: svc.port,
         issue: `Certificado TLS expirado no porto ${svc.port}`,
+        cvssScore: 8.0,
         nis2Article: "Art. 21(2)(h)",
         severity: "critical",
       });
@@ -118,6 +120,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
       issues.push({
         port: svc.port,
         issue: `Certificado auto-assinado no porto ${svc.port} — não é de confiança para clientes`,
+        cvssScore: 7.4,
         nis2Article: "Art. 21(2)(h)",
         severity: "high",
       });
@@ -127,6 +130,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
       issues.push({
         port: svc.port,
         issue: `Cifra fraca "${cipher}" activa no porto ${svc.port}`,
+        cvssScore: 7.5,
         nis2Article: "Art. 21(2)(h)",
         severity: "high",
       });
@@ -136,6 +140,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
       issues.push({
         port: svc.port,
         issue: `Protocolo obsoleto "${tlsVersion}" no porto ${svc.port} — vulnerável a ataques BEAST/POODLE`,
+        cvssScore: 7.4,
         nis2Article: "Art. 21(2)(h)",
         severity: "high",
       });
