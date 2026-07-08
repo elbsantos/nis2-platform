@@ -7,6 +7,7 @@
  */
 
 import net from "net";
+import { cvssToSeverity } from "../utils/cvss";
 import { getCisControls } from "../utils/cis-mapping";
 import { getIso27001Controls, getNistCsfControls } from "../utils/framework-mapping";
 
@@ -90,7 +91,6 @@ interface VulnRule {
   maxVersion: string;   // afecta OpenSSH < maxVersion
   minVersion?: string;  // só se versão >= minVersion (para regressões)
   cvssScore: number;
-  severity: "critical" | "high" | "medium" | "low";
   description: string;
   nis2Articles: string[];
   remediationHint: string;
@@ -102,27 +102,24 @@ const OPENSSH_RULES: VulnRule[] = [
     maxVersion: "9.8",
     minVersion: "8.5",
     cvssScore: 8.1,
-    severity: "high",
     description:
       'OpenSSH "regreSSHion" (CVE-2024-6387) — race condition no signal handler permite execução remota de código não autenticado em servidores Linux com glibc. Afecta OpenSSH 8.5p1–9.7p1.',
-    nis2Articles: ["Art. 21(2)(i)"],  // RCE SSH → controlo de acessos (i)
+    nis2Articles: ["Art. 21(2)(i)"],
     remediationHint: "Actualiza OpenSSH para versão 9.8p1 ou superior.",
   },
   {
     cveId: "CVE-2023-51385",
     maxVersion: "9.6",
     cvssScore: 9.8,
-    severity: "critical",
     description:
       "OpenSSH < 9.6 — injecção de comandos OS via hostname controlado pelo utilizador em configurações ProxyCommand/ssh_config com expansão de tokens.",
-    nis2Articles: ["Art. 21(2)(i)"],  // command injection SSH → controlo de acessos (i)
+    nis2Articles: ["Art. 21(2)(i)"],
     remediationHint: "Actualiza OpenSSH para 9.6p1 ou superior.",
   },
   {
     cveId: "CVE-2021-41617",
     maxVersion: "8.8",
     cvssScore: 7.0,
-    severity: "high",
     description:
       "OpenSSH < 8.8 — escalonamento de privilégios em sessões multiplexadas. Processos auxiliares herdam grupos incorrectos quando AuthorizedKeysCommand ou AuthorizedPrincipalsCommand estão activos.",
     nis2Articles: ["Art. 21(2)(i)"],
@@ -132,7 +129,6 @@ const OPENSSH_RULES: VulnRule[] = [
     cveId: "CVE-2018-15473",
     maxVersion: "7.7",
     cvssScore: 5.3,
-    severity: "medium",
     description:
       "OpenSSH < 7.7 — enumeração de utilizadores válidos via diferenças de tempo de resposta na autenticação por chave pública. Facilita ataques de força bruta direccionados.",
     nis2Articles: ["Art. 21(2)(i)"],
@@ -142,10 +138,9 @@ const OPENSSH_RULES: VulnRule[] = [
     cveId: "CVE-2016-0777",
     maxVersion: "7.1",
     cvssScore: 8.1,
-    severity: "high",
     description:
       "OpenSSH < 7.1p2 — a funcionalidade UseRoaming vaza conteúdo de memória do processo para servidores maliciosos, podendo expor chaves privadas SSH e outros dados sensíveis.",
-    nis2Articles: ["Art. 21(2)(i)"],  // memory leak de chaves SSH → controlo de acessos (i)
+    nis2Articles: ["Art. 21(2)(i)"],
     remediationHint: "Actualiza OpenSSH para 7.1p2 ou superior. Adiciona 'UseRoaming no' em /etc/ssh/ssh_config como medida imediata.",
   },
 ];
@@ -161,7 +156,7 @@ function buildOutdatedFinding(version: string): SshVuln | null {
   return {
     cveId,
     cvssScore: 7.5,
-    severity: "high",
+    severity: cvssToSeverity(7.5),
     description: `OpenSSH ${version} é uma versão desactualizada (anterior a 2019). Não recebe correcções de segurança activas e acumula vulnerabilidades conhecidas.`,
     nis2Articles,
     cisControls:      getCisControls(cveId, nis2Articles),
@@ -196,7 +191,7 @@ export async function checkSsh(host: string, port = 22): Promise<SshCheckResult 
           vulns.push({
             cveId:            rule.cveId,
             cvssScore:        rule.cvssScore,
-            severity:         rule.severity,
+            severity:         cvssToSeverity(rule.cvssScore),
             description:      rule.description,
             nis2Articles:     rule.nis2Articles,
             cisControls:      getCisControls(rule.cveId, rule.nis2Articles),

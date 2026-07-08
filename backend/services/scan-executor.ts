@@ -12,6 +12,7 @@ import type { DirectTlsResult } from "../integrations/direct-tls";
 import type { EmailSecurityResult } from "../integrations/email-security";
 import type { HttpHeadersResult } from "../integrations/http-headers";
 import type { DarkWebResult } from "../integrations/dark-web";
+import { cvssToSeverity } from "../utils/cvss";
 import { getCisControls } from "../utils/cis-mapping";
 import { getIso27001Controls, getNistCsfControls } from "../utils/framework-mapping";
 import { batchLookupCveVersionRanges, isVersionInNvdRanges } from "../integrations/nvd";
@@ -341,7 +342,7 @@ function tlsIssueToVulnFinding(tls: TlsIssueFinding): VulnFinding {
   return {
     cveId,
     cvssScore,
-    severity: (cvssScore >= 9 ? "critical" : cvssScore >= 7 ? "high" : cvssScore >= 4 ? "medium" : "low") as VulnFinding["severity"],
+    severity: cvssToSeverity(cvssScore),
     description: issue,
     affectedService: "tls",
     port,
@@ -689,7 +690,7 @@ export async function executeAgentlessScan(
         vulns.push({
           cveId: "NIS2-SVC-UNKNOWN",
           cvssScore: 5.0,
-          severity: "medium",
+          severity: cvssToSeverity(5.0),
           description: `${svcName} (porto ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`,
           affectedService: portFinding.service,
           nis2Articles: nis2Unknown,
@@ -822,7 +823,7 @@ export async function executeAgentlessScan(
       vulns.push({
         cveId: "NIS2-TLS-001",
         cvssScore: 7.5,
-        severity: "high",
+        severity: cvssToSeverity(7.5),
         description: "Serviço HTTP sem HTTPS — dados transmitidos em claro",
         affectedService: "http",
         nis2Articles: tlsNis2,
@@ -854,7 +855,7 @@ export async function executeAgentlessScan(
           vulns.push({
             cveId:            sv.cveId,
             cvssScore:        sv.cvssScore,
-            severity:         sv.severity,
+            severity:         cvssToSeverity(sv.cvssScore),
             description:      sv.description,
             affectedService,
             port:             sshResult.port,
@@ -869,7 +870,7 @@ export async function executeAgentlessScan(
             scanId:           options.scanId,
             organizationId:   options.organizationId,
             cveId:            sv.cveId,
-            severity:         sv.severity,
+            severity:         cvssToSeverity(sv.cvssScore),
             cvssScore:        sv.cvssScore,
             description:      sv.description,
             affectedComponent: affectedService,
@@ -909,7 +910,7 @@ export async function executeAgentlessScan(
           vulns.push({
             cveId,
             cvssScore,
-            severity: cvssScore >= 7 ? "high" : "medium",
+            severity: cvssToSeverity(cvssScore),
             description: check.detail,
             affectedService: "email",
             nis2Articles: [check.nis2Article],
@@ -934,7 +935,7 @@ export async function executeAgentlessScan(
           vulns.push({
             cveId,
             cvssScore,
-            severity: cvssScore >= 7 ? "high" : cvssScore >= 4 ? "medium" : "low",
+            severity: cvssToSeverity(cvssScore),
             description: check.detail,
             affectedService: "http",
             nis2Articles: [check.nis2Article],
@@ -965,7 +966,7 @@ export async function executeAgentlessScan(
         vulns.push({
           cveId,
           cvssScore,
-          severity: cvssScore >= 7 ? "high" : "medium",
+          severity: cvssToSeverity(cvssScore),
           description: `Credenciais da organização expostas no breach "${breach.name}" — dados: ${breach.dataClasses.join(", ")}.`,
           affectedService: "credentials",
           nis2Articles: breachNis2,
@@ -989,7 +990,7 @@ export async function executeAgentlessScan(
           vulns.push({
             cveId,
             cvssScore: 7.0,
-            severity: "high",
+            severity: cvssToSeverity(7.0),
             description: bl.detail,
             affectedService: isIpAddress(options.target) ? "network" : "domain",
             // Lista negra = indicador de comprometimento → (i) controlo de acessos.
