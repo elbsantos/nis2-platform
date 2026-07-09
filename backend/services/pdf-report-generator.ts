@@ -21,6 +21,8 @@ import {
   type RcaVuln,
 } from "./root-cause-aggregation";
 
+const sev = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
+
 // ---------------------------------------------------------------------------
 // S3 / Hetzner Object Storage client
 // ---------------------------------------------------------------------------
@@ -646,6 +648,10 @@ async function buildTechnicalReport(
 
     // Metadata grid
     y = drawSectionTitle(doc, "Metadados do Scan", y);
+    const c = vulns.filter(v => v.severity === "critical").length;
+    const a = vulns.filter(v => v.severity === "high").length;
+    const m = vulns.filter(v => v.severity === "medium").length;
+    const b = vulns.filter(v => v.severity === "low").length;
     const metaRows = [
       ["Alvo",          scan?.target ?? "—"],
       ["Modo de scan",  scan?.mode === "sme" ? "PME / Entidade Importante" : "Cadeia de Abastecimento"],
@@ -653,7 +659,7 @@ async function buildTechnicalReport(
       ["Início",        fmtFull(scan?.startedAt)],
       ["Conclusão",     fmtFull(scan?.completedAt)],
       ["Score global",  `${overall}/100 — ${scoreLabel(overall)}${hasQuestionnaire ? " (combinado scan + questionário)" : " (scan)"}`],
-      ["Vulnerabilidades", `${vulns.length} (${vulns.filter(v => v.severity === "critical").length} críticas, ${vulns.filter(v => v.severity === "high").length} altas, ${vulns.filter(v => v.severity === "medium").length} médias)`],
+      ["Vulnerabilidades", `${vulns.length} (${sev(c,"crítica","críticas")}, ${sev(a,"alta","altas")}, ${sev(m,"média","médias")}, ${sev(b,"baixa","baixas")})`],
     ];
     metaRows.forEach(([label, val], i) => {
       const rowBg = i % 2 === 0 ? C.bg : C.white;
@@ -1112,8 +1118,8 @@ export function buildMethodologyBullets(dataSources: string[]): Array<{ label: s
       (hasNvd ? "; validação de versões e intervalos de afectação via NVD (National Vulnerability Database)." : ".");
 
   const tlsDetail = hasCensys
-    ? "Avaliação de certificados digitais e cifras TLS/SSL nas portas normalizadas (443, 8443), combinando dados Censys com verificação directa TCP/TLS."
-    : "Verificação directa TCP/TLS de certificados digitais, cifras e configurações de segurança nas portas normalizadas (443, 8443).";
+    ? "Avaliação de certificados digitais e protocolos TLS/SSL (incluindo deteção de TLS 1.0/1.1 obsoletos) nas portas normalizadas (443, 8443), combinando dados Censys com verificação directa TCP/TLS. A verificação de cifras fracas individuais (RC4/3DES) não está incluída nesta versão."
+    : "Verificação directa TCP/TLS de certificados digitais e protocolos (incluindo deteção de TLS 1.0/1.1 obsoletos) nas portas normalizadas (443, 8443). A verificação de cifras fracas individuais (RC4/3DES) não está incluída nesta versão.";
 
   return [
     { label: "Mapeamento de Perímetro",      detail: perimeterDetail },
