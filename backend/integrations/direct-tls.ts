@@ -293,6 +293,7 @@ function checkLegacyProtocol(domain: string, timeoutMs = 5_000): Promise<LegacyP
         servername: domain,
         minVersion: "TLSv1"   as tls.SecureVersion,
         maxVersion: "TLSv1.1" as tls.SecureVersion,
+        ciphers: "DEFAULT:@SECLEVEL=0",
         rejectUnauthorized: false,
         timeout: timeoutMs,
       },
