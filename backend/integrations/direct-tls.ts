@@ -301,6 +301,7 @@ function checkLegacyProtocol(domain: string, timeoutMs = 5_000): Promise<LegacyP
         // Handshake succeeded — server accepted TLS 1.0/1.1.
         const proto = s.getProtocol() ?? "";
         s.destroy();
+        console.log(`[sonda legada TLS] ${domain}: vulnerable — ${proto}`);
         settle({ status: "vulnerable", protocol: proto });
       }
     );
