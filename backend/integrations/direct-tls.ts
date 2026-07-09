@@ -266,6 +266,70 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
 }
 
 // ---------------------------------------------------------------------------
+// Legacy TLS protocol probe — separate connection offering TLSv1.0/1.1 only.
+// Node.js 18+ refuses to negotiate below TLS 1.2 in the main handshake, so
+// PROTOCOL-OBSOLETE can only be detected via a dedicated probe that explicitly
+// caps maxVersion at TLSv1.1.
+// ---------------------------------------------------------------------------
+
+type LegacyProbeResult =
+  | { status: "vulnerable"; protocol: string }  // server accepted TLS 1.0/1.1 → finding
+  | { status: "clean" }                          // server refused legacy via TLS alert → no finding
+  | { status: "inconclusive"; reason: string };  // timeout / network error → log, no finding
+
+function checkLegacyProtocol(domain: string, timeoutMs = 5_000): Promise<LegacyProbeResult> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (r: LegacyProbeResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(r);
+    };
+
+    const s = tls.connect(
+      {
+        host: domain,
+        port: 443,
+        servername: domain,
+        minVersion: "TLSv1"   as tls.SecureVersion,
+        maxVersion: "TLSv1.1" as tls.SecureVersion,
+        rejectUnauthorized: false,
+        timeout: timeoutMs,
+      },
+      () => {
+        // Handshake succeeded — server accepted TLS 1.0/1.1.
+        const proto = s.getProtocol() ?? "";
+        s.destroy();
+        settle({ status: "vulnerable", protocol: proto });
+      }
+    );
+
+    s.on("timeout", () => {
+      s.destroy();
+      settle({ status: "inconclusive", reason: `Timeout (${timeoutMs / 1000} s)` });
+    });
+
+    s.on("error", (err) => {
+      s.destroy();
+      const msg = (err as Error).message ?? "";
+      // TLS alerts that unambiguously mean "server refused our protocol offer":
+      //   alert 70 (protocol_version) — RFC 5246 §7.2: version not supported
+      //   alert 40 (handshake_failure) — no common protocol/cipher found
+      // "no protocols available" / "unsupported protocol" are EXCLUDED because they
+      // can originate from the client (local OpenSSL policy) before the server even
+      // responds — marking them "clean" would be a false negative.
+      // Everything else (ECONNRESET, ETIMEDOUT, ECONNREFUSED, client-side SSL errors)
+      // is inconclusive: could be network, firewall, or local TLS stack limitation.
+      if (/alert protocol version|alert number 70|alert handshake failure|alert number 40/i.test(msg)) {
+        settle({ status: "clean" });
+      } else {
+        settle({ status: "inconclusive", reason: msg.slice(0, 120) });
+      }
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Public API — full direct check
 // ---------------------------------------------------------------------------
 
@@ -300,7 +364,24 @@ export async function checkDirectTls(domain: string): Promise<DirectTlsResult> {
     };
   }
 
-  const tlsResult = await tlsHandshake(domain);
+  // Run main TLS handshake and legacy protocol probe in parallel (both need port 443 open).
+  const [tlsResult, legacyResult] = await Promise.all([
+    tlsHandshake(domain),
+    checkLegacyProtocol(domain),
+  ]);
+
+  if (legacyResult.status === "vulnerable") {
+    tlsResult.tlsIssues.push({
+      issue: `Protocolo TLS obsoleto "${legacyResult.protocol}" aceite pelo servidor — vulnerável a BEAST/POODLE/DROWN`,
+      cvssScore: 7.4,
+      severity: "high",
+      nis2Article: "Art. 21(2)(h)",
+    });
+  } else if (legacyResult.status === "inconclusive") {
+    console.log(`[TLS legacy probe] ${domain}: inconclusivo — ${legacyResult.reason}`);
+  }
+  // status "clean": sem finding, sem log (esperado para servidores modernos).
+
   tlsResult.ports = openPorts;
   tlsResult.cdn = cdnInfo;
   return tlsResult;
