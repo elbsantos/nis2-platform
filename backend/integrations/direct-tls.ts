@@ -238,7 +238,7 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
 
         if (/TLSv1\.0|TLSv1\.1|SSLv2|SSLv3/.test(protocol)) {
           result.tlsIssues.push({
-            issue: `Protocolo TLS obsoleto "${protocol}" — vulnerável a BEAST/POODLE/DROWN`,
+            issue: `Protocolo TLS obsoleto "${protocol}" — vulnerável a ataques contra protocolos obsoletos (ex.: BEAST em TLS 1.0)`,
             cvssScore: 7.4,
             severity: "high",
             nis2Article: "Art. 21(2)(h)",
@@ -374,7 +374,7 @@ export async function checkDirectTls(domain: string): Promise<DirectTlsResult> {
 
   if (legacyResult.status === "vulnerable") {
     tlsResult.tlsIssues.push({
-      issue: `Protocolo TLS obsoleto "${legacyResult.protocol}" aceite pelo servidor — vulnerável a BEAST/POODLE/DROWN`,
+      issue: `Protocolo TLS obsoleto "${legacyResult.protocol}" aceite pelo servidor — vulnerável a ataques contra protocolos obsoletos (ex.: BEAST em TLS 1.0)`,
       cvssScore: 7.4,
       severity: "high",
       nis2Article: "Art. 21(2)(h)",
