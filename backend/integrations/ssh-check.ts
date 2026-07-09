@@ -110,7 +110,7 @@ const OPENSSH_RULES: VulnRule[] = [
   {
     cveId: "CVE-2023-51385",
     maxVersion: "9.6",
-    cvssScore: 9.8,
+    cvssScore: 6.5,
     description:
       "OpenSSH < 9.6 — injecção de comandos OS via hostname controlado pelo utilizador em configurações ProxyCommand/ssh_config com expansão de tokens.",
     nis2Articles: ["Art. 21(2)(i)"],
@@ -137,7 +137,7 @@ const OPENSSH_RULES: VulnRule[] = [
   {
     cveId: "CVE-2016-0777",
     maxVersion: "7.1",
-    cvssScore: 8.1,
+    cvssScore: 6.5,
     description:
       "OpenSSH < 7.1p2 — a funcionalidade UseRoaming vaza conteúdo de memória do processo para servidores maliciosos, podendo expor chaves privadas SSH e outros dados sensíveis.",
     nis2Articles: ["Art. 21(2)(i)"],
