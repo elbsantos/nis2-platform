@@ -40,6 +40,7 @@ async function startServer() {
   });
 
   const app = express();
+  app.disable("x-powered-by");
   const server = createServer(app);
 
   // ── 1. Stripe webhook — raw body, BEFORE json parser ───────────────────
