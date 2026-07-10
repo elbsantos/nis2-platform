@@ -533,12 +533,21 @@ export function enrichFinding(raw: string, cveId?: string): { critical: boolean;
 
   const r = raw.toLowerCase();
 
-  if (/dmarc/i.test(raw))
-    return { critical: true,  text: "Ausência de Registo DMARC: Falha grave na identidade do email do domínio. Permite que atacantes enviem mensagens falsas em nome da sua empresa (phishing/spoofing)." };
-  if (/spf/i.test(raw))
-    return { critical: true,  text: "Ausência de Registo SPF: Sem esta validação no DNS, qualquer servidor na Internet pode fazer-se passar pelo seu domínio institucional." };
-  if (/dkim/i.test(raw))
-    return { critical: true,  text: "Ausência de Assinatura DKIM: Emails enviados pelo domínio não têm assinatura digital criptográfica, facilitando a falsificação de mensagens." };
+  if (/dmarc/i.test(raw)) {
+    if (/\(aviso\)/i.test(raw))
+      return { critical: false, text: "DMARC em modo de monitorização (p=none): a política existe mas não bloqueia emails não autenticados. Considere endurecer para quarantine ou reject." };
+    return { critical: true,  text: "Ausência de registo DMARC: sem esta política, atacantes podem enviar emails falsos em nome do domínio (phishing/spoofing)." };
+  }
+  if (/spf/i.test(raw)) {
+    if (/\(aviso\)/i.test(raw))
+      return { critical: false, text: "SPF configurado de forma permissiva: a política existe mas autoriza envio a partir de qualquer servidor, reduzindo a proteção contra spoofing." };
+    return { critical: true,  text: "Ausência de registo SPF: sem esta validação, qualquer servidor pode enviar email em nome do domínio." };
+  }
+  if (/dkim/i.test(raw)) {
+    if (/\(aviso\)/i.test(raw))
+      return { critical: false, text: "DKIM não detectado nos selectores comuns — pode estar configurado com um selector personalizado. Confirme com o seu fornecedor de email." };
+    return { critical: true,  text: "Ausência de assinatura DKIM: os emails do domínio não têm assinatura criptográfica, facilitando a falsificação de mensagens." };
+  }
 
   if (/27017|mongodb/i.test(raw))
     return { critical: true,  text: "Porta 27017 Exposta (Base de Dados MongoDB): O serviço de base de dados está acessível publicamente, aumentando drasticamente a superfície de ataque." };
