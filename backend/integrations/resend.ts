@@ -30,8 +30,8 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM = process.env.EMAIL_FROM ?? "";
-const APP_URL = process.env.APP_URL ?? "https://nis2pt.pt";
+const FROM = process.env.EMAIL_FROM ?? "CISPLAN <noreply@cisplan.com>";
+const APP_URL = process.env.APP_URL ?? "https://cisplan.com";
 
 // ---------------------------------------------------------------------------
 // Base send helper
