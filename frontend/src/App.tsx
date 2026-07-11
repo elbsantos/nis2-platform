@@ -1,8 +1,10 @@
 import { Routes, Route, Navigate, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "./lib/auth";
-import Landing      from "./pages/Landing";
-import Login        from "./pages/Login";
-import Register     from "./pages/Register";
+import Landing        from "./pages/Landing";
+import Login          from "./pages/Login";
+import Register       from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword  from "./pages/ResetPassword";
 import ScanStart       from "./pages/ScanStart";
 import ScanResults     from "./pages/ScanResults";
 import ScanHistory     from "./pages/ScanHistory";
@@ -81,9 +83,11 @@ export default function App() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/"         element={<Landing />} />
-      <Route path="/login"    element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/"                 element={<Landing />} />
+      <Route path="/login"            element={<Login />} />
+      <Route path="/register"         element={<Register />} />
+      <Route path="/forgot-password"  element={<ForgotPassword />} />
+      <Route path="/reset-password"   element={<ResetPassword />} />
 
       {/* Protected routes */}
       <Route element={<RequireAuth />}>

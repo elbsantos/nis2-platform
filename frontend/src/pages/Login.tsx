@@ -16,6 +16,8 @@ export default function Login() {
   const location  = useLocation();
   const from      = (location.state as { from?: string })?.from ?? "/scan/start";
 
+  const message   = (location.state as { message?: string })?.message ?? "";
+
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState("");
@@ -54,6 +56,12 @@ export default function Login() {
               <Link to="/register">Registar gratuitamente</Link>
             </p>
 
+            {message && (
+              <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "6px", padding: "10px 14px", fontSize: "14px", color: "#166534", marginBottom: "12px" }}>
+                {message}
+              </div>
+            )}
+
             <form className="auth-form" onSubmit={handleSubmit}>
               <div className="auth-field">
                 <label htmlFor="login-email">Email</label>
@@ -77,6 +85,9 @@ export default function Login() {
                   required
                   placeholder="••••••••"
                 />
+                <Link to="/forgot-password" className="auth-hint" style={{ fontSize: "13px", display: "block", marginTop: "4px", textAlign: "right" }}>
+                  Esqueceste-te da senha?
+                </Link>
               </div>
 
               {error && <div className="auth-error">{error}</div>}
