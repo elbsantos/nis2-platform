@@ -267,6 +267,30 @@ const MIGRATIONS: Migration[] = [
       return "applied";
     },
   },
+
+  // ── Reset de senha ─────────────────────────────────────────────────────────
+
+  {
+    name: "users.resetTokenHash",
+    run: async (db) => {
+      if (await columnExists(db, "users", "resetTokenHash")) return "skipped";
+      await db.execute(sql.raw(
+        "ALTER TABLE `users` ADD COLUMN `resetTokenHash` VARCHAR(64) NULL"
+      ));
+      return "applied";
+    },
+  },
+
+  {
+    name: "users.resetTokenExpiresAt",
+    run: async (db) => {
+      if (await columnExists(db, "users", "resetTokenExpiresAt")) return "skipped";
+      await db.execute(sql.raw(
+        "ALTER TABLE `users` ADD COLUMN `resetTokenExpiresAt` TIMESTAMP NULL"
+      ));
+      return "applied";
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

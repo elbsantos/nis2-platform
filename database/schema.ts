@@ -41,14 +41,16 @@ export const organizations = mysqlTable("organizations", {
 export const users = mysqlTable(
   "users",
   {
-    id:             int("id").autoincrement().primaryKey(),
-    email:          varchar("email", { length: 255 }).notNull(),
-    name:           varchar("name", { length: 255 }),
-    passwordHash:   varchar("passwordHash", { length: 255 }),
-    role:           mysqlEnum("role", ["admin", "member"]).notNull().default("member"),
-    organizationId: int("organizationId"),
-    createdAt:      timestamp("createdAt").notNull().defaultNow(),
-    updatedAt:      timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+    id:                   int("id").autoincrement().primaryKey(),
+    email:                varchar("email", { length: 255 }).notNull(),
+    name:                 varchar("name", { length: 255 }),
+    passwordHash:         varchar("passwordHash", { length: 255 }),
+    role:                 mysqlEnum("role", ["admin", "member"]).notNull().default("member"),
+    organizationId:       int("organizationId"),
+    resetTokenHash:       varchar("resetTokenHash", { length: 64 }),
+    resetTokenExpiresAt:  timestamp("resetTokenExpiresAt"),
+    createdAt:            timestamp("createdAt").notNull().defaultNow(),
+    updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
   },
   (t) => [uniqueIndex("uq_email").on(t.email)]
 );
