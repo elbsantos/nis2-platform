@@ -60,7 +60,12 @@ async function send(opts: {
 // Shared HTML wrapper — clean, minimal, PT branding
 // ---------------------------------------------------------------------------
 
+// CTA_STYLE: inline para clientes de email que ignoram blocos <style>
+const CTA_STYLE = 'style="display:inline-block;background:#1d4ed8;color:#ffffff!important;font-weight:bold;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;margin:8px 0 24px;"';
+
 function htmlWrapper(content: string): string {
+  // Substitui class="cta" por style inline — compatibilidade com Gmail/Outlook
+  const body = content.replace(/class="cta"/g, CTA_STYLE);
   return `<!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -76,9 +81,6 @@ function htmlWrapper(content: string): string {
     .header p { color: #bfdbfe; font-size: 13px; margin: 4px 0 0; }
     .body { padding: 32px; }
     .body p { font-size: 15px; line-height: 1.6; margin: 0 0 16px; }
-    .cta { display: inline-block; background: #1d4ed8; color: #fff;
-           text-decoration: none; padding: 12px 24px; border-radius: 8px;
-           font-size: 14px; font-weight: 500; margin: 8px 0 24px; }
     .score-box { background: #f0f9ff; border: 1px solid #bae6fd;
                  border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
     .score-box .val { font-size: 36px; font-weight: 700; color: #0369a1; }
@@ -91,13 +93,13 @@ function htmlWrapper(content: string): string {
 <body>
   <div class="wrap">
     <div class="header">
-      <h1>NIS2 Plataforma PT</h1>
+      <h1>CISPLAN</h1>
       <p>Conformidade NIS2 para PMEs portuguesas</p>
     </div>
-    <div class="body">${content}</div>
+    <div class="body">${body}</div>
     <div class="footer">
-      Este email foi enviado pela NIS2 Plataforma PT. 
-      <a href="${APP_URL}/unsubscribe">Cancelar subscrição</a> · 
+      Este email foi enviado pela CISPLAN.
+      <a href="${APP_URL}/unsubscribe">Cancelar subscrição</a> ·
       <a href="${APP_URL}/privacy">Privacidade</a>
     </div>
   </div>
