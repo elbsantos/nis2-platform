@@ -208,6 +208,28 @@ export async function sendUpgradeConfirmed(opts: {
 }
 
 // ---------------------------------------------------------------------------
+// Template: Password reset
+// ---------------------------------------------------------------------------
+
+export async function sendPasswordReset(opts: {
+  to: string;
+  name: string;
+  link: string;
+}): Promise<void> {
+  await send({
+    to: opts.to,
+    subject: "Recuperação de senha — CISPLAN",
+    html: htmlWrapper(`
+      <p>Olá${opts.name ? ` <strong>${opts.name}</strong>` : ""},</p>
+      <p>Recebemos um pedido de recuperação de senha para a tua conta CISPLAN.</p>
+      <a href="${opts.link}" class="cta">Definir nova senha →</a>
+      <p>Este link é válido durante <strong>1 hora</strong>. Após esse prazo terás de pedir um novo link.</p>
+      <p style="color:#6b7280;font-size:13px;">Se não pediste a recuperação de senha, podes ignorar este email — a tua conta continua segura.</p>
+    `),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Template: Payment failed
 // ---------------------------------------------------------------------------
 

@@ -93,6 +93,32 @@ export async function createUser(data: {
   return { id: row.id, ...data };
 }
 
+export async function setResetToken(userId: number, tokenHash: string, expiresAt: Date) {
+  await getDb()
+    .update(users)
+    .set({ resetTokenHash: tokenHash, resetTokenExpiresAt: expiresAt, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+export async function getUserByResetToken(tokenHash: string) {
+  const rows = await getDb().select().from(users).where(eq(users.resetTokenHash, tokenHash)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function clearResetToken(userId: number) {
+  await getDb()
+    .update(users)
+    .set({ resetTokenHash: null, resetTokenExpiresAt: null, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+export async function resetUserPassword(userId: number, passwordHash: string) {
+  await getDb()
+    .update(users)
+    .set({ passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
 // ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------

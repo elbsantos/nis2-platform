@@ -7,9 +7,10 @@
 
 import type { Application } from "express";
 import { SignJWT } from "jose";
-import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
+import { scryptSync, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { z } from "zod";
-import { getUserByEmail, createUser, createOrganization, getOrCreateOrgForOwner } from "../db";
+import { getUserByEmail, createUser, createOrganization, getOrCreateOrgForOwner, setResetToken, getUserByResetToken, resetUserPassword } from "../db";
+import { sendPasswordReset } from "../integrations/resend";
 
 const COOKIE_NAME = "auth_token";
 const COOKIE_OPTIONS = {
@@ -24,9 +25,11 @@ const COOKIE_OPTIONS = {
 // Input validation schemas
 // ---------------------------------------------------------------------------
 
+const PASSWORD_SCHEMA = z.string().min(8).max(128);
+
 const registerSchema = z.object({
   email:   z.string().email().max(255).toLowerCase().trim(),
-  password: z.string().min(8).max(128),
+  password: PASSWORD_SCHEMA,
   name:    z.string().max(255).trim().optional(),
   orgName: z.string().min(1).max(255).trim(),
 });
@@ -35,6 +38,17 @@ const loginSchema = z.object({
   email:    z.string().email().max(255).toLowerCase().trim(),
   password: z.string().min(1).max(128),
 });
+
+const forgotSchema = z.object({
+  email: z.string().email().max(255).toLowerCase().trim(),
+});
+
+const resetSchema = z.object({
+  token:    z.string().length(64),
+  password: PASSWORD_SCHEMA,
+});
+
+const APP_URL = process.env.APP_URL ?? "https://cisplan.com";
 
 // ---------------------------------------------------------------------------
 // Password hashing — scrypt (OWASP-recommended, Node built-in)
@@ -175,6 +189,71 @@ export function registerOAuthRoutes(app: Application): void {
       res.json({ id: user.id, email: user.email, name: user.name, org });
     } catch {
       res.status(401).json({ error: "Token inválido" });
+    }
+  });
+
+  // ── POST /api/auth/forgot-password ───────────────────────────────────────
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const parsed = forgotSchema.safeParse(req.body);
+    // Resposta idêntica mesmo com input inválido — anti-enumeração
+    const SAFE_RESPONSE = { message: "Se o email existir na plataforma, receberás um link de reset nos próximos minutos." };
+
+    if (!parsed.success) {
+      res.json(SAFE_RESPONSE);
+      return;
+    }
+
+    const { email } = parsed.data;
+
+    try {
+      const user = await getUserByEmail(email);
+      if (user) {
+        const token    = randomBytes(32).toString("hex");
+        const tokenHash = createHash("sha256").update(token).digest("hex");
+        const expiresAt = new Date(Date.now() + 3_600_000); // 1h
+        await setResetToken(user.id, tokenHash, expiresAt);
+        const link = `${APP_URL}/reset-password?token=${token}`;
+        // Erro de envio não altera resposta — anti-enumeração
+        try {
+          await sendPasswordReset({ to: user.email, name: user.name ?? "", link });
+        } catch (emailErr) {
+          console.error("[Auth] Falha ao enviar email de reset:", emailErr);
+        }
+      }
+    } catch (err) {
+      console.error("[Auth] Forgot-password error:", err);
+    }
+
+    res.json(SAFE_RESPONSE);
+  });
+
+  // ── POST /api/auth/reset-password ────────────────────────────────────────
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const parsed = resetSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(401).json({ error: "Link inválido ou expirado." });
+      return;
+    }
+
+    const { token, password } = parsed.data;
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
+    try {
+      const user = await getUserByResetToken(tokenHash);
+
+      if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+        res.status(401).json({ error: "Link inválido ou expirado." });
+        return;
+      }
+
+      const newHash = hashPassword(password);
+      // Single-use: limpa token e actualiza senha na mesma operação
+      await resetUserPassword(user.id, newHash);
+
+      res.json({ message: "Senha atualizada com sucesso." });
+    } catch (err) {
+      console.error("[Auth] Reset-password error:", err);
+      res.status(500).json({ error: "Erro ao redefinir a senha." });
     }
   });
 }
