@@ -60,7 +60,7 @@ export const ENV = {
 
   // ── Resend (email) ────────────────────────────────────────────────────────
   resendApiKey: optional("RESEND_API_KEY"),
-  emailFrom: optional("EMAIL_FROM", "NIS2 Plataforma <noreply@nis2pt.pt>"),
+  emailFrom: optional("EMAIL_FROM", "CISPLAN <noreply@cisplan.com>"),
 
   // ── Internal ──────────────────────────────────────────────────────────────
   forgeApiUrl: optional("BUILT_IN_FORGE_API_URL"),

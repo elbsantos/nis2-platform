@@ -474,7 +474,7 @@ export default function Billing() {
           Para organismos públicos, contratos anuais ou volume de clientes, entra em contacto directo.
         </p>
         <a
-          href="mailto:hello@nis2pt.pt?subject=Proposta NIS2 Plataforma PT"
+          href="mailto:hello@nis2pt.pt?subject=Proposta CISPLAN"
           className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-lg hover:bg-blue-800"
         >
           Falar com a equipa →

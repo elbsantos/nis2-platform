@@ -56,7 +56,7 @@ async function buildCertificate(opts: {
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc    = new PDFDocument({ size: "A4", layout: "landscape", margin: 60,
-                                     info: { Title: "Certificado NIS2 Plataforma PT" } });
+                                     info: { Title: "Certificado CISPLAN" } });
     const chunks: Buffer[] = [];
     doc.on("data",  (c: Buffer) => chunks.push(c));
     doc.on("end",   () => resolve(Buffer.concat(chunks)));
@@ -78,7 +78,7 @@ async function buildCertificate(opts: {
 
     // ── Logo / Issuer ──
     doc.fontSize(13).fillColor(C.brand).font("Helvetica-Bold")
-       .text("NIS2 Plataforma PT", 0, 52, { align: "center", width: W });
+       .text("CISPLAN", 0, 52, { align: "center", width: W });
 
     doc.fontSize(9).fillColor(C.muted).font("Helvetica")
        .text("Conformidade NIS2 para PMEs Portuguesas | nis2pt.pt", 0, 70, { align: "center", width: W });
@@ -134,12 +134,12 @@ async function buildCertificate(opts: {
     doc.moveTo(W / 2 - 80, 415).lineTo(W / 2 + 80, 415)
        .strokeColor(C.muted).lineWidth(0.5).stroke();
     doc.fontSize(9).fillColor(C.muted).font("Helvetica")
-       .text("NIS2 Plataforma PT", 0, 420, { align: "center", width: W });
+       .text("CISPLAN", 0, 420, { align: "center", width: W });
 
     // ── Footer ──
     doc.fontSize(8).fillColor(C.muted)
        .text(
-         `Documento gerado automaticamente por NIS2 Plataforma PT · ${new Date().toLocaleDateString("pt-PT")}`,
+         `Documento gerado automaticamente por CISPLAN · ${new Date().toLocaleDateString("pt-PT")}`,
          0, H - 48, { align: "center", width: W }
        );
 

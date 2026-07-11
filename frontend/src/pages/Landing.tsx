@@ -833,7 +833,7 @@ export default function Landing() {
             </div>
             <div className="penalty-item green">
               <div>
-                <div className="type">Plano Pro CISPLAN PT — por mês</div>
+                <div className="type">Plano Pro CISPLAN — por mês</div>
                 <div className="sub">Scanner + Curso + Remediação IA</div>
               </div>
               <div className="amount">€89</div>
@@ -971,7 +971,7 @@ export default function Landing() {
               <li className="yes">API access completa</li>
               <li className="yes">Gestor de conta dedicado</li>
             </ul>
-            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN PT" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
+            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
           </div>
         </div>
 
@@ -1052,7 +1052,7 @@ export default function Landing() {
             <a href="#precos">Starter — Gratuito</a>
             <a href="#precos">Pro — €89/mês</a>
             <a href="#precos">MSSP — €199/mês</a>
-            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN PT">Enterprise</a>
+            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN">Enterprise</a>
           </div>
           <div className="footer-col">
             <h4>Conta</h4>
@@ -1062,7 +1062,7 @@ export default function Landing() {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>© 2026 CISPLAN PT · DL 125/2025 · Todos os direitos reservados</p>
+          <p>© 2026 CISPLAN · DL 125/2025 · Todos os direitos reservados</p>
           <div className="footer-links">
             <Link to="/login">Entrar</Link>
             <Link to="/register">Registar</Link>
