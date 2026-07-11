@@ -229,7 +229,7 @@ export async function createApiLimiter() {
     keyGenerator,
     store,
     passOnStoreError: true,
-    skip: (req) => req.path === "/health" || req.path.startsWith("/api/trpc/system."),
+    skip: (req) => req.path === "/health" || req.path.startsWith("/api/trpc/system.") || req.path.startsWith("/api/auth/"),
     handler: (req, res, next) =>
       tooManyRequestsHandler(req, res, next, "Demasiados pedidos. Tenta novamente dentro de 1 minuto.", 60),
   });
@@ -237,6 +237,7 @@ export async function createApiLimiter() {
 
 // ---------------------------------------------------------------------------
 // 2. Auth limiter — /api/auth/*  →  20 req / 15 min (brute-force protection)
+//    Exclui /api/auth/forgot-password (coberto pelo limiter dedicado abaixo).
 // ---------------------------------------------------------------------------
 export async function createAuthLimiter() {
   const store = await buildStore();
@@ -248,6 +249,7 @@ export async function createAuthLimiter() {
     keyGenerator,
     store,
     passOnStoreError: true,
+    skip: (req) => req.path.startsWith("/api/auth/forgot-password"),
     handler: (req, res, next) =>
       tooManyRequestsHandler(req, res, next, "Demasiadas tentativas de autenticação. Espera 15 minutos.", 15 * 60),
   });
