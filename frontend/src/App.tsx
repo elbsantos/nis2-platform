@@ -46,7 +46,7 @@ function AppNav() {
     <nav className="bg-[#0f1e38] border-b-2 border-[#b8860b] px-4">
       <div className="max-w-5xl mx-auto flex items-center gap-1 h-12">
         <NavLink to="/" className="font-bold text-white text-sm mr-4 hover:text-[#f0c040] transition-colors">
-          NIS2 <span className="text-[#f0c040]">PT</span>
+          CISPLAN
         </NavLink>
         <NavLink to="/scan/start"    className={({ isActive }) => isActive ? active : inactive}>Novo scan</NavLink>
         <NavLink to="/scan/history"  className={({ isActive }) => isActive ? active : inactive}>Histórico</NavLink>

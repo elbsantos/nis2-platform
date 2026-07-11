@@ -117,7 +117,7 @@ export async function sendWelcome(opts: {
 }): Promise<void> {
   await send({
     to: opts.to,
-    subject: "Bem-vindo à NIS2 Plataforma PT",
+    subject: "Bem-vindo ao CISPLAN",
     html: htmlWrapper(`
       <p>Olá <strong>${opts.name}</strong>,</p>
       <p>A tua conta foi criada com sucesso. Podes agora correr o teu primeiro diagnóstico NIS2 — gratuito, sem instalação de software.</p>
@@ -196,7 +196,7 @@ export async function sendUpgradeConfirmed(opts: {
 
   await send({
     to: opts.to,
-    subject: `Plano ${planLabel} activado — NIS2 Plataforma PT`,
+    subject: `Plano ${planLabel} activado — CISPLAN`,
     html: htmlWrapper(`
       <p>Olá <strong>${opts.name}</strong>,</p>
       <p>O teu plano <strong>${planLabel}</strong> foi activado com sucesso. Tens agora acesso a todas as funcionalidades ${opts.plan === "mssp" ? "multi-cliente" : "completas"}.</p>
@@ -242,7 +242,7 @@ export async function sendPaymentFailed(opts: {
 }): Promise<void> {
   await send({
     to: opts.to,
-    subject: "Problema com o teu pagamento — NIS2 Plataforma PT",
+    subject: "Problema com o teu pagamento — CISPLAN",
     html: htmlWrapper(`
       <p>Olá <strong>${opts.name}</strong>,</p>
       <p>Não foi possível processar o teu pagamento. A tua conta foi mantida activa por 7 dias enquanto resolves o problema.</p>

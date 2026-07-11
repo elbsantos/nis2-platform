@@ -35,7 +35,7 @@ export default function ForgotPassword() {
       <div className="auth-layout">
         <div className="auth-form-side">
           <Link to="/" className="auth-logo">
-            <span className="auth-logo-text">CISPLAN <span>PT</span></span>
+            <span className="auth-logo-text">CISPLAN</span>
           </Link>
 
           <div className="auth-content">
@@ -82,7 +82,7 @@ export default function ForgotPassword() {
               <Link to="/login">← Voltar ao login</Link>
             </p>
 
-            <p className="auth-page-footer">© 2026 CISPLAN PT · DL 125/2025</p>
+            <p className="auth-page-footer">© 2026 CISPLAN · DL 125/2025</p>
           </div>
         </div>
       </div>

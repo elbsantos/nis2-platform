@@ -60,7 +60,7 @@ export default function Register() {
         <div className="auth-form-side">
           <Link to="/" className="auth-logo">
             <span className="auth-logo-text">
-              CISPLAN <span>PT</span>
+              CISPLAN
             </span>
           </Link>
 
@@ -159,7 +159,7 @@ export default function Register() {
             </div>
 
             <p className="auth-page-footer">
-              © 2026 CISPLAN PT · DL 125/2025
+              © 2026 CISPLAN · DL 125/2025
             </p>
           </div>
         </div>
