@@ -229,7 +229,7 @@ export async function createApiLimiter() {
     keyGenerator,
     store,
     passOnStoreError: true,
-    skip: (req) => req.path === "/health" || req.path.startsWith("/api/trpc/system.") || req.path.startsWith("/api/auth/"),
+    skip: (req) => req.originalUrl.startsWith("/api/trpc/system.") || req.originalUrl.startsWith("/api/auth/"),
     handler: (req, res, next) =>
       tooManyRequestsHandler(req, res, next, "Demasiados pedidos. Tenta novamente dentro de 1 minuto.", 60),
   });
@@ -249,7 +249,7 @@ export async function createAuthLimiter() {
     keyGenerator,
     store,
     passOnStoreError: true,
-    skip: (req) => req.path.startsWith("/api/auth/forgot-password"),
+    skip: (req) => req.originalUrl.startsWith("/api/auth/forgot-password"),
     handler: (req, res, next) =>
       tooManyRequestsHandler(req, res, next, "Demasiadas tentativas de autenticação. Espera 15 minutos.", 15 * 60),
   });
