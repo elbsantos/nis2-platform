@@ -8,7 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { createApiLimiter, createAuthLimiter, getRedisClient } from "../middlewares/rateLimit";
+import { createApiLimiter, createAuthLimiter, createForgotPasswordLimiter, getRedisClient } from "../middlewares/rateLimit";
 import { registerWebhookRoutes } from "../middlewares/webhookHandler";
 import { registerDocsHandler } from "../middlewares/docs.handler";
 import { securityHeaders, corsHeaders } from "../middlewares/security";
@@ -74,12 +74,15 @@ async function startServer() {
   }
 
   // ── 6. Rate limiters ────────────────────────────────────────────────────
-  const [apiLimiter, authLimiter] = await Promise.all([
+  const [apiLimiter, authLimiter, forgotPasswordLimiter] = await Promise.all([
     createApiLimiter(),
     createAuthLimiter(),
+    createForgotPasswordLimiter(),
   ]);
   app.use("/api", apiLimiter);
-  app.use("/api/oauth", authLimiter);
+  // Mais restritivo primeiro: forgot-password (5/15min) antes do geral (20/15min)
+  app.use("/api/auth/forgot-password", forgotPasswordLimiter);
+  app.use("/api/auth", authLimiter);
 
   // ── 7. Docs download ────────────────────────────────────────────────────
   registerDocsHandler(app);

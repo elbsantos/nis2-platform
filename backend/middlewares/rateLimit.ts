@@ -236,7 +236,7 @@ export async function createApiLimiter() {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Auth limiter — /api/oauth/*  →  20 req / 15 min (brute-force protection)
+// 2. Auth limiter — /api/auth/*  →  20 req / 15 min (brute-force protection)
 // ---------------------------------------------------------------------------
 export async function createAuthLimiter() {
   const store = await buildStore();
@@ -250,6 +250,26 @@ export async function createAuthLimiter() {
     passOnStoreError: true,
     handler: (req, res, next) =>
       tooManyRequestsHandler(req, res, next, "Demasiadas tentativas de autenticação. Espera 15 minutos.", 15 * 60),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 3. Forgot-password limiter — /api/auth/forgot-password  →  5 req / 15 min
+//    Mais restritivo que o authLimiter geral: previne disparo em massa de
+//    emails de reset sem autenticação.
+// ---------------------------------------------------------------------------
+export async function createForgotPasswordLimiter() {
+  const store = await buildStore();
+  return rateLimit({
+    windowMs: 15 * 60 * 1_000,
+    limit: 5,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator,
+    store,
+    passOnStoreError: true,
+    handler: (req, res, next) =>
+      tooManyRequestsHandler(req, res, next, "Demasiados pedidos de reset. Espera 15 minutos.", 15 * 60),
   });
 }
 
