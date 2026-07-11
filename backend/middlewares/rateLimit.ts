@@ -39,23 +39,25 @@ export async function getRedisClient(): Promise<RedisClient> {
 }
 
 async function _doConnect(): Promise<RedisClient> {
-  // URL priority: rede interna Railway → proxy público → localhost dev
-  // O proxy público (REDIS_URL) corta ligações ociosas e nunca deve ser
-  // usado para comunicação serviço-a-serviço em Railway.
+  // Trata valor vazio como ausente — ?? não salta "", pick() sim.
+  const pick = (v?: string) => (v && v.trim() ? v : undefined);
   const redisUrl =
-    process.env.REDIS_PRIVATE_URL ??
-    process.env.REDIS_URL ??
+    pick(process.env.REDIS_PRIVATE_URL) ??
+    pick(process.env.REDIS_URL) ??
     "redis://localhost:6379";
 
   // Log URL mascarando a password (entre ':' e '@')
   const safeUrl = redisUrl.replace(/:([^:@/][^@]*)@/, ":***@");
   console.log(`[Redis] A ligar: ${safeUrl}`);
 
-  if (process.env.REDIS_PRIVATE_URL) {
+  if (pick(process.env.REDIS_PRIVATE_URL)) {
     console.log("[Redis] A usar rede interna Railway (REDIS_PRIVATE_URL) ✓");
-  } else if (process.env.REDIS_URL) {
-    console.warn("[Redis] REDIS_PRIVATE_URL não definida — a usar REDIS_URL (proxy público). " +
-      "Define REDIS_PRIVATE_URL no Railway para ligação estável.");
+  } else if (pick(process.env.REDIS_URL)) {
+    if (redisUrl.includes("railway.internal") || redisUrl.includes(".internal")) {
+      console.log("[Redis] A usar REDIS_URL (rede interna Railway) ✓");
+    } else {
+      console.warn("[Redis] A usar REDIS_URL (proxy público) — define REDIS_PRIVATE_URL para ligação interna estável.");
+    }
   }
 
   const client = createClient({
