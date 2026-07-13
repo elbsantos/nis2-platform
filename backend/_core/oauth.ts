@@ -9,7 +9,7 @@ import type { Application } from "express";
 import { SignJWT } from "jose";
 import { scryptSync, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { z } from "zod";
-import { getUserByEmail, createUser, createOrganization, getOrCreateOrgForOwner, setResetToken, getUserByResetToken, resetUserPassword } from "../db";
+import { getUserByEmail, getUserById, createUser, createOrganization, getOrCreateOrgForOwner, setResetToken, getUserByResetToken, resetUserPassword, deleteAccount } from "../db";
 import { sendPasswordReset } from "../integrations/resend";
 
 const COOKIE_NAME = "auth_token";
@@ -254,6 +254,73 @@ export function registerOAuthRoutes(app: Application): void {
     } catch (err) {
       console.error("[Auth] Reset-password error:", err);
       res.status(500).json({ error: "Erro ao redefinir a senha." });
+    }
+  });
+
+  // ── DELETE /api/auth/account ─────────────────────────────────────────────
+  // userId vem SEMPRE do JWT (nunca do body) — impede apagar conta alheia.
+  // Confirmação por senha obrigatória antes de qualquer operação irreversível.
+  app.delete("/api/auth/account", async (req, res) => {
+    // 1. Extrair userId do JWT
+    const raw = req.cookies?.[COOKIE_NAME] as string | undefined;
+    if (!raw) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+
+    let userId: number;
+    try {
+      const { jwtVerify } = await import("jose");
+      const { payload } = await jwtVerify(raw, getJwtSecret());
+      const sub = parseInt(String(payload.sub), 10);
+      if (!sub || isNaN(sub)) throw new Error("invalid sub");
+      userId = sub;
+    } catch {
+      res.status(401).json({ error: "Token inválido" });
+      return;
+    }
+
+    // 2. Validar senha — confirmação forte antes de qualquer delete
+    const bodyParsed = z.object({ password: z.string().min(1).max(128) }).safeParse(req.body);
+    if (!bodyParsed.success) {
+      res.status(400).json({ error: "Senha obrigatória" });
+      return;
+    }
+
+    try {
+      const user = await getUserById(userId);
+      if (!user) {
+        res.status(401).json({ error: "Conta não encontrada" });
+        return;
+      }
+
+      const valid = verifyPassword(bodyParsed.data.password, user.passwordHash ?? "");
+      if (!valid) {
+        res.status(401).json({ error: "Senha incorreta" });
+        return;
+      }
+
+      // 3. Transação atómica: hard-delete de dados + anonimização do user
+      const { stripeSubId } = await deleteAccount(userId);
+
+      // 4. Cancelar Stripe fora da transação (externo; falha não reverte o delete)
+      if (stripeSubId) {
+        try {
+          const { cancelSubscription } = await import("../integrations/stripe");
+          await cancelSubscription(stripeSubId);
+        } catch (stripeErr) {
+          console.error(`[Auth] SUBSCRIÇÃO ÓRFÃ userId=${userId} subId=${stripeSubId} — reconciliação manual necessária`, stripeErr);
+        }
+      }
+
+      // 5. Limpar cookie de sessão
+      res.clearCookie(COOKIE_NAME, { path: "/" });
+
+      // 6. Resposta de sucesso
+      res.json({ message: "Conta eliminada." });
+    } catch (err) {
+      console.error("[Auth] Delete account error:", err);
+      res.status(500).json({ error: "Erro ao eliminar conta" });
     }
   });
 }

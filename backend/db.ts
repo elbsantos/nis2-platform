@@ -418,7 +418,7 @@ export async function getRemediationItemByCvePrefix(orgId: number, cveId: string
 // Course progress
 // ---------------------------------------------------------------------------
 
-import { questionnaireSessions, remediationItems, courseProgress } from "../database/schema";
+import { questionnaireSessions, remediationItems, courseProgress, controlEvidence } from "../database/schema";
 
 export async function markLessonComplete(data: {
   userId: number;
@@ -649,4 +649,64 @@ export async function updateRemediationStatus(
         eq(remediationItems.organizationId, orgId)
       )
     );
+}
+
+// ---------------------------------------------------------------------------
+// Account deletion (RGPD art. 17)
+// ---------------------------------------------------------------------------
+
+/**
+ * Executes account deletion atomically inside a single transaction:
+ *   1. Hard-deletes all org data in FK-safe order.
+ *   2. Anonymises the user row (lápide com deletedAt).
+ * Returns stripeSubId (if any) so the caller can cancel it outside the tx.
+ */
+export async function deleteAccount(userId: number): Promise<{ stripeSubId: string | null }> {
+  return getDb().transaction(async (tx) => {
+    // Read user inside the transaction (not through getUserById which uses getDb())
+    const userRows = await tx.select().from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+      .limit(1);
+    const user = userRows[0];
+    if (!user) throw new Error(`deleteAccount: user ${userId} not found or already deleted`);
+
+    const orgId = user.organizationId;
+    let stripeSubId: string | null = null;
+
+    if (orgId) {
+      // Capture stripeSubId before deleting subscriptions
+      const subRows = await tx.select({ stripeSubId: subscriptions.stripeSubId })
+        .from(subscriptions)
+        .where(eq(subscriptions.organizationId, orgId))
+        .limit(1);
+      stripeSubId = subRows[0]?.stripeSubId ?? null;
+
+      // Hard-delete in FK-safe order (most-dependent first)
+      await tx.delete(remediationItems).where(eq(remediationItems.organizationId, orgId));
+      await tx.delete(vulnerabilities).where(eq(vulnerabilities.organizationId, orgId));
+      await tx.delete(controlEvidence).where(eq(controlEvidence.organizationId, orgId));
+      await tx.delete(subscriptions).where(eq(subscriptions.organizationId, orgId));
+      await tx.delete(scans).where(eq(scans.organizationId, orgId));
+      await tx.delete(questionnaireSessions).where(eq(questionnaireSessions.organizationId, orgId));
+      await tx.delete(courseProgress).where(eq(courseProgress.organizationId, orgId));
+      await tx.delete(organizations).where(eq(organizations.id, orgId));
+    } else {
+      // Edge case: user without org — delete by userId directly
+      await tx.delete(questionnaireSessions).where(eq(questionnaireSessions.userId, userId));
+      await tx.delete(courseProgress).where(eq(courseProgress.userId, userId));
+    }
+
+    // Anonymise user row (preserve id as FK anchor; PII cleared)
+    await tx.update(users).set({
+      email:               `deleted_${userId}@deleted`,
+      name:                null,
+      passwordHash:        null,
+      resetTokenHash:      null,
+      resetTokenExpiresAt: null,
+      deletedAt:           new Date(),
+      updatedAt:           new Date(),
+    }).where(eq(users.id, userId));
+
+    return { stripeSubId };
+  });
 }
