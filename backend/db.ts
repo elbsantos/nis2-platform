@@ -15,7 +15,7 @@ import {
   vulnerabilities,
   subscriptions,
 } from "../database/schema";
-import { eq, desc, asc, and, gte, like, sql } from "drizzle-orm";
+import { eq, desc, asc, and, gte, like, sql, isNull } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Connection pool — resilient singleton that resets on fatal errors
@@ -73,7 +73,9 @@ export type { User, Organization, Scan, Vulnerability, Subscription } from "../d
 // ---------------------------------------------------------------------------
 
 export async function getUserById(userId: number) {
-  const rows = await getDb().select().from(users).where(eq(users.id, userId)).limit(1);
+  const rows = await getDb().select().from(users).where(
+    and(eq(users.id, userId), isNull(users.deletedAt))
+  ).limit(1);
   return rows[0] ?? null;
 }
 

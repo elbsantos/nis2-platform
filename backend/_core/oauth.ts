@@ -152,7 +152,7 @@ export function registerOAuthRoutes(app: Application): void {
       const dummyHash = "0000000000000000:0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
       const valid = user ? verifyPassword(password, user.passwordHash ?? "") : verifyPassword(password, dummyHash);
 
-      if (!user || !valid) {
+      if (!user || !valid || user.deletedAt) {
         res.status(401).json({ error: "Credenciais inválidas" });
         return;
       }
@@ -207,7 +207,7 @@ export function registerOAuthRoutes(app: Application): void {
 
     try {
       const user = await getUserByEmail(email);
-      if (user) {
+      if (user && !user.deletedAt) {
         const token    = randomBytes(32).toString("hex");
         const tokenHash = createHash("sha256").update(token).digest("hex");
         const expiresAt = new Date(Date.now() + 3_600_000); // 1h
