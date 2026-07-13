@@ -49,6 +49,7 @@ export const users = mysqlTable(
     organizationId:       int("organizationId"),
     resetTokenHash:       varchar("resetTokenHash", { length: 64 }),
     resetTokenExpiresAt:  timestamp("resetTokenExpiresAt"),
+    deletedAt:            timestamp("deletedAt"),
     createdAt:            timestamp("createdAt").notNull().defaultNow(),
     updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
   },

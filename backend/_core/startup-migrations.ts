@@ -291,6 +291,19 @@ const MIGRATIONS: Migration[] = [
       return "applied";
     },
   },
+
+  // ── Exclusão de conta (RGPD art. 17) ──────────────────────────────────────
+
+  {
+    name: "users.deletedAt",
+    run: async (db) => {
+      if (await columnExists(db, "users", "deletedAt")) return "skipped";
+      await db.execute(sql.raw(
+        "ALTER TABLE `users` ADD COLUMN `deletedAt` TIMESTAMP NULL"
+      ));
+      return "applied";
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
