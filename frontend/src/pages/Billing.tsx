@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { useAuth } from "../lib/auth";
 
 // ---------------------------------------------------------------------------
 // Plan definitions
@@ -353,6 +354,131 @@ function FaqSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Delete account modal
+// ---------------------------------------------------------------------------
+
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
+
+  async function handleDelete() {
+    if (!password) { setError("A senha é obrigatória."); return; }
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/account", {
+        method:  "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body:    JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Erro ao eliminar conta.");
+        return;
+      }
+      // Cookie foi limpo pelo backend; limpar estado local e redirecionar
+      await logout();
+      navigate("/login", {
+        replace: true,
+        state:   { message: "A tua conta foi eliminada. Os teus dados foram apagados conforme o RGPD, art. 17." },
+      });
+    } catch {
+      setError("Erro de ligação. Tenta novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
+        <h2 className="text-lg font-bold text-gray-900 mb-2">
+          Eliminar conta permanentemente
+        </h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Esta ação é <strong>irreversível</strong>. Todos os dados serão apagados: scans,
+          questionários, planos de remediação e organização. A conta não pode ser recuperada.
+        </p>
+        <p className="text-sm text-gray-600 mb-5">
+          Para confirmar, introduz a tua senha actual:
+        </p>
+
+        <div className="mb-4">
+          <label htmlFor="delete-password" className="block text-sm font-medium text-gray-700 mb-1">
+            Senha actual
+          </label>
+          <input
+            id="delete-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600 mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={loading || !password}
+            className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {loading ? "A eliminar…" : "Eliminar definitivamente"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Danger zone
+// ---------------------------------------------------------------------------
+
+function DangerZone() {
+  const [showModal, setShowModal] = useState(false);
+
+  return (
+    <>
+      <div className="mt-16 border border-red-800/60 bg-red-950/20 rounded-2xl p-6 max-w-2xl mx-auto">
+        <h2 className="text-base font-bold text-red-400 mb-1">Zona de Perigo</h2>
+        <p className="text-sm text-slate-400 mb-5">
+          A eliminação de conta apaga permanentemente todos os teus dados — scans, questionários,
+          organização e planos de remediação — e não pode ser revertida. Tens direito ao apagamento
+          dos teus dados pessoais nos termos do RGPD, art. 17.
+        </p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
+          Eliminar a minha conta
+        </button>
+      </div>
+
+      {showModal && <DeleteAccountModal onClose={() => setShowModal(false)} />}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -480,6 +606,9 @@ export default function Billing() {
           Falar com a equipa →
         </a>
       </div>
+
+      {/* Danger zone */}
+      <DangerZone />
     </div>
   );
 }
