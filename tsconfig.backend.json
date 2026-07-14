@@ -3,5 +3,6 @@
   "compilerOptions": {
     "outDir": "dist/backend"
   },
-  "include": ["backend/**/*", "database/**/*"]
+  "include": ["backend/**/*", "database/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }
