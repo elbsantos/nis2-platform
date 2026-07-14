@@ -67,6 +67,7 @@ const C = {
 };
 
 const PAGE_W = 595, PAGE_H = 842, MARGIN = 50, CONTENT_W = PAGE_W - MARGIN * 2;
+const CONTENT_BOTTOM = 757; // PAGE_H(842) − footer(32) − header(53)
 
 // ---------------------------------------------------------------------------
 // NIS2 Article catalogue
@@ -244,7 +245,7 @@ async function buildExecutiveReport(
       drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
       y = 90;
     };
-    const execEnsure = (needed: number) => { if (y + needed > 770) execAddPage(); };
+    const execEnsure = (needed: number) => { if (y + needed > CONTENT_BOTTOM) execAddPage(); };
 
     // Section title
     y = drawSectionTitle(doc, "Resumo Executivo", y);
@@ -495,9 +496,11 @@ async function buildExecutiveReport(
     drawRunningFooter(doc, execPage++);
 
     // ── PRÓXIMOS PASSOS + METODOLOGIA + REFERÊNCIAS ───────────────────────
-    doc.addPage({ size: "A4", margin: 0 });
-    drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
-    y = 90;
+    if (y + 60 > CONTENT_BOTTOM) {
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
+      y = 90;
+    }
 
     y = drawSectionTitle(doc, "Próximos Passos Recomendados", y);
     const steps = buildNextSteps(overall, counts);
@@ -511,7 +514,7 @@ async function buildExecutiveReport(
     });
     y += 10;
 
-    y = drawMethodologySection(doc, y, dataSources, scanLimitations);
+    y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Executivo");
     y = drawReferencesSection(doc, y);
     drawRunningFooter(doc, execPage);
 
@@ -715,7 +718,7 @@ async function buildTechnicalReport(
       doc.text("CVEs",             MARGIN + 395, y + 5, { width: 60, align: "center" });
       y += 18;
       openPorts.slice(0, 20).forEach((p, i) => {
-        if (y > 730) { doc.addPage({ size: "A4", margin: 0 }); drawRunningHeader(doc, scan?.target ?? "—", "Técnico"); y = 90; }
+        if (y + 18 > CONTENT_BOTTOM) { doc.addPage({ size: "A4", margin: 0 }); drawRunningHeader(doc, scan?.target ?? "—", "Técnico"); y = 90; }
         const rowBg = i % 2 === 0 ? C.bg : C.white;
         doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
         doc.fontSize(8).font("Sans-Bold").fillColor(C.brand)
@@ -750,9 +753,11 @@ async function buildTechnicalReport(
     drawRunningFooter(doc, 2);
 
     // ── PAGE 3: VULNERABILIDADES ───────────────────────────────────────────
-    doc.addPage({ size: "A4", margin: 0 });
-    drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-    y = 90;
+    if (y + 70 > CONTENT_BOTTOM) {
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
+      y = 90;
+    }
 
     y = drawSectionTitle(doc, `Vulnerabilidades Encontradas (${vulns.length})`, y);
 
@@ -776,7 +781,7 @@ async function buildTechnicalReport(
               g.counts.low      > 0 ? `${g.counts.low} baixa${g.counts.low !== 1 ? "s" : ""}` : "",
             ].filter(Boolean).join(" · ");
           const lH = doc.fontSize(7.5).font("Sans").heightOfString(line, { width: CONTENT_W - 16 });
-          if (y + lH > 760) {
+          if (y + lH > CONTENT_BOTTOM) {
             drawRunningFooter(doc, 3);
             doc.addPage({ size: "A4", margin: 0 });
             drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
@@ -820,7 +825,7 @@ async function buildTechnicalReport(
         const PADDING  = 14; // top + bottom breathing room
         const rowH = HEADER_H + descH + remH + dnsH + PADDING;
 
-        if (y + rowH > 760) {
+        if (y + rowH > CONTENT_BOTTOM) {
           drawRunningFooter(doc, pageNum++);
           doc.addPage({ size: "A4", margin: 0 });
           drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
@@ -882,9 +887,11 @@ async function buildTechnicalReport(
     }
 
     // ── PAGE 4: NIS2 COMPLIANCE POR ARTIGO ────────────────────────────────
-    doc.addPage({ size: "A4", margin: 0 });
-    drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-    y = 90;
+    if (y + 110 > CONTENT_BOTTOM) {
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
+      y = 90;
+    }
     y = drawSectionTitle(doc, "Conformidade NIS2 — Detalhe por Artigo (Art. 21(2))", y);
 
     // Intro text
@@ -915,7 +922,7 @@ async function buildTechnicalReport(
       const totalFindH = findingHeights.reduce((a, b) => a + b, 0);
       const rowH = 34 + (hasFail ? totalFindH + 4 : 14);
 
-      if (y + rowH > 750) {
+      if (y + rowH > CONTENT_BOTTOM) {
         drawRunningFooter(doc, techPage++);
         doc.addPage({ size: "A4", margin: 0 });
         drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
@@ -987,13 +994,13 @@ async function buildTechnicalReport(
     y += 10;
 
     // ── METODOLOGIA + REFERÊNCIAS ──────────────────────────────────────────
-    if (y + 200 > 740) {
+    if (y + 200 > CONTENT_BOTTOM) {
       drawRunningFooter(doc, techPage++);
       doc.addPage({ size: "A4", margin: 0 });
       drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
       y = 90;
     }
-    y = drawMethodologySection(doc, y, dataSources, scanLimitations);
+    y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Técnico");
     y = drawReferencesSection(doc, y);
     drawRunningFooter(doc, techPage);
 
@@ -1149,7 +1156,7 @@ export function buildMethodologyBullets(dataSources: string[]): Array<{ label: s
   ];
 }
 
-function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[], scanLimitations: string[]): number {
+function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[], scanLimitations: string[], target: string, reportType: string): number {
   y = drawSectionTitle(doc, "Metodologia & Limitações Técnicas", y);
 
   const intro =
@@ -1164,12 +1171,18 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
   const categories = buildMethodologyBullets(dataSources);
 
   categories.forEach((cat) => {
+    const estH = doc.fontSize(8).font("Sans").heightOfString(cat.label + ": " + cat.detail, { width: CONTENT_W - 8 });
+    if (y + estH + 8 > CONTENT_BOTTOM) {
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, target, reportType);
+      y = 90;
+    }
     doc.rect(MARGIN, y, 3, 12).fillColor(C.brand).fill();
     doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
        .text(cat.label + ": ", MARGIN + 8, y, { continued: true, width: CONTENT_W - 8 });
     doc.font("Sans").fillColor(C.muted)
        .text(cat.detail, { width: CONTENT_W - 8 });
-    y += doc.heightOfString(cat.detail, { width: CONTENT_W - 8 }) + 8;
+    y = doc.y + 8;
   });
 
   y += 4;
