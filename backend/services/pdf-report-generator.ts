@@ -514,8 +514,14 @@ async function buildExecutiveReport(
     });
     y += 10;
 
+    if (y + 200 > CONTENT_BOTTOM) {
+      drawRunningFooter(doc, execPage++);
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
+      y = 90;
+    }
     y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Executivo");
-    y = drawReferencesSection(doc, y);
+    y = drawReferencesSection(doc, y, scan?.target ?? "—", "Executivo");
     drawRunningFooter(doc, execPage);
 
     doc.end();
@@ -1001,7 +1007,7 @@ async function buildTechnicalReport(
       y = 90;
     }
     y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Técnico");
-    y = drawReferencesSection(doc, y);
+    y = drawReferencesSection(doc, y, scan?.target ?? "—", "Técnico");
     drawRunningFooter(doc, techPage);
 
     doc.end();
@@ -1219,7 +1225,7 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
   return y;
 }
 
-function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
+function drawReferencesSection(doc: PDFKit.PDFDocument, y: number, target: string, reportType: string): number {
   y = drawSectionTitle(doc, "Referências Oficiais & Disclaimer", y);
 
   const refs = [
@@ -1232,15 +1238,22 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
   ];
 
   refs.forEach(([label, val], i) => {
+    const valH = doc.fontSize(7.5).font("Sans").heightOfString(val, { width: CONTENT_W - 126 });
+    const rowH = Math.max(18, valH + 10);
+    if (y + rowH > CONTENT_BOTTOM) {
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, target, reportType);
+      y = 90;
+    }
     const rowBg = i % 2 === 0 ? C.bg : C.white;
-    doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
+    doc.rect(MARGIN, y, CONTENT_W, rowH).fillColor(rowBg).fill();
     doc.fontSize(7.5).font("Sans-Bold").fillColor(C.brand)
        .text(label, MARGIN + 6, y + 5, { width: 110 });
     doc.fontSize(7.5).font("Sans").fillColor(C.text)
        .text(val, MARGIN + 120, y + 5, { width: CONTENT_W - 126 });
-    y += 18;
+    y = doc.y + 4;
   });
-  y += 10;
+  y += 6;
 
   const disclaimer =
     "DISCLAIMER: Este relatório é gerado automaticamente pela plataforma CISPLAN com base em fontes de inteligência pública. " +
