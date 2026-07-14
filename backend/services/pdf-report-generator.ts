@@ -6,6 +6,7 @@
  */
 
 import PDFDocument from "pdfkit";
+import path from "path";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getScanById, getOrganizationById, getLatestCompletedQuestionnaireForOrg } from "../db";
 import {
@@ -22,6 +23,11 @@ import {
 } from "./root-cause-aggregation";
 
 const sev = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
+
+// Fontes embebidas — DejaVu Sans cobre Unicode (setas →↳, diacríticos PT, ✓…)
+// path.join(__dirname, …) é resolvido relativamente ao módulo, não ao cwd — seguro no Railway.
+const FONT_REGULAR = path.join(__dirname, "..", "assets", "fonts", "DejaVuSans.ttf");
+const FONT_BOLD    = path.join(__dirname, "..", "assets", "fonts", "DejaVuSans-Bold.ttf");
 
 // ---------------------------------------------------------------------------
 // S3 / Hetzner Object Storage client
@@ -205,6 +211,8 @@ async function buildExecutiveReport(
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
       info: { Title: "CISPLAN — Relatório Executivo NIS2", Author: "CISPLAN", Creator: "CISPLAN" } });
+    doc.registerFont("Sans",      FONT_REGULAR);
+    doc.registerFont("Sans-Bold", FONT_BOLD);
     const chunks: Buffer[] = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
@@ -254,15 +262,15 @@ async function buildExecutiveReport(
       const bx = MARGIN + 80 + i * (boxW + 5);
       doc.rect(bx, y, boxW, 60).fillColor(C.bg).fill();
       doc.rect(bx, y, boxW, 4).fillColor(b.color).fill();
-      doc.fontSize(26).font("Helvetica-Bold").fillColor(b.color)
+      doc.fontSize(26).font("Sans-Bold").fillColor(b.color)
          .text(String(b.count), bx, y + 14, { width: boxW, align: "center" });
-      doc.fontSize(9).font("Helvetica").fillColor(C.muted)
+      doc.fontSize(9).font("Sans").fillColor(C.muted)
          .text(b.label, bx, y + 43, { width: boxW, align: "center" });
     });
     y += 75;
 
     // Scan info row
-    doc.fontSize(8).font("Helvetica").fillColor(C.muted);
+    doc.fontSize(8).font("Sans").fillColor(C.muted);
     doc.text(`Alvo: `, MARGIN, y, { continued: true }).fillColor(C.text).text(scan?.target ?? "—", { continued: true });
     doc.fillColor(C.muted).text(`   ·   Data: `, { continued: true }).fillColor(C.text).text(fmt(scan?.completedAt ?? scan?.createdAt));
     doc.fillColor(C.muted).text(`Modo: `, MARGIN, y + 14, { continued: true })
@@ -293,18 +301,18 @@ async function buildExecutiveReport(
         ? `Software OpenSSH ${sshTitle[1]} desatualizado${group.port !== null ? ` (porto ${group.port})` : ""}`
         : group.title;
       const titleLine = `${displayTitle} — ${secCount} ${sevLbl} (${group.counts.total} no total)`;
-      const titleH   = doc.fontSize(8).font("Helvetica-Bold").heightOfString(titleLine,     { width: CONTENT_W - 28 });
-      const summaryH = doc.fontSize(8).font("Helvetica")     .heightOfString(group.summary, { width: CONTENT_W - 28 });
-      const actionH  = doc.fontSize(7.5).font("Helvetica")   .heightOfString(`→ ${group.action}`, { width: CONTENT_W - 28 });
+      const titleH   = doc.fontSize(8).font("Sans-Bold").heightOfString(titleLine,     { width: CONTENT_W - 28 });
+      const summaryH = doc.fontSize(8).font("Sans")     .heightOfString(group.summary, { width: CONTENT_W - 28 });
+      const actionH  = doc.fontSize(7.5).font("Sans")   .heightOfString(`→ ${group.action}`, { width: CONTENT_W - 28 });
       execEnsure(titleH + summaryH + actionH + 22);
       doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(sColor).fill();
-      doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
+      doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
          .text(titleLine, MARGIN + 22, y, { width: CONTENT_W - 26 });
       y += titleH + 2;
-      doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+      doc.fontSize(8).font("Sans").fillColor(C.muted)
          .text(group.summary, MARGIN + 22, y, { width: CONTENT_W - 26 });
       y += summaryH + 4;
-      doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+      doc.fontSize(7.5).font("Sans").fillColor(C.brand)
          .text(`→ ${group.action}`, MARGIN + 22, y, { width: CONTENT_W - 26 });
       y += actionH + 10;
     };
@@ -312,10 +320,10 @@ async function buildExecutiveReport(
     // Renderiza um finding individual (sintético ou CVE não agrupado).
     const drawExecIndividual = (v: RcaVuln, sColor: string) => {
       const enriched = enrichFinding(v.description || v.cveId, v.cveId);
-      const tH = doc.fontSize(8).font("Helvetica").heightOfString(enriched.text, { width: CONTENT_W - 28 });
+      const tH = doc.fontSize(8).font("Sans").heightOfString(enriched.text, { width: CONTENT_W - 28 });
       execEnsure(tH + 14);
       doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(sColor).fill();
-      doc.fontSize(8).font("Helvetica").fillColor(C.text)
+      doc.fontSize(8).font("Sans").fillColor(C.text)
          .text(enriched.text, MARGIN + 22, y, { width: CONTENT_W - 26 });
       y += tH + 10;
     };
@@ -342,10 +350,10 @@ async function buildExecutiveReport(
           ? `Software OpenSSH ${sshT[1]} desatualizado${group.port !== null ? ` (porto ${group.port})` : ""}`
           : group.title;
         const cLine = `${dTitle} — ${secCount} ${sevLbl} (${group.counts.total} no total) — ver secção ${topSevSection[group.topSeverity]}`;
-        const cH = doc.fontSize(8).font("Helvetica").heightOfString(cLine, { width: CONTENT_W - 28 });
+        const cH = doc.fontSize(8).font("Sans").heightOfString(cLine, { width: CONTENT_W - 28 });
         execEnsure(cH + 14);
         doc.rect(MARGIN + 10, y + 3, 5, 5).fillColor(sColor).fill();
-        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(8).font("Sans").fillColor(C.muted)
            .text(cLine, MARGIN + 22, y, { width: CONTENT_W - 26 });
         y += cH + 10;
       };
@@ -365,7 +373,7 @@ async function buildExecutiveReport(
         execEnsure(36);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fdf4ff").fill();
         doc.rect(MARGIN, y, 4, 22).fillColor(C.critical).fill();
-        doc.fontSize(9).font("Helvetica-Bold").fillColor(C.critical)
+        doc.fontSize(9).font("Sans-Bold").fillColor(C.critical)
            .text(
              `CRÍTICAS (${criticals.length}) — Ação imediata nas próximas 24 a 72 horas`,
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
@@ -376,7 +384,7 @@ async function buildExecutiveReport(
         rcaResult.individuals.filter(i => i.severity === "critical")
           .forEach(v => drawExecIndividual(v, C.critical));
         execEnsure(14);
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
         y += 18;
       }
@@ -386,7 +394,7 @@ async function buildExecutiveReport(
         execEnsure(36);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fff7f0").fill();
         doc.rect(MARGIN, y, 4, 22).fillColor(C.danger).fill();
-        doc.fontSize(9).font("Helvetica-Bold").fillColor(C.danger)
+        doc.fontSize(9).font("Sans-Bold").fillColor(C.danger)
            .text(
              `ALTAS (${highs.length}) — Resolução recomendada em 7 dias`,
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
@@ -397,7 +405,7 @@ async function buildExecutiveReport(
         rcaResult.individuals.filter(i => i.severity === "high")
           .forEach(v => drawExecIndividual(v, C.danger));
         execEnsure(14);
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
         y += 18;
       }
@@ -407,7 +415,7 @@ async function buildExecutiveReport(
         execEnsure(50);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fffbeb").fill();
         doc.rect(MARGIN, y, 4, 22).fillColor(C.warning).fill();
-        doc.fontSize(9).font("Helvetica-Bold").fillColor("#92400e")
+        doc.fontSize(9).font("Sans-Bold").fillColor("#92400e")
            .text(
              `MÉDIAS (${mediums.length}) — Resolução recomendada em 30 dias`,
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
@@ -418,14 +426,14 @@ async function buildExecutiveReport(
         const medIndividuals = rcaResult.individuals.filter(i => i.severity === "medium");
         if (medIndividuals.length > 0) {
           const medSummary = buildMediumIndividualsSummary(medIndividuals);
-          const mH = doc.fontSize(8).font("Helvetica").heightOfString(medSummary, { width: CONTENT_W - 28 });
+          const mH = doc.fontSize(8).font("Sans").heightOfString(medSummary, { width: CONTENT_W - 28 });
           execEnsure(mH + 28);
-          doc.fontSize(8).font("Helvetica").fillColor(C.text)
+          doc.fontSize(8).font("Sans").fillColor(C.text)
              .text(medSummary, MARGIN + 22, y, { width: CONTENT_W - 26 });
           y += mH + 8;
         }
         execEnsure(14);
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text(
              "→ Listagem individual de cada vulnerabilidade no Relatório Técnico.",
              MARGIN + 22, y
@@ -438,7 +446,7 @@ async function buildExecutiveReport(
         execEnsure(36);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#f0fdf4").fill();
         doc.rect(MARGIN, y, 4, 22).fillColor(C.success).fill();
-        doc.fontSize(9).font("Helvetica-Bold").fillColor("#166534")
+        doc.fontSize(9).font("Sans-Bold").fillColor("#166534")
            .text(
              `BAIXAS (${lows.length}) — Resolução recomendada em 90 dias`,
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
@@ -449,7 +457,7 @@ async function buildExecutiveReport(
         rcaResult.individuals.filter(i => i.severity === "low")
           .forEach(v => drawExecIndividual(v, C.success));
         execEnsure(14);
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
         y += 18;
       }
@@ -469,15 +477,15 @@ async function buildExecutiveReport(
         const by   = y + row * 22;
         const art  = s.article.replace("Art. 21(2)", "").replace(/[()]/g, "");
         doc.rect(bx + 20, by + 6, colW - 55, 8).fillColor(C.border).fill();
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.muted)
+        doc.fontSize(7.5).font("Sans-Bold").fillColor(C.muted)
            .text(art, bx, by + 5, { width: 18, align: "right" });
         if (s.combinedScore === null) {
-          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+          doc.fontSize(7.5).font("Sans").fillColor(C.muted)
              .text("N/A", bx + colW - 30, by + 5, { width: 28, align: "right" });
         } else {
           const fill = Math.round((s.combinedScore / 100) * (colW - 55));
           doc.rect(bx + 20, by + 6, Math.max(2, fill), 8).fillColor(scoreColor(s.combinedScore)).fill();
-          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(scoreColor(s.combinedScore))
+          doc.fontSize(7.5).font("Sans-Bold").fillColor(scoreColor(s.combinedScore))
              .text(`${s.combinedScore}`, bx + colW - 30, by + 5, { width: 28, align: "right" });
         }
       });
@@ -495,9 +503,9 @@ async function buildExecutiveReport(
     const steps = buildNextSteps(overall, counts);
     steps.forEach((step, i) => {
       doc.rect(MARGIN, y, 20, 20).fillColor(C.brand).fill();
-      doc.fontSize(9).font("Helvetica-Bold").fillColor(C.white)
+      doc.fontSize(9).font("Sans-Bold").fillColor(C.white)
          .text(String(i + 1), MARGIN, y + 6, { width: 20, align: "center" });
-      doc.fontSize(9).font("Helvetica").fillColor(C.text)
+      doc.fontSize(9).font("Sans").fillColor(C.text)
          .text(step, MARGIN + 28, y + 5, { width: CONTENT_W - 28 });
       y += 28;
     });
@@ -636,6 +644,8 @@ async function buildTechnicalReport(
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false,
       info: { Title: "CISPLAN — Relatório Técnico NIS2", Author: "CISPLAN", Creator: "CISPLAN" } });
+    doc.registerFont("Sans",      FONT_REGULAR);
+    doc.registerFont("Sans-Bold", FONT_BOLD);
     const chunks: Buffer[] = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
@@ -673,9 +683,9 @@ async function buildTechnicalReport(
     metaRows.forEach(([label, val], i) => {
       const rowBg = i % 2 === 0 ? C.bg : C.white;
       doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
-      doc.fontSize(8.5).font("Helvetica-Bold").fillColor(C.muted)
+      doc.fontSize(8.5).font("Sans-Bold").fillColor(C.muted)
          .text(label, MARGIN + 6, y + 5, { width: 120 });
-      doc.fontSize(8.5).font("Helvetica").fillColor(C.text)
+      doc.fontSize(8.5).font("Sans").fillColor(C.text)
          .text(String(val), MARGIN + 130, y + 5, { width: CONTENT_W - 136 });
       y += 18;
     });
@@ -689,7 +699,7 @@ async function buildTechnicalReport(
     y = drawSectionTitle(doc, "Portos Analisados", y);
     if (openPorts.length > 0) {
       // Summary line
-      doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+      doc.fontSize(7.5).font("Sans").fillColor(C.muted)
          .text(
            `${openPorts.length} porta(s) analisada(s) · ${withCvesCount} com vulnerabilidades · ${withoutCvesCount} sem CVEs conhecidos.`,
            MARGIN, y + 1, { width: CONTENT_W }
@@ -697,7 +707,7 @@ async function buildTechnicalReport(
       y += 16;
       // Table header
       doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(C.navy).fill();
-      doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white);
+      doc.fontSize(8).font("Sans-Bold").fillColor(C.white);
       doc.text("Porto",            MARGIN + 6,   y + 5, { width: 50 });
       doc.text("Protocolo",        MARGIN + 60,  y + 5, { width: 60 });
       doc.text("Serviço",          MARGIN + 125, y + 5, { width: 100 });
@@ -708,31 +718,31 @@ async function buildTechnicalReport(
         if (y > 730) { doc.addPage({ size: "A4", margin: 0 }); drawRunningHeader(doc, scan?.target ?? "—", "Técnico"); y = 90; }
         const rowBg = i % 2 === 0 ? C.bg : C.white;
         doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
-        doc.fontSize(8).font("Helvetica-Bold").fillColor(C.brand)
+        doc.fontSize(8).font("Sans-Bold").fillColor(C.brand)
            .text(String(p.port), MARGIN + 6, y + 5, { width: 50 });
-        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(8).font("Sans").fillColor(C.muted)
            .text(p.protocol.toUpperCase(), MARGIN + 60, y + 5, { width: 60 });
         doc.fillColor(C.text).text(p.service, MARGIN + 125, y + 5, { width: 100 });
         doc.fillColor(C.muted).text(truncate(`${p.product ?? ""} ${p.version ?? ""}`.trim() || "—", 35), MARGIN + 230, y + 5, { width: 160 });
         const cveCount = (p.cves ?? []).length;
         if (cveCount > 0) {
           doc.rect(MARGIN + 398, y + 3, 48, 13).fillColor(C.danger).fill();
-          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
+          doc.fontSize(7.5).font("Sans-Bold").fillColor(C.white)
              .text(`${cveCount} CVE${cveCount > 1 ? "s" : ""}`, MARGIN + 398, y + 6, { width: 48, align: "center" });
         } else {
-          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+          doc.fontSize(7.5).font("Sans").fillColor(C.muted)
              .text("—", MARGIN + 398, y + 6, { width: 48, align: "center" });
         }
         y += 18;
       });
       if (openPorts.length > 20) {
-        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(8).font("Sans").fillColor(C.muted)
            .text(`+ ${openPorts.length - 20} porto(s) adicionais — ver detalhe completo na plataforma.`, MARGIN, y + 4);
         y += 18;
       }
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
-      doc.fontSize(9).font("Helvetica").fillColor(C.success)
+      doc.fontSize(9).font("Sans").fillColor(C.success)
          .text("✓ Nenhum porto exposto detetado nas fontes consultadas.", MARGIN + 10, y + 10);
       y += 30;
     }
@@ -750,7 +760,7 @@ async function buildTechnicalReport(
     if (vulns.length > 0) {
       const techRca = aggregateByRootCause(vulns, openPorts);
       if (techRca.groups.length > 0) {
-        doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
+        doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
            .text("Resumo por causa raiz:", MARGIN, y);
         y += 14;
         techRca.groups.forEach((g) => {
@@ -765,7 +775,7 @@ async function buildTechnicalReport(
               g.counts.medium   > 0 ? `${g.counts.medium} méd.`    : "",
               g.counts.low      > 0 ? `${g.counts.low} baixa${g.counts.low !== 1 ? "s" : ""}` : "",
             ].filter(Boolean).join(" · ");
-          const lH = doc.fontSize(7.5).font("Helvetica").heightOfString(line, { width: CONTENT_W - 16 });
+          const lH = doc.fontSize(7.5).font("Sans").heightOfString(line, { width: CONTENT_W - 16 });
           if (y + lH > 760) {
             drawRunningFooter(doc, 3);
             doc.addPage({ size: "A4", margin: 0 });
@@ -773,13 +783,13 @@ async function buildTechnicalReport(
             y = 90;
           }
           doc.rect(MARGIN, y + 2, 3, lH).fillColor(severityColor(g.topSeverity)).fill();
-          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+          doc.fontSize(7.5).font("Sans").fillColor(C.muted)
              .text(line, MARGIN + 8, y, { width: CONTENT_W - 12 });
           y += lH + 4;
         });
         if (techRca.individuals.length > 0) {
           const indLine = `${techRca.individuals.length} finding${techRca.individuals.length !== 1 ? "s" : ""} individu${techRca.individuals.length !== 1 ? "ais" : "al"} (sintéticos de configuração e serviços isolados)`;
-          doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+          doc.fontSize(7.5).font("Sans").fillColor(C.muted)
              .text(indLine, MARGIN + 8, y, { width: CONTENT_W - 12 });
           y += 14;
         }
@@ -799,12 +809,12 @@ async function buildTechnicalReport(
         const descText  = v.description ?? "";
         const remText   = v.remediation ? `↳ ${v.remediation}` : "";
         const dnsExample = getDnsExample(v.cveId, v.affectedComponent, scan?.target ?? "");
-        const descH = doc.fontSize(8).font("Helvetica").heightOfString(descText, { width: TEXT_W });
+        const descH = doc.fontSize(8).font("Sans").heightOfString(descText, { width: TEXT_W });
         const remH  = remText
-          ? doc.fontSize(8).font("Helvetica").heightOfString(remText, { width: TEXT_W }) + 4
+          ? doc.fontSize(8).font("Sans").heightOfString(remText, { width: TEXT_W }) + 4
           : 0;
         const dnsH  = dnsExample
-          ? doc.fontSize(7.5).font("Helvetica").heightOfString(dnsExample, { width: TEXT_W - 12 }) + 18
+          ? doc.fontSize(7.5).font("Sans").heightOfString(dnsExample, { width: TEXT_W - 12 }) + 18
           : 0;
         const HEADER_H = 20; // CVE ID row
         const PADDING  = 14; // top + bottom breathing room
@@ -822,9 +832,9 @@ async function buildTechnicalReport(
         doc.rect(MARGIN, y, 4, rowH - 4).fillColor(sColor).fill();
 
         // CVE ID line
-        doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
+        doc.fontSize(9).font("Sans-Bold").fillColor(C.text)
            .text(v.cveId, MARGIN + 12, y + 4, { width: 200 });
-        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(8).font("Sans").fillColor(C.muted)
            .text(
              `CVSS ${v.cvssScore}  ·  ${v.affectedComponent}${v.port ? ` :${v.port}` : ""}`,
              MARGIN + 215, y + 5, { width: 185 }
@@ -832,18 +842,18 @@ async function buildTechnicalReport(
 
         // Severity badge (top-right)
         doc.rect(MARGIN + 415, y + 2, 80, 14).fillColor(sColor).fill();
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.white)
+        doc.fontSize(7.5).font("Sans-Bold").fillColor(C.white)
            .text(severityLabel(v.severity).toUpperCase(), MARGIN + 415, y + 5, { width: 80, align: "center" });
 
         // Description — placed right below header row
         const descY = y + HEADER_H;
-        doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(8).font("Sans").fillColor(C.muted)
            .text(descText, MARGIN + 12, descY, { width: TEXT_W });
 
         // Remediation hint — placed below description
         if (remText) {
           const remY = descY + descH + 4;
-          doc.fontSize(8).font("Helvetica").fillColor(C.brand)
+          doc.fontSize(8).font("Sans").fillColor(C.brand)
              .text(remText, MARGIN + 12, remY, { width: TEXT_W });
         }
 
@@ -852,9 +862,9 @@ async function buildTechnicalReport(
           const dnsY = descY + descH + remH + (remText ? 4 : 0) + 4;
           doc.rect(MARGIN + 12, dnsY, TEXT_W, dnsH - 4).fillColor(C.bg).fill();
           doc.rect(MARGIN + 12, dnsY, 3, dnsH - 4).fillColor(C.warning).fill();
-          doc.fontSize(7).font("Helvetica-Bold").fillColor(C.muted)
+          doc.fontSize(7).font("Sans-Bold").fillColor(C.muted)
              .text("Registo DNS (copiar para o seu fornecedor de domínio):", MARGIN + 20, dnsY + 4, { width: TEXT_W - 12 });
-          doc.fontSize(7.5).font("Helvetica").fillColor(C.navy)
+          doc.fontSize(7.5).font("Sans").fillColor(C.navy)
              .text(dnsExample, MARGIN + 20, dnsY + 14, { width: TEXT_W - 12 });
         }
 
@@ -866,7 +876,7 @@ async function buildTechnicalReport(
       drawRunningFooter(doc, 3);
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 36).fillColor("#ecfdf5").fill();
-      doc.fontSize(10).font("Helvetica-Bold").fillColor(C.success)
+      doc.fontSize(10).font("Sans-Bold").fillColor(C.success)
          .text("✓ Nenhuma vulnerabilidade conhecida encontrada.", MARGIN + 12, y + 12);
       drawRunningFooter(doc, 3);
     }
@@ -878,7 +888,7 @@ async function buildTechnicalReport(
     y = drawSectionTitle(doc, "Conformidade NIS2 — Detalhe por Artigo (Art. 21(2))", y);
 
     // Intro text
-    doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+    doc.fontSize(8).font("Sans").fillColor(C.muted)
        .text(
          "Avaliação automatizada baseada nos serviços expostos, vulnerabilidades detetadas e configurações de segurança analisadas. " +
          "Cada artigo reflete um domínio de conformidade da Diretiva NIS2, transposta em Portugal pelo Decreto-Lei n.º 125/2025.",
@@ -900,7 +910,7 @@ async function buildTechnicalReport(
         .filter(ef => !_seenEnriched.has(ef.text) && (_seenEnriched.add(ef.text), true))
         .slice(0, 4);
       const findingHeights = enriched.map(ef =>
-        doc.fontSize(7.5).font("Helvetica").heightOfString(ef.text, { width: FIND_W }) + 6
+        doc.fontSize(7.5).font("Sans").heightOfString(ef.text, { width: FIND_W }) + 6
       );
       const totalFindH = findingHeights.reduce((a, b) => a + b, 0);
       const rowH = 34 + (hasFail ? totalFindH + 4 : 14);
@@ -920,13 +930,13 @@ async function buildTechnicalReport(
 
       // Score circle (small) — "N/A" para medidas sem score disponível
       doc.circle(MARGIN + 16, y + 16, 14).fillColor(col).fill();
-      doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white)
+      doc.fontSize(8).font("Sans-Bold").fillColor(C.white)
          .text(isNull ? "N/A" : String(displayScore), MARGIN + 4, y + 11, { width: 24, align: "center" });
 
       // Article + short title
-      doc.fontSize(9).font("Helvetica-Bold").fillColor(C.text)
+      doc.fontSize(9).font("Sans-Bold").fillColor(C.text)
          .text(s.article, MARGIN + 38, y + 2, { width: 100 });
-      doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+      doc.fontSize(8).font("Sans").fillColor(C.muted)
          .text(artInfo?.short ?? "", MARGIN + 38, y + 14, { width: 140 });
 
       // Progress bar
@@ -934,7 +944,7 @@ async function buildTechnicalReport(
       doc.rect(MARGIN + 185, y + 10, barFill, 8).fillColor(col).fill();
 
       // Scope description
-      doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+      doc.fontSize(7.5).font("Sans").fillColor(C.muted)
          .text("Âmbito: " + (artInfo?.desc ?? s.title), MARGIN + 360, y + 2, { width: CONTENT_W - 315 });
 
       // Findings with colored square indicators
@@ -943,30 +953,30 @@ async function buildTechnicalReport(
         enriched.forEach((ef, fi) => {
           const fColor = ef.critical ? C.danger : C.warning;
           doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(fColor).fill();
-          doc.fontSize(7.5).font("Helvetica").fillColor(ef.critical ? C.danger : C.text)
+          doc.fontSize(7.5).font("Sans").fillColor(ef.critical ? C.danger : C.text)
              .text(ef.text, MARGIN + 48, fy, { width: FIND_W });
           fy += findingHeights[fi];
         });
       } else if (isNull && !s.scannable) {
         // Medida organizacional sem questionário preenchido
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(7.5).font("Sans").fillColor(C.muted)
            .text(
              "Não avaliável por scan — requer questionário de autoavaliação (medida organizacional não observável externamente).",
              MARGIN + 48, y + 30, { width: FIND_W }
            );
       } else if (isNull) {
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+        doc.fontSize(7.5).font("Sans").fillColor(C.muted)
            .text("Sem dados suficientes para avaliação.", MARGIN + 48, y + 30, { width: FIND_W });
       } else if (!s.scannable && s.source === "questionnaire") {
         // Score obtido exclusivamente via questionário (medida organizacional)
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.brand).fill();
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.brand)
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text("Score obtido via Questionário NIS2 (medida organizacional).", MARGIN + 48, y + 30, { width: FIND_W });
       } else {
         doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.success).fill();
-        doc.fontSize(7.5).font("Helvetica").fillColor(C.success)
+        doc.fontSize(7.5).font("Sans").fillColor(C.success)
            .text("Sem problemas detetados neste domínio.", MARGIN + 48, y + 30, { width: FIND_W });
       }
 
@@ -1010,9 +1020,9 @@ function drawCoverPage(
   doc.rect(0, PAGE_H * 0.55 + 5, PAGE_W, PAGE_H * 0.45 - 5).fillColor(C.white).fill();
 
   // ── Brand / Logo area ──
-  doc.fontSize(32).font("Helvetica-Bold").fillColor(C.white)
+  doc.fontSize(32).font("Sans-Bold").fillColor(C.white)
      .text("CISPLAN", MARGIN, 52);
-  doc.fontSize(11).font("Helvetica").fillColor("#93c5fd")
+  doc.fontSize(11).font("Sans").fillColor("#93c5fd")
      .text("Plataforma de Conformidade NIS2", MARGIN, 92);
 
   // ── Score circle (large) ──
@@ -1021,13 +1031,13 @@ function drawCoverPage(
   // Outer ring
   doc.circle(cx, cy, radius + 6).fillColor(C.navyMid).fill();
   doc.circle(cx, cy, radius).fillColor(scoreColor(overall)).fill();
-  doc.fontSize(38).font("Helvetica-Bold").fillColor(C.white)
+  doc.fontSize(38).font("Sans-Bold").fillColor(C.white)
      .text(String(overall), cx - 35, cy - 22, { width: 70, align: "center" });
-  doc.fontSize(13).font("Helvetica").fillColor(C.white)
+  doc.fontSize(13).font("Sans").fillColor(C.white)
      .text("/ 100", cx - 30, cy + 18, { width: 60, align: "center" });
 
   // Score label below circle
-  doc.fontSize(13).font("Helvetica-Bold").fillColor(scoreColor(overall))
+  doc.fontSize(13).font("Sans-Bold").fillColor(scoreColor(overall))
      .text(scoreLabel(overall), 0, cy + 75, { align: "center", width: PAGE_W });
 
   // ── Bottom white section ──
@@ -1035,11 +1045,11 @@ function drawCoverPage(
 
   // Classification badge
   doc.rect(MARGIN, by, 130, 20).fillColor(C.danger).fill();
-  doc.fontSize(8).font("Helvetica-Bold").fillColor(C.white)
+  doc.fontSize(8).font("Sans-Bold").fillColor(C.white)
      .text(classification, MARGIN, by + 6, { width: 130, align: "center" });
 
   // Report type title
-  doc.fontSize(20).font("Helvetica-Bold").fillColor(C.text)
+  doc.fontSize(20).font("Sans-Bold").fillColor(C.text)
      .text(reportType, MARGIN, by + 34, { width: CONTENT_W });
 
   // Divider
@@ -1048,16 +1058,16 @@ function drawCoverPage(
 
   // Target + date
   const target = scan?.target ?? "—";
-  doc.fontSize(10).font("Helvetica-Bold").fillColor(C.muted)
+  doc.fontSize(10).font("Sans-Bold").fillColor(C.muted)
      .text("Alvo da análise:", MARGIN, by + 76);
-  doc.fontSize(14).font("Helvetica-Bold").fillColor(C.brand)
+  doc.fontSize(14).font("Sans-Bold").fillColor(C.brand)
      .text(target, MARGIN, by + 92);
-  doc.fontSize(9).font("Helvetica").fillColor(C.muted)
+  doc.fontSize(9).font("Sans").fillColor(C.muted)
      .text(`Data: ${fmtFull(scan?.completedAt ?? scan?.createdAt)}   ·   Scan ID: #${scan?.id ?? "—"}`, MARGIN, by + 114);
 
   // Bottom footer bar
   doc.rect(0, PAGE_H - 46, PAGE_W, 46).fillColor(C.navyMid).fill();
-  doc.fontSize(7.5).font("Helvetica").fillColor("#93c5fd")
+  doc.fontSize(7.5).font("Sans").fillColor("#93c5fd")
      .text(
        "CISPLAN · cisplan.com   ·   NIS2 Directiva (UE) 2022/2555 · DL 125/2025   ·   CNCS — Centro Nacional de Cibersegurança",
        MARGIN, PAGE_H - 28, { align: "center", width: CONTENT_W }
@@ -1072,11 +1082,11 @@ function drawRunningHeader(doc: PDFKit.PDFDocument, target: string, type: string
   doc.rect(0, 0, PAGE_W, 50).fillColor(C.navy).fill();
   doc.rect(0, 50, PAGE_W, 3).fillColor(C.brand).fill();
 
-  doc.fontSize(12).font("Helvetica-Bold").fillColor(C.white)
+  doc.fontSize(12).font("Sans-Bold").fillColor(C.white)
      .text("CISPLAN", MARGIN, 16);
-  doc.fontSize(8).font("Helvetica").fillColor("#93c5fd")
+  doc.fontSize(8).font("Sans").fillColor("#93c5fd")
      .text(`Relatório ${type} NIS2`, MARGIN + 80, 19);
-  doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+  doc.fontSize(8).font("Sans").fillColor(C.muted)
      .text(target, 0, 19, { align: "right", width: PAGE_W - MARGIN });
 }
 
@@ -1084,12 +1094,12 @@ function drawRunningFooter(doc: PDFKit.PDFDocument, pageNum: number): void {
   doc.rect(0, PAGE_H - 32, PAGE_W, 32).fillColor(C.bg).fill();
   doc.moveTo(MARGIN, PAGE_H - 32).lineTo(PAGE_W - MARGIN, PAGE_H - 32)
      .strokeColor(C.border).lineWidth(0.5).stroke();
-  doc.fontSize(7).font("Helvetica").fillColor(C.muted)
+  doc.fontSize(7).font("Sans").fillColor(C.muted)
      .text(
        `CISPLAN · Relatório gerado em ${fmt(new Date())} · Confidencial`,
        MARGIN, PAGE_H - 20, { width: CONTENT_W - 40 }
      );
-  doc.fontSize(7).font("Helvetica-Bold").fillColor(C.brand)
+  doc.fontSize(7).font("Sans-Bold").fillColor(C.brand)
      .text(`Página ${pageNum}`, 0, PAGE_H - 20, { width: PAGE_W - MARGIN, align: "right" });
 }
 
@@ -1099,7 +1109,7 @@ function drawRunningFooter(doc: PDFKit.PDFDocument, pageNum: number): void {
 
 function drawSectionTitle(doc: PDFKit.PDFDocument, title: string, y: number): number {
   doc.rect(MARGIN, y, 4, 18).fillColor(C.brand).fill();
-  doc.fontSize(11).font("Helvetica-Bold").fillColor(C.text)
+  doc.fontSize(11).font("Sans-Bold").fillColor(C.text)
      .text(title, MARGIN + 12, y + 3);
   doc.moveTo(MARGIN, y + 22).lineTo(PAGE_W - MARGIN, y + 22)
      .strokeColor(C.border).lineWidth(0.5).stroke();
@@ -1109,9 +1119,9 @@ function drawSectionTitle(doc: PDFKit.PDFDocument, title: string, y: number): nu
 function drawScoreCircle(doc: PDFKit.PDFDocument, score: number, x: number, y: number): void {
   const cx = x + 30, cy = y + 30;
   doc.circle(cx, cy, 32).fillColor(scoreColor(score)).fill();
-  doc.fontSize(20).font("Helvetica-Bold").fillColor(C.white)
+  doc.fontSize(20).font("Sans-Bold").fillColor(C.white)
      .text(String(score), cx - 22, cy - 13, { width: 44, align: "center" });
-  doc.fontSize(8).font("Helvetica").fillColor(C.white)
+  doc.fontSize(8).font("Sans").fillColor(C.white)
      .text("/ 100", cx - 20, cy + 10, { width: 40, align: "center" });
 }
 
@@ -1147,7 +1157,7 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
     "recorrendo exclusivamente a fontes de dados externas e técnicas de inteligência de fontes abertas (OSINT). " +
     "As auditorias basearam-se nas seguintes plataformas e protocolos:";
 
-  doc.fontSize(8).font("Helvetica").fillColor(C.text)
+  doc.fontSize(8).font("Sans").fillColor(C.text)
      .text(intro, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
   y += doc.heightOfString(intro, { width: CONTENT_W, lineGap: 2 }) + 8;
 
@@ -1155,16 +1165,16 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
 
   categories.forEach((cat) => {
     doc.rect(MARGIN, y, 3, 12).fillColor(C.brand).fill();
-    doc.fontSize(8).font("Helvetica-Bold").fillColor(C.text)
+    doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
        .text(cat.label + ": ", MARGIN + 8, y, { continued: true, width: CONTENT_W - 8 });
-    doc.font("Helvetica").fillColor(C.muted)
+    doc.font("Sans").fillColor(C.muted)
        .text(cat.detail, { width: CONTENT_W - 8 });
     y += doc.heightOfString(cat.detail, { width: CONTENT_W - 8 }) + 8;
   });
 
   y += 4;
   const limitTitle = "Limitações do Diagnóstico Exterior:";
-  doc.fontSize(8).font("Helvetica-Bold").fillColor(C.warning).text(limitTitle, MARGIN, y);
+  doc.fontSize(8).font("Sans-Bold").fillColor(C.warning).text(limitTitle, MARGIN, y);
   y += 14;
 
   const limits =
@@ -1175,16 +1185,16 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
     "deve preencher o Questionário de Autoavaliação NIS2 (42 controlos) disponível no painel da plataforma. " +
     "Os resultados aqui apresentados baseiam-se em heurísticas de risco e devem ser validados por técnicos de sistemas.";
 
-  doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+  doc.fontSize(8).font("Sans").fillColor(C.muted)
      .text(limits, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
   y += doc.heightOfString(limits, { width: CONTENT_W, lineGap: 2 }) + 6;
 
   if (scanLimitations.length > 0) {
-    doc.fontSize(8).font("Helvetica-Bold").fillColor(C.warning)
+    doc.fontSize(8).font("Sans-Bold").fillColor(C.warning)
        .text("Limitações específicas deste scan:", MARGIN, y);
     y += 12;
     for (const lim of scanLimitations) {
-      doc.fontSize(8).font("Helvetica").fillColor(C.muted)
+      doc.fontSize(8).font("Sans").fillColor(C.muted)
          .text(`• ${lim}`, MARGIN + 8, y, { width: CONTENT_W - 8, lineGap: 2 });
       y += doc.heightOfString(lim, { width: CONTENT_W - 8, lineGap: 2 }) + 4;
     }
@@ -1211,9 +1221,9 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
   refs.forEach(([label, val], i) => {
     const rowBg = i % 2 === 0 ? C.bg : C.white;
     doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
-    doc.fontSize(7.5).font("Helvetica-Bold").fillColor(C.brand)
+    doc.fontSize(7.5).font("Sans-Bold").fillColor(C.brand)
        .text(label, MARGIN + 6, y + 5, { width: 110 });
-    doc.fontSize(7.5).font("Helvetica").fillColor(C.text)
+    doc.fontSize(7.5).font("Sans").fillColor(C.text)
        .text(val, MARGIN + 120, y + 5, { width: CONTENT_W - 126 });
     y += 18;
   });
@@ -1227,7 +1237,7 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number): number {
 
   doc.rect(MARGIN, y, CONTENT_W, 4).fillColor(C.danger).fill();
   y += 8;
-  doc.fontSize(7.5).font("Helvetica").fillColor(C.muted)
+  doc.fontSize(7.5).font("Sans").fillColor(C.muted)
      .text(disclaimer, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
   const h = doc.heightOfString(disclaimer, { width: CONTENT_W, lineGap: 2 });
   return y + h + 10;
