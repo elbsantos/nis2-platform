@@ -494,12 +494,7 @@ async function buildExecutiveReport(
     }
 
     // ── PRÓXIMOS PASSOS + METODOLOGIA + REFERÊNCIAS ───────────────────────
-    if (y + 60 > CONTENT_BOTTOM) {
-      drawRunningFooter(doc, execPage++);
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
-      y = 90;
-    }
+    if (y + 60 > CONTENT_BOTTOM) execAddPage();
 
     y = drawSectionTitle(doc, "Próximos Passos Recomendados", y);
     const steps = buildNextSteps(overall, counts);
@@ -513,14 +508,9 @@ async function buildExecutiveReport(
     });
     y += 10;
 
-    if (y + 200 > CONTENT_BOTTOM) {
-      drawRunningFooter(doc, execPage++);
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
-      y = 90;
-    }
-    y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Executivo");
-    y = drawReferencesSection(doc, y, scan?.target ?? "—", "Executivo");
+    if (y + 200 > CONTENT_BOTTOM) execAddPage();
+    y = drawMethodologySection(doc, y, dataSources, scanLimitations, execAddPage);
+    y = drawReferencesSection(doc, y, execAddPage);
     drawRunningFooter(doc, execPage);
 
     doc.end();
@@ -979,8 +969,8 @@ async function buildTechnicalReport(
 
     // ── METODOLOGIA + REFERÊNCIAS ──────────────────────────────────────────
     if (y + 200 > CONTENT_BOTTOM) techAddPage();
-    y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Técnico");
-    y = drawReferencesSection(doc, y, scan?.target ?? "—", "Técnico");
+    y = drawMethodologySection(doc, y, dataSources, scanLimitations, techAddPage);
+    y = drawReferencesSection(doc, y, techAddPage);
     drawRunningFooter(doc, techPage);
 
     doc.end();
@@ -1135,7 +1125,8 @@ export function buildMethodologyBullets(dataSources: string[]): Array<{ label: s
   ];
 }
 
-function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[], scanLimitations: string[], target: string, reportType: string): number {
+function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources: string[], scanLimitations: string[], ensurePage: (needed: number) => void): number {
+  if (y + 60 > CONTENT_BOTTOM) { ensurePage(60); y = 90; }
   y = drawSectionTitle(doc, "Metodologia & Limitações Técnicas", y);
 
   const intro =
@@ -1151,11 +1142,7 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
 
   categories.forEach((cat) => {
     const estH = doc.fontSize(8).font("Sans").heightOfString(cat.label + ": " + cat.detail, { width: CONTENT_W - 8 });
-    if (y + estH + 8 > CONTENT_BOTTOM) {
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, target, reportType);
-      y = 90;
-    }
+    if (y + estH + 8 > CONTENT_BOTTOM) { ensurePage(estH + 8); y = 90; }
     doc.rect(MARGIN, y, 3, 12).fillColor(C.brand).fill();
     doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
        .text(cat.label + ": ", MARGIN + 8, y, { continued: true, width: CONTENT_W - 8 });
@@ -1198,7 +1185,8 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
   return y;
 }
 
-function drawReferencesSection(doc: PDFKit.PDFDocument, y: number, target: string, reportType: string): number {
+function drawReferencesSection(doc: PDFKit.PDFDocument, y: number, ensurePage: (needed: number) => void): number {
+  if (y + 60 > CONTENT_BOTTOM) { ensurePage(60); y = 90; }
   y = drawSectionTitle(doc, "Referências Oficiais & Disclaimer", y);
 
   const refs = [
@@ -1213,11 +1201,7 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number, target: strin
   refs.forEach(([label, val], i) => {
     const valH = doc.fontSize(7.5).font("Sans").heightOfString(val, { width: CONTENT_W - 126 });
     const rowH = Math.max(18, valH + 10);
-    if (y + rowH > CONTENT_BOTTOM) {
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, target, reportType);
-      y = 90;
-    }
+    if (y + rowH > CONTENT_BOTTOM) { ensurePage(rowH); y = 90; }
     const rowBg = i % 2 === 0 ? C.bg : C.white;
     doc.rect(MARGIN, y, CONTENT_W, rowH).fillColor(rowBg).fill();
     doc.fontSize(7.5).font("Sans-Bold").fillColor(C.brand)
