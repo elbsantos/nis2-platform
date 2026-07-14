@@ -1134,9 +1134,11 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
     "recorrendo exclusivamente a fontes de dados externas e técnicas de inteligência de fontes abertas (OSINT). " +
     "As auditorias basearam-se nas seguintes plataformas e protocolos:";
 
+  const introH = doc.fontSize(8).font("Sans").heightOfString(intro, { width: CONTENT_W, lineGap: 2 });
+  if (y + introH > CONTENT_BOTTOM) { ensurePage(introH); y = 90; }
   doc.fontSize(8).font("Sans").fillColor(C.text)
      .text(intro, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
-  y += doc.heightOfString(intro, { width: CONTENT_W, lineGap: 2 }) + 8;
+  y += introH + 8;
 
   const categories = buildMethodologyBullets(dataSources);
 
@@ -1151,11 +1153,7 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
     y = doc.y + 8;
   });
 
-  y += 4;
   const limitTitle = "Limitações do Diagnóstico Exterior:";
-  doc.fontSize(8).font("Sans-Bold").fillColor(C.warning).text(limitTitle, MARGIN, y);
-  y += 14;
-
   const limits =
     "Por ser uma análise estritamente externa (do ponto de vista do atacante), este teste não acede a sistemas internos, " +
     "bases de dados protegidas, aplicações autenticadas ou redes privadas (VPNs/LANs). Consequentemente, vulnerabilidades " +
@@ -1163,16 +1161,27 @@ function drawMethodologySection(doc: PDFKit.PDFDocument, y: number, dataSources:
     "cópias de segurança) não são avaliados automaticamente. Para auditar estes controlos específicos da NIS2, a organização " +
     "deve preencher o Questionário de Autoavaliação NIS2 (42 controlos) disponível no painel da plataforma. " +
     "Os resultados aqui apresentados baseiam-se em heurísticas de risco e devem ser validados por técnicos de sistemas.";
-
+  const limTitleH = doc.fontSize(8).font("Sans-Bold").heightOfString(limitTitle, { width: CONTENT_W });
+  const limitsH   = doc.fontSize(8).font("Sans").heightOfString(limits, { width: CONTENT_W, lineGap: 2 });
+  if (y + 4 + limTitleH + 14 + 12 > CONTENT_BOTTOM) { ensurePage(4 + limTitleH + 14 + 12); y = 90; }
+  y += 4;
+  doc.fontSize(8).font("Sans-Bold").fillColor(C.warning).text(limitTitle, MARGIN, y);
+  y += 14;
+  if (y + limitsH + 6 > CONTENT_BOTTOM) { ensurePage(limitsH + 6); y = 90; }
   doc.fontSize(8).font("Sans").fillColor(C.muted)
      .text(limits, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
-  y += doc.heightOfString(limits, { width: CONTENT_W, lineGap: 2 }) + 6;
+  y += limitsH + 6;
 
   if (scanLimitations.length > 0) {
+    const specTitleH = doc.fontSize(8).font("Sans-Bold").heightOfString("Limitações específicas deste scan:", { width: CONTENT_W });
+    const firstItemH = doc.fontSize(8).font("Sans").heightOfString(`• ${scanLimitations[0]}`, { width: CONTENT_W - 8, lineGap: 2 });
+    if (y + specTitleH + 12 + firstItemH + 4 > CONTENT_BOTTOM) { ensurePage(specTitleH + 12 + firstItemH + 4); y = 90; }
     doc.fontSize(8).font("Sans-Bold").fillColor(C.warning)
        .text("Limitações específicas deste scan:", MARGIN, y);
     y += 12;
     for (const lim of scanLimitations) {
+      const limH = doc.fontSize(8).font("Sans").heightOfString(`• ${lim}`, { width: CONTENT_W - 8, lineGap: 2 });
+      if (y + limH + 4 > CONTENT_BOTTOM) { ensurePage(limH + 4); y = 90; }
       doc.fontSize(8).font("Sans").fillColor(C.muted)
          .text(`• ${lim}`, MARGIN + 8, y, { width: CONTENT_W - 8, lineGap: 2 });
       y += doc.heightOfString(lim, { width: CONTENT_W - 8, lineGap: 2 }) + 4;
@@ -1218,12 +1227,13 @@ function drawReferencesSection(doc: PDFKit.PDFDocument, y: number, ensurePage: (
     "A CISPLAN não se responsabiliza por decisões tomadas exclusivamente com base neste relatório sem confirmação técnica adicional. " +
     "Os resultados devem ser interpretados por um profissional de cibersegurança qualificado.";
 
+  const disclaimerH = doc.fontSize(7.5).font("Sans").heightOfString(disclaimer, { width: CONTENT_W, lineGap: 2 });
+  if (y + 4 + 8 + disclaimerH + 10 > CONTENT_BOTTOM) { ensurePage(4 + 8 + disclaimerH + 10); y = 90; }
   doc.rect(MARGIN, y, CONTENT_W, 4).fillColor(C.danger).fill();
   y += 8;
   doc.fontSize(7.5).font("Sans").fillColor(C.muted)
      .text(disclaimer, MARGIN, y, { width: CONTENT_W, lineGap: 2 });
-  const h = doc.heightOfString(disclaimer, { width: CONTENT_W, lineGap: 2 });
-  return y + h + 10;
+  return y + disclaimerH + 10;
 }
 
 // groupByTheme, getVulnTheme, buildMediumSummary removidos em 0.6:
