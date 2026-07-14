@@ -1059,7 +1059,7 @@ function drawCoverPage(
   doc.rect(0, PAGE_H - 46, PAGE_W, 46).fillColor(C.navyMid).fill();
   doc.fontSize(7.5).font("Helvetica").fillColor("#93c5fd")
      .text(
-       "CISPLAN · cisplan.pt   ·   NIS2 Directiva (UE) 2022/2555 · DL 125/2025   ·   CNCS — Centro Nacional de Cibersegurança",
+       "CISPLAN · cisplan.com   ·   NIS2 Directiva (UE) 2022/2555 · DL 125/2025   ·   CNCS — Centro Nacional de Cibersegurança",
        MARGIN, PAGE_H - 28, { align: "center", width: CONTENT_W }
      );
 }
