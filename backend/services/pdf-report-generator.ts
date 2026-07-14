@@ -493,10 +493,9 @@ async function buildExecutiveReport(
       y += half * 22 + 10;
     }
 
-    drawRunningFooter(doc, execPage++);
-
     // ── PRÓXIMOS PASSOS + METODOLOGIA + REFERÊNCIAS ───────────────────────
     if (y + 60 > CONTENT_BOTTOM) {
+      drawRunningFooter(doc, execPage++);
       doc.addPage({ size: "A4", margin: 0 });
       drawRunningHeader(doc, scan?.target ?? "—", "Executivo");
       y = 90;
@@ -673,6 +672,13 @@ async function buildTechnicalReport(
     doc.addPage({ size: "A4", margin: 0 });
     drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
     let y = 90;
+    let techPage = 2;
+    const techAddPage = () => {
+      drawRunningFooter(doc, techPage++);
+      doc.addPage({ size: "A4", margin: 0 });
+      drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
+      y = 90;
+    };
 
     // Metadata grid
     y = drawSectionTitle(doc, "Metadados do Scan", y);
@@ -724,7 +730,7 @@ async function buildTechnicalReport(
       doc.text("CVEs",             MARGIN + 395, y + 5, { width: 60, align: "center" });
       y += 18;
       openPorts.slice(0, 20).forEach((p, i) => {
-        if (y + 18 > CONTENT_BOTTOM) { doc.addPage({ size: "A4", margin: 0 }); drawRunningHeader(doc, scan?.target ?? "—", "Técnico"); y = 90; }
+        if (y + 18 > CONTENT_BOTTOM) techAddPage();
         const rowBg = i % 2 === 0 ? C.bg : C.white;
         doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(rowBg).fill();
         doc.fontSize(8).font("Sans-Bold").fillColor(C.brand)
@@ -756,14 +762,9 @@ async function buildTechnicalReport(
       y += 30;
     }
     y += 6;
-    drawRunningFooter(doc, 2);
 
-    // ── PAGE 3: VULNERABILIDADES ───────────────────────────────────────────
-    if (y + 70 > CONTENT_BOTTOM) {
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-      y = 90;
-    }
+    // ── VULNERABILIDADES ───────────────────────────────────────────────────
+    if (y + 70 > CONTENT_BOTTOM) techAddPage();
 
     y = drawSectionTitle(doc, `Vulnerabilidades Encontradas (${vulns.length})`, y);
 
@@ -787,12 +788,7 @@ async function buildTechnicalReport(
               g.counts.low      > 0 ? `${g.counts.low} baixa${g.counts.low !== 1 ? "s" : ""}` : "",
             ].filter(Boolean).join(" · ");
           const lH = doc.fontSize(7.5).font("Sans").heightOfString(line, { width: CONTENT_W - 16 });
-          if (y + lH > CONTENT_BOTTOM) {
-            drawRunningFooter(doc, 3);
-            doc.addPage({ size: "A4", margin: 0 });
-            drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-            y = 90;
-          }
+          if (y + lH > CONTENT_BOTTOM) techAddPage();
           doc.rect(MARGIN, y + 2, 3, lH).fillColor(severityColor(g.topSeverity)).fill();
           doc.fontSize(7.5).font("Sans").fillColor(C.muted)
              .text(line, MARGIN + 8, y, { width: CONTENT_W - 12 });
@@ -812,7 +808,6 @@ async function buildTechnicalReport(
 
     if (vulns.length > 0) {
       const sorted = [...vulns].sort((a, b) => parseFloat(b.cvssScore) - parseFloat(a.cvssScore));
-      let pageNum = 3;
       const TEXT_W = CONTENT_W - 20; // width available for description/remediation text
 
       sorted.forEach((v) => {
@@ -831,12 +826,7 @@ async function buildTechnicalReport(
         const PADDING  = 14; // top + bottom breathing room
         const rowH = HEADER_H + descH + remH + dnsH + PADDING;
 
-        if (y + rowH > CONTENT_BOTTOM) {
-          drawRunningFooter(doc, pageNum++);
-          doc.addPage({ size: "A4", margin: 0 });
-          drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-          y = 90;
-        }
+        if (y + rowH > CONTENT_BOTTOM) techAddPage();
         const sColor = severityColor(v.severity);
 
         // Left accent bar (full card height)
@@ -884,20 +874,15 @@ async function buildTechnicalReport(
            .strokeColor(C.border).lineWidth(0.4).stroke();
         y += rowH;
       });
-      drawRunningFooter(doc, 3);
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 36).fillColor("#ecfdf5").fill();
       doc.fontSize(10).font("Sans-Bold").fillColor(C.success)
          .text("✓ Nenhuma vulnerabilidade conhecida encontrada.", MARGIN + 12, y + 12);
-      drawRunningFooter(doc, 3);
+      y += 36;
     }
 
-    // ── PAGE 4: NIS2 COMPLIANCE POR ARTIGO ────────────────────────────────
-    if (y + 110 > CONTENT_BOTTOM) {
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-      y = 90;
-    }
+    // ── NIS2 COMPLIANCE POR ARTIGO ─────────────────────────────────────────
+    if (y + 110 > CONTENT_BOTTOM) techAddPage();
     y = drawSectionTitle(doc, "Conformidade NIS2 — Detalhe por Artigo (Art. 21(2))", y);
 
     // Intro text
@@ -908,8 +893,6 @@ async function buildTechnicalReport(
          MARGIN, y, { width: CONTENT_W }
        );
     y += 28;
-
-    let techPage = 4;
     const FIND_W = CONTENT_W - 52;
     combined.forEach((s) => {
       const rawFindings = s.findings?.filter(Boolean) ?? [];
@@ -928,12 +911,7 @@ async function buildTechnicalReport(
       const totalFindH = findingHeights.reduce((a, b) => a + b, 0);
       const rowH = 34 + (hasFail ? totalFindH + 4 : 14);
 
-      if (y + rowH > CONTENT_BOTTOM) {
-        drawRunningFooter(doc, techPage++);
-        doc.addPage({ size: "A4", margin: 0 });
-        drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-        y = 90;
-      }
+      if (y + rowH > CONTENT_BOTTOM) techAddPage();
       const artInfo = NIS2_ARTICLES[s.article];
       const BAR_MAX = 160;
       const displayScore = s.combinedScore;
@@ -1000,12 +978,7 @@ async function buildTechnicalReport(
     y += 10;
 
     // ── METODOLOGIA + REFERÊNCIAS ──────────────────────────────────────────
-    if (y + 200 > CONTENT_BOTTOM) {
-      drawRunningFooter(doc, techPage++);
-      doc.addPage({ size: "A4", margin: 0 });
-      drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
-      y = 90;
-    }
+    if (y + 200 > CONTENT_BOTTOM) techAddPage();
     y = drawMethodologySection(doc, y, dataSources, scanLimitations, scan?.target ?? "—", "Técnico");
     y = drawReferencesSection(doc, y, scan?.target ?? "—", "Técnico");
     drawRunningFooter(doc, techPage);
