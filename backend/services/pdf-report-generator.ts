@@ -1039,10 +1039,11 @@ function drawCoverPage(
   // ── Bottom white section ──
   const by = PAGE_H * 0.55 + 28;
 
-  // Classification badge
-  doc.rect(MARGIN, by, 130, 20).fillColor(C.danger).fill();
+  // Classification badge — largura calculada ao texto (DejaVu mais larga que Helvetica)
+  const badgeW = Math.max(110, doc.fontSize(8).font("Sans-Bold").widthOfString(classification) + 16);
+  doc.rect(MARGIN, by, badgeW, 20).fillColor(C.danger).fill();
   doc.fontSize(8).font("Sans-Bold").fillColor(C.white)
-     .text(classification, MARGIN, by + 6, { width: 130, align: "center" });
+     .text(classification, MARGIN, by + 6, { width: badgeW, align: "center", lineBreak: false });
 
   // Report type title
   doc.fontSize(20).font("Sans-Bold").fillColor(C.text)
