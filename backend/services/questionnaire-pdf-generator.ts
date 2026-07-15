@@ -139,7 +139,7 @@ function newPage(doc: PDFKit.PDFDocument): number {
 
 export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc    = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: true });
+    const doc    = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: true, bufferPages: true });
     doc.registerFont("Sans",      FONT_REGULAR);
     doc.registerFont("Sans-Bold", FONT_BOLD);
     const chunks: Buffer[] = [];
@@ -152,8 +152,7 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
       answeredCount, totalApplicable, measureScores, gaps,
     } = data;
 
-    const totalPages = gaps.length > 12 ? "3+" : gaps.length > 0 ? "2" : "2";
-    const coverage   = Math.round((answeredCount / 42) * 100);
+    const coverage = Math.round((answeredCount / 42) * 100);
 
     // ── PAGE 1: CAPA + SCORE GLOBAL + SCORE POR MEDIDA ─────────────────────
 
@@ -223,7 +222,6 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
 
     for (const m of measureScores) {
       if (y > CONTENT_BOTTOM) {
-        drawPageFooter(doc, 1, totalPages);
         y = newPage(doc);
         drawHeaderStrip(doc, "SCORE POR MEDIDA");
       }
@@ -262,7 +260,6 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
 
     // ── PAGE 2+: PLANO DE AÇÃO ───────────────────────────────────────────────
     if (gaps.length > 0) {
-      drawPageFooter(doc, 1, totalPages);
       y = newPage(doc);
       drawHeaderStrip(doc, "PLANO DE AÇÃO");
 
@@ -274,8 +271,6 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
            MARGIN, y + 16, { width: CW }
          );
       y += 34;
-
-      let pageNum = 2;
 
       for (let i = 0; i < gaps.length; i++) {
         const gap = gaps[i];
@@ -299,7 +294,6 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
         const rowH = 8 + headerH + qH + helpH + docH + 16;
 
         if (y + rowH > CONTENT_BOTTOM) {
-          drawPageFooter(doc, pageNum++, totalPages);
           y = newPage(doc);
           drawHeaderStrip(doc, "PLANO DE AÇÃO (cont.)");
         }
@@ -355,11 +349,16 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
         y += rowH + 4;
       }
 
-      drawPageFooter(doc, pageNum, totalPages);
-    } else {
-      drawPageFooter(doc, 1, totalPages);
     }
 
+    // Passagem final: rodapés com total real (bufferPages: true)
+    const range = doc.bufferedPageRange();
+    const total  = range.count;
+    for (let p = 0; p < total; p++) {
+      doc.switchToPage(range.start + p);
+      drawPageFooter(doc, p + 1, String(total));
+    }
+    doc.flushPages();
     doc.end();
   });
 }
