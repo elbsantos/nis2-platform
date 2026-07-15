@@ -919,10 +919,13 @@ async function buildTechnicalReport(
         doc.fontSize(7.5).font("Sans").heightOfString(ef.text, { width: FIND_W }) + 6
       );
       const totalFindH = findingHeights.reduce((a, b) => a + b, 0);
-      const rowH = 34 + (hasFail ? totalFindH + 4 : 14);
+      const artInfo  = NIS2_ARTICLES[s.article];
+      const scopeText = "Âmbito: " + (artInfo?.desc ?? s.title);
+      const scopeH   = doc.fontSize(7.5).font("Sans").heightOfString(scopeText, { width: CONTENT_W - 315 });
+      const headerH  = Math.max(30, 2 + scopeH) + 4; // circle_bottom(30) ou âmbito_bottom, + gap
+      const rowH     = headerH + (hasFail ? totalFindH + 4 : 14);
 
       if (y + rowH > CONTENT_BOTTOM) techAddPage();
-      const artInfo = NIS2_ARTICLES[s.article];
       const BAR_MAX = 160;
       const displayScore = s.combinedScore;
       const isNull = displayScore === null;
@@ -946,11 +949,11 @@ async function buildTechnicalReport(
 
       // Scope description
       doc.fontSize(7.5).font("Sans").fillColor(C.muted)
-         .text("Âmbito: " + (artInfo?.desc ?? s.title), MARGIN + 360, y + 2, { width: CONTENT_W - 315 });
+         .text(scopeText, MARGIN + 360, y + 2, { width: CONTENT_W - 315 });
 
-      // Findings with colored square indicators
+      // Findings / status — offset dinâmico garante que nunca colide com âmbito de 2 linhas
       if (hasFail) {
-        let fy = y + 30;
+        let fy = y + headerH;
         enriched.forEach((ef, fi) => {
           const fColor = ef.critical ? C.critical : C.warning;
           doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(fColor).fill();
@@ -959,26 +962,24 @@ async function buildTechnicalReport(
           fy += findingHeights[fi];
         });
       } else if (isNull && !s.scannable) {
-        // Medida organizacional sem questionário preenchido
-        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
+        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.muted).fill();
         doc.fontSize(7.5).font("Sans").fillColor(C.muted)
            .text(
              "Não avaliável por scan — requer questionário de autoavaliação (medida organizacional não observável externamente).",
-             MARGIN + 48, y + 30, { width: FIND_W }
+             MARGIN + 48, y + headerH, { width: FIND_W }
            );
       } else if (isNull) {
-        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.muted).fill();
+        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.muted).fill();
         doc.fontSize(7.5).font("Sans").fillColor(C.muted)
-           .text("Sem dados suficientes para avaliação.", MARGIN + 48, y + 30, { width: FIND_W });
+           .text("Sem dados suficientes para avaliação.", MARGIN + 48, y + headerH, { width: FIND_W });
       } else if (!s.scannable && s.source === "questionnaire") {
-        // Score obtido exclusivamente via questionário (medida organizacional)
-        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.brand).fill();
+        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.brand).fill();
         doc.fontSize(7.5).font("Sans").fillColor(C.brand)
-           .text("Score obtido via Questionário NIS2 (medida organizacional).", MARGIN + 48, y + 30, { width: FIND_W });
+           .text("Score obtido via Questionário NIS2 (medida organizacional).", MARGIN + 48, y + headerH, { width: FIND_W });
       } else {
-        doc.rect(MARGIN + 38, y + 30, 6, 6).fillColor(C.success).fill();
+        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.success).fill();
         doc.fontSize(7.5).font("Sans").fillColor(C.success)
-           .text("Sem problemas detetados neste domínio.", MARGIN + 48, y + 30, { width: FIND_W });
+           .text("Sem problemas detetados neste domínio.", MARGIN + 48, y + headerH, { width: FIND_W });
       }
 
       doc.moveTo(MARGIN, y + rowH - 2).lineTo(PAGE_W - MARGIN, y + rowH - 2)
