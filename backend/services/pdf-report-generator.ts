@@ -21,6 +21,7 @@ import {
   type RootCauseGroup,
   type RcaVuln,
 } from "./root-cause-aggregation";
+import { drawGauge, drawSeverityTiles, drawNIS2Radar, drawServiceBars } from "./pdf-chart-helpers";
 
 const sev = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 
@@ -252,26 +253,6 @@ async function buildExecutiveReport(
     // Section title
     y = drawSectionTitle(doc, "Resumo Executivo", y);
 
-    // Score + severity boxes side by side
-    drawScoreCircle(doc, overall, MARGIN, y);
-    const boxW = Math.floor((CONTENT_W - 80) / 4);
-    const boxes = [
-      { label: "Críticas", count: counts.critical, color: C.critical },
-      { label: "Altas",    count: counts.high,     color: C.danger   },
-      { label: "Médias",   count: counts.medium,   color: C.warning  },
-      { label: "Baixas",   count: counts.low,      color: C.success  },
-    ];
-    boxes.forEach((b, i) => {
-      const bx = MARGIN + 80 + i * (boxW + 5);
-      doc.rect(bx, y, boxW, 60).fillColor(C.bg).fill();
-      doc.rect(bx, y, boxW, 4).fillColor(b.color).fill();
-      doc.fontSize(26).font("Sans-Bold").fillColor(b.color)
-         .text(String(b.count), bx, y + 14, { width: boxW, align: "center" });
-      doc.fontSize(9).font("Sans").fillColor(C.muted)
-         .text(b.label, bx, y + 43, { width: boxW, align: "center" });
-    });
-    y += 75;
-
     // Scan info row
     doc.fontSize(8).font("Sans").fillColor(C.muted);
     doc.text(`Alvo: `, MARGIN, y, { continued: true }).fillColor(C.text).text(scan?.target ?? "—", { continued: true });
@@ -330,6 +311,70 @@ async function buildExecutiveReport(
          .text(enriched.text, MARGIN + 22, y, { width: CONTENT_W - 26 });
       y += tH + 10;
     };
+
+    // ── PAINEL DE RELANCE ─────────────────────────────────────────────────
+    // Linha 1: Gauge (esq.) + Severity Tiles (dir.)
+    execEnsure(150);
+    const gH = drawGauge(doc, MARGIN, y, overall, scoreLabel(overall), 52);
+    const tH2 = drawSeverityTiles(doc, MARGIN + 120, y, counts, 375);
+    y += Math.max(gH, tH2) + 16;
+
+    // Linha 2: Radar NIS2 (esq.) + Barras por serviço (dir.)
+    execEnsure(240);
+    const radarScores: Record<string, number | null> = {};
+    combined.forEach(s => { radarScores[s.slug] = s.combinedScore; });
+    const serviceRows = rcaResult.groups.slice(0, 8).map(g => ({
+      label: g.port !== null ? `${g.service}:${g.port}` : g.service,
+      counts: { critical: g.counts.critical, high: g.counts.high, medium: g.counts.medium, low: g.counts.low },
+    }));
+    const panelLineY = y;
+    const radarH = drawNIS2Radar(doc, MARGIN, panelLineY, radarScores, 90);
+    if (serviceRows.length > 0) {
+      const barsX = MARGIN + 236;
+      doc.fontSize(8).font("Sans-Bold").fillColor(C.muted)
+         .text("Vulnerabilidades por serviço", barsX, panelLineY);
+      drawServiceBars(doc, barsX, panelLineY + 18, serviceRows, 259);
+    }
+    y += Math.max(radarH, serviceRows.length > 0 ? 18 + serviceRows.length * 30 : 0) + 20;
+
+    // ── PRIORIDADES IMEDIATAS ─────────────────────────────────────────────
+    const topGroups = [...rcaResult.groups]
+      .sort((a, b) => {
+        const ord: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        return (ord[a.topSeverity] ?? 4) - (ord[b.topSeverity] ?? 4);
+      })
+      .slice(0, 3);
+
+    if (topGroups.length > 0) {
+      execEnsure(40);
+      y = drawSectionTitle(doc, "Prioridades Imediatas", y);
+      const deadlineMap: Record<string, string> = {
+        critical: "24–72 horas", high: "7 dias", medium: "30 dias", low: "90 dias",
+      };
+      topGroups.forEach(g => {
+        const sColor   = severityColor(g.topSeverity);
+        const sshT     = g.service.match(/^SSH \(OpenSSH_(\S+)/i);
+        const dTitle   = sshT
+          ? `Software OpenSSH ${sshT[1]} desatualizado${g.port !== null ? ` (porto ${g.port})` : ""}`
+          : g.title;
+        const titleH   = doc.fontSize(8).font("Sans-Bold").heightOfString(dTitle,           { width: CONTENT_W - 20 });
+        const actionH  = doc.fontSize(7.5).font("Sans")    .heightOfString(`→ ${g.action}`, { width: CONTENT_W - 20 });
+        const cardH    = 6 + titleH + 4 + actionH + 4 + 12 + 10;
+        execEnsure(cardH + 8);
+        doc.rect(MARGIN, y, CONTENT_W, cardH).fillColor(C.bg).fill();
+        doc.rect(MARGIN, y, 4, cardH).fillColor(sColor).fill();
+        doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
+           .text(dTitle, MARGIN + 12, y + 6, { width: CONTENT_W - 20 });
+        y += 6 + titleH + 4;
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
+           .text(`→ ${g.action}`, MARGIN + 12, y, { width: CONTENT_W - 20 });
+        y += actionH + 4;
+        doc.fontSize(7).font("Sans").fillColor(C.muted)
+           .text(`Prazo recomendado: ${deadlineMap[g.topSeverity]}`, MARGIN + 12, y);
+        y += 12 + 10;
+      });
+      y += 8;
+    }
 
     if (vulns.length > 0) {
       execEnsure(60);
@@ -466,33 +511,6 @@ async function buildExecutiveReport(
       }
 
       y += 6;
-    }
-
-    // Conformidade NIS2 overview (mini bars — usa scores combinados)
-    if (combined.length) {
-      y = drawSectionTitle(doc, "Score por Artigo NIS2 (Art. 21(2))", y);
-      const half = Math.ceil(combined.length / 2);
-      const colW = CONTENT_W / 2 - 10;
-      combined.forEach((s, idx) => {
-        const col  = idx < half ? 0 : 1;
-        const row  = idx < half ? idx : idx - half;
-        const bx   = MARGIN + col * (colW + 20);
-        const by   = y + row * 22;
-        const art  = s.article.replace("Art. 21(2)", "").replace(/[()]/g, "");
-        doc.rect(bx + 20, by + 6, colW - 55, 8).fillColor(C.border).fill();
-        doc.fontSize(7.5).font("Sans-Bold").fillColor(C.muted)
-           .text(art, bx, by + 5, { width: 18, align: "right" });
-        if (s.combinedScore === null) {
-          doc.fontSize(7.5).font("Sans").fillColor(C.muted)
-             .text("N/A", bx + colW - 30, by + 5, { width: 28, align: "right" });
-        } else {
-          const fill = Math.round((s.combinedScore / 100) * (colW - 55));
-          doc.rect(bx + 20, by + 6, Math.max(2, fill), 8).fillColor(scoreColor(s.combinedScore)).fill();
-          doc.fontSize(7.5).font("Sans-Bold").fillColor(scoreColor(s.combinedScore))
-             .text(`${s.combinedScore}`, bx + colW - 30, by + 5, { width: 28, align: "right" });
-        }
-      });
-      y += half * 22 + 10;
     }
 
     // ── PRÓXIMOS PASSOS + METODOLOGIA + REFERÊNCIAS ───────────────────────
