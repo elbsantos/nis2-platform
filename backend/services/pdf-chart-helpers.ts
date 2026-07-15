@@ -151,8 +151,8 @@ export function drawSeverityTiles(
 
 /**
  * Radar com 10 eixos (a–j), sentido horário a partir das 12h.
- * scores: Record com chaves "a"–"j"; null/ausente → 0. Cada valor clampado [0,100].
- * Retorna a altura total consumida (diâmetro + margem de rótulos).
+ * scores: Record com chaves "a"–"j"; null/ausente → vértice no centro (ponto oco).
+ * Retorna a altura total consumida (diâmetro + rótulos + legenda se houver nulls).
  */
 export function drawNIS2Radar(
   doc:    PDFKit.PDFDocument,
@@ -189,36 +189,52 @@ export function drawNIS2Radar(
     doc.moveTo(cx, cy).lineTo(ex, ey).lineWidth(0.4).strokeColor(CH.border).stroke();
   }
 
-  // Polígono de dados
-  const dpts = RADAR_KEYS.map((k, i) => {
-    const val = Math.max(0, Math.min(100, scores[k] ?? 0));
-    return pt(i, r * (val / 100));
+  // Dados: distinguir null (não avaliado) de valor numérico (incluindo 0)
+  const ddata = RADAR_KEYS.map((k, i) => {
+    const raw  = scores[k] ?? null;
+    const val  = raw !== null ? Math.max(0, Math.min(100, raw)) : 0;
+    return { xy: pt(i, r * (val / 100)), isNull: raw === null };
   });
+  const nullSlugs = RADAR_KEYS.filter((_, i) => ddata[i].isNull);
+  const hasNull   = nullSlugs.length > 0;
 
-  // Fill semi-transparente
-  doc.moveTo(dpts[0][0], dpts[0][1]);
-  dpts.slice(1).forEach(([px, py]) => doc.lineTo(px, py));
+  // Fill semi-transparente do polígono
+  doc.moveTo(ddata[0].xy[0], ddata[0].xy[1]);
+  ddata.slice(1).forEach(({ xy: [px, py] }) => doc.lineTo(px, py));
   doc.closePath().fillOpacity(0.15).fillColor(CH.brand).fill();
-  doc.fillOpacity(1); // repor opacidade
+  doc.fillOpacity(1);
 
   // Stroke do polígono
-  doc.moveTo(dpts[0][0], dpts[0][1]);
-  dpts.slice(1).forEach(([px, py]) => doc.lineTo(px, py));
+  doc.moveTo(ddata[0].xy[0], ddata[0].xy[1]);
+  ddata.slice(1).forEach(({ xy: [px, py] }) => doc.lineTo(px, py));
   doc.closePath().lineWidth(1.5).strokeColor(CH.brand).stroke();
 
-  // Pontos nos vértices
-  dpts.forEach(([px, py]) => {
-    doc.circle(px, py, 3).fillColor(CH.brand).fill();
+  // Pontos nos vértices: cheio azul para medidos; null → sem ponto no vértice
+  ddata.forEach(({ xy: [px, py], isNull }) => {
+    if (!isNull) {
+      doc.circle(px, py, 3).fillColor(CH.brand).fill();
+    }
   });
 
-  // Rótulos nas pontas dos eixos
+  // Rótulos nas pontas dos eixos: cinzento para não avaliados, escuro para medidos
   RADAR_KEYS.forEach((k, i) => {
     const [lx, ly] = pt(i, r + 14);
-    doc.fontSize(8).font("Sans-Bold").fillColor(CH.text)
+    doc.fontSize(8).font("Sans-Bold").fillColor(ddata[i].isNull ? CH.muted : CH.text)
        .text(k, lx - 8, ly - 5, { width: 16, align: "center" });
   });
 
-  return (r + pad) * 2;
+  // Legenda nominal: lista os slugs não avaliados por ordem, só quando existem
+  const legendH = hasNull ? 16 : 0;
+  if (hasNull) {
+    doc.fontSize(7).font("Sans").fillColor(CH.muted)
+       .text(
+         `Não avaliado (sem respostas): ${nullSlugs.join(", ")}`,
+         x, y + (r + pad) * 2 + 2,
+         { width: (r + pad) * 2 },
+       );
+  }
+
+  return (r + pad) * 2 + legendH;
 }
 
 // ---------------------------------------------------------------------------
