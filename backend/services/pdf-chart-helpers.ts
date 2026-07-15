@@ -19,7 +19,9 @@ const CH = {
   success: "#10b981",
   warning: "#f59e0b",
   danger:  "#ef4444",
-  critical:"#7c3aed",
+  critical:"#dc2626",
+  high:    "#ea580c",
+  low:     "#3b82f6",
   text:    "#111827",
   muted:   "#6b7280",
   border:  "#e5e7eb",
@@ -34,7 +36,7 @@ function scoreColor(s: number): string {
 
 function severityColor(sev: string): string {
   return (
-    ({ critical: CH.critical, high: CH.danger, medium: CH.warning, low: CH.success } as Record<string, string>)[sev]
+    ({ critical: CH.critical, high: CH.high, medium: CH.warning, low: CH.low } as Record<string, string>)[sev]
     ?? CH.muted
   );
 }

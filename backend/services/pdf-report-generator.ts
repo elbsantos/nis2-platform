@@ -58,7 +58,9 @@ const C = {
   success:  "#10b981",
   warning:  "#f59e0b",
   danger:   "#ef4444",
-  critical: "#7c3aed",
+  critical: "#dc2626",
+  high:     "#ea580c",
+  low:      "#3b82f6",
   text:     "#111827",
   muted:    "#6b7280",
   border:   "#e5e7eb",
@@ -117,14 +119,14 @@ function scoreLabel(s: number): string {
   return "Não Conforme";
 }
 function severityColor(s: string): string {
-  return { critical: C.critical, high: C.danger, medium: C.warning, low: C.success }[s] ?? C.muted;
+  return { critical: C.critical, high: C.high, medium: C.warning, low: C.low }[s] ?? C.muted;
 }
 function severityLabel(s: string): string {
   return { critical: "Crítica", high: "Alta", medium: "Média", low: "Baixa" }[s] ?? s;
 }
 function cvssColor(v: number): string {
   if (v >= 9) return C.critical;
-  if (v >= 7) return C.danger;
+  if (v >= 7) return C.high;
   if (v >= 4) return C.warning;
   return C.success;
 }
@@ -932,9 +934,9 @@ async function buildTechnicalReport(
       if (hasFail) {
         let fy = y + 30;
         enriched.forEach((ef, fi) => {
-          const fColor = ef.critical ? C.danger : C.warning;
+          const fColor = ef.critical ? C.critical : C.warning;
           doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(fColor).fill();
-          doc.fontSize(7.5).font("Sans").fillColor(ef.critical ? C.danger : C.text)
+          doc.fontSize(7.5).font("Sans").fillColor(ef.critical ? C.critical : C.text)
              .text(ef.text, MARGIN + 48, fy, { width: FIND_W });
           fy += findingHeights[fi];
         });
