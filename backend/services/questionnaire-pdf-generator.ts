@@ -33,7 +33,8 @@ const C = {
 const PAGE_W  = 595;
 const PAGE_H  = 842;
 const MARGIN  = 50;
-const CW      = PAGE_W - MARGIN * 2;  // content width = 495
+const CW             = PAGE_W - MARGIN * 2;  // content width = 495
+const CONTENT_BOTTOM = 757;
 
 // ---------------------------------------------------------------------------
 // Types — espelham o que o router devolve
@@ -221,7 +222,7 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
     const BAR_W       = CW - BAR_LABEL_W - 60;
 
     for (const m of measureScores) {
-      if (y > 760) {
+      if (y > CONTENT_BOTTOM) {
         drawPageFooter(doc, 1, totalPages);
         y = newPage(doc);
         drawHeaderStrip(doc, "SCORE POR MEDIDA");
@@ -279,13 +280,25 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
       for (let i = 0; i < gaps.length; i++) {
         const gap = gaps[i];
 
-        // Estimate height needed for this item
-        const qLines = Math.ceil(gap.question.length / 80) + 1;
-        const hLines = Math.ceil(gap.helpText.length / 80) + 1;
-        const docLines = gap.suggestedDocument ? Math.ceil(gap.suggestedDocument.length / 80) + 1 : 0;
-        const estimH   = 16 + qLines * 11 + hLines * 10 + docLines * 10 + 16;
+        const tw = CW - 32;
 
-        if (y + estimH > 790) {
+        // Measured heights — DejaVu metrics via heightOfString
+        const headerH = doc.fontSize(7.5).font("Sans-Bold").heightOfString("X", {});
+        const qH      = doc.fontSize(8).font("Sans-Bold").heightOfString(gap.question, { width: tw });
+        const helpH   = doc.fontSize(7.5).font("Sans").heightOfString(
+          "O que fazer: " + gap.helpText, { width: tw }
+        );
+        // linha mista bold+regular: medir com a bold (conservador — sobrestima, nunca transborda)
+        const docH  = gap.suggestedDocument
+          ? doc.fontSize(7).font("Sans-Bold").heightOfString(
+              "Entregável: " + gap.suggestedDocument +
+              (gap.evidenceRequired ? "  (obrigatório)" : ""),
+              { width: tw }
+            )
+          : 0;
+        const rowH = 8 + headerH + qH + helpH + docH + 16;
+
+        if (y + rowH > CONTENT_BOTTOM) {
           drawPageFooter(doc, pageNum++, totalPages);
           y = newPage(doc);
           drawHeaderStrip(doc, "PLANO DE AÇÃO (cont.)");
@@ -293,19 +306,18 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
 
         // Row background
         const rowBg = i % 2 === 0 ? "#f8fafc" : C.white;
-        doc.rect(MARGIN, y, CW, estimH).fillColor(rowBg).fill();
-        doc.rect(MARGIN, y, CW, estimH).strokeColor(C.border).lineWidth(0.3).stroke();
+        doc.rect(MARGIN, y, CW, rowH).fillColor(rowBg).fill();
+        doc.rect(MARGIN, y, CW, rowH).strokeColor(C.border).lineWidth(0.3).stroke();
 
         // Priority number circle
         const circleColor = gap.answer === "no" ? C.danger : C.warning;
         const numX = MARGIN + 14;
-        const numY = y + estimH / 2;
+        const numY = y + rowH / 2;
         doc.circle(numX, numY, 10).fillColor(circleColor).fill();
         doc.fontSize(8).font("Sans-Bold").fillColor(C.white)
            .text(String(i + 1), numX - 8, numY - 5, { width: 16, align: "center" });
 
         const tx = MARGIN + 30;
-        const tw = CW - 32;
         let iy = y + 8;
 
         // Control ID + answer badge + article
@@ -316,23 +328,23 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
            .text(`  ${answerLabel}`, { continued: true });
         doc.fillColor(C.muted)
            .text(`  ·  Art. 21(2)(${gap.articleSlug})`);
-        iy += 11;
+        iy = doc.y;
 
         // Question
         doc.fontSize(8).font("Sans-Bold").fillColor(C.text)
            .text(gap.question, tx, iy, { width: tw });
-        iy += qLines * 11;
+        iy = doc.y;
 
         // What to do
         doc.fontSize(7.5).font("Sans").fillColor(C.muted)
-           .text("O que fazer: ", tx, iy, { continued: true });
+           .text("O que fazer: ", tx, iy, { width: tw, continued: true });
         doc.fillColor(C.text).text(gap.helpText, { width: tw });
-        iy += hLines * 10;
+        iy = doc.y;
 
         // Suggested document
         if (gap.suggestedDocument) {
           doc.fontSize(7).font("Sans-Bold").fillColor(C.muted)
-             .text("Entregável: ", tx, iy, { continued: true });
+             .text("Entregável: ", tx, iy, { width: tw, continued: true });
           doc.font("Sans").fillColor(C.text)
              .text(gap.suggestedDocument, { continued: gap.evidenceRequired });
           if (gap.evidenceRequired) {
@@ -340,7 +352,7 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
           }
         }
 
-        y += estimH + 4;
+        y += rowH + 4;
       }
 
       drawPageFooter(doc, pageNum, totalPages);
