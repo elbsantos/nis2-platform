@@ -899,10 +899,12 @@ async function buildTechnicalReport(
     doc.fontSize(8).font("Sans").fillColor(C.muted)
        .text(
          "Avaliação automatizada baseada nos serviços expostos, vulnerabilidades detetadas e configurações de segurança analisadas. " +
-         "Cada artigo reflete um domínio de conformidade da Diretiva NIS2, transposta em Portugal pelo Decreto-Lei n.º 125/2025.",
+         "Cada artigo reflete um domínio de conformidade da Diretiva NIS2, transposta em Portugal pelo Decreto-Lei n.º 125/2025. " +
+         "O score por artigo resulta da fonte disponível: scan externo para medidas técnicas, questionário de autoavaliação para medidas organizacionais, " +
+         "ou o mínimo de ambos quando as duas fontes existem (critério conservador).",
          MARGIN, y, { width: CONTENT_W }
        );
-    y += 28;
+    y = doc.y + 8;
     const FIND_W = CONTENT_W - 52;
     combined.forEach((s) => {
       const rawFindings = s.findings?.filter(Boolean) ?? [];
@@ -919,20 +921,53 @@ async function buildTechnicalReport(
         doc.fontSize(7.5).font("Sans").heightOfString(ef.text, { width: FIND_W }) + 6
       );
       const totalFindH = findingHeights.reduce((a, b) => a + b, 0);
-      const artInfo  = NIS2_ARTICLES[s.article];
+      const artInfo   = NIS2_ARTICLES[s.article];
       const scopeText = "Âmbito: " + (artInfo?.desc ?? s.title);
-      const scopeH   = doc.fontSize(7.5).font("Sans").heightOfString(scopeText, { width: CONTENT_W - 315 });
-      const headerH  = Math.max(30, 2 + scopeH) + 4; // circle_bottom(30) ou âmbito_bottom, + gap
-      const rowH     = headerH + (hasFail ? totalFindH + 4 : 14);
+      const scopeH    = doc.fontSize(7.5).font("Sans").heightOfString(scopeText, { width: CONTENT_W - 315 });
+      const headerH   = Math.max(30, 2 + scopeH) + 4;
+
+      // Pre-compute displayScore/isNull — necessário para rowH antes de desenhar
+      const displayScore = s.combinedScore;
+      const isNull       = displayScore === null;
+
+      // Linhas do corpo: origem, findings, divergência, referência cruzada
+      const sourceLabel: Record<string, string> = {
+        scan:          "Scan externo",
+        questionnaire: "Questionário NIS2",
+        combined:      "Combinado (scan + questionário)",
+        none:          "Sem dados — requer preenchimento do Questionário NIS2 na plataforma",
+      };
+      const originLine = "Origem: " + (sourceLabel[s.source] ?? "—")
+        + (s.source === "combined"
+          ? `  ·  Scan: ${s.scanScore ?? "—"} · Questionário: ${s.questionnaireScore ?? "—"}`
+          : "");
+      const originH = doc.fontSize(7.5).font("Sans-Bold").heightOfString(originLine, { width: FIND_W }) + 4;
+
+      const noIssuesText = "Sem problemas detetados neste domínio.";
+      const noIssuesH = (!hasFail && !isNull && s.scannable)
+        ? doc.fontSize(7.5).font("Sans").heightOfString(noIssuesText, { width: FIND_W }) + 4
+        : 0;
+
+      const divText = "Divergência entre a autoavaliação e a evidência do scan externo — recomenda-se rever as respostas do questionário para este domínio.";
+      const divH = s.divergent
+        ? doc.fontSize(7.5).font("Sans").heightOfString(divText, { width: FIND_W }) + 4
+        : 0;
+
+      const showCrossRef = (s.source === "questionnaire" || s.source === "combined") && (s.combinedScore ?? 100) < 100;
+      const crossRefText = "→ Ver Relatório de Autoavaliação para o detalhe das lacunas organizacionais por pergunta.";
+      const crossRefH = showCrossRef
+        ? doc.fontSize(7.5).font("Sans").heightOfString(crossRefText, { width: FIND_W }) + 4
+        : 0;
+
+      const bodyH = originH + (hasFail ? totalFindH + 4 : noIssuesH) + divH + crossRefH;
+      const rowH  = headerH + bodyH;
 
       if (y + rowH > CONTENT_BOTTOM) techAddPage();
       const BAR_MAX = 160;
-      const displayScore = s.combinedScore;
-      const isNull = displayScore === null;
       const barFill = isNull ? 0 : Math.max(2, Math.round((displayScore! / 100) * BAR_MAX));
       const col = isNull ? C.muted : scoreColor(displayScore!);
 
-      // Score circle (small) — "N/A" para medidas sem score disponível
+      // Score circle (small)
       doc.circle(MARGIN + 16, y + 16, 14).fillColor(col).fill();
       doc.fontSize(8).font("Sans-Bold").fillColor(C.white)
          .text(isNull ? "N/A" : String(displayScore), MARGIN + 4, y + 11, { width: 24, align: "center" });
@@ -951,9 +986,15 @@ async function buildTechnicalReport(
       doc.fontSize(7.5).font("Sans").fillColor(C.muted)
          .text(scopeText, MARGIN + 360, y + 2, { width: CONTENT_W - 315 });
 
-      // Findings / status — offset dinâmico garante que nunca colide com âmbito de 2 linhas
+      let fy = y + headerH;
+
+      // Origem do score — mapeada directamente de s.source
+      doc.fontSize(7.5).font("Sans-Bold").fillColor(C.muted)
+         .text(originLine, MARGIN + 48, fy, { width: FIND_W });
+      fy += originH;
+
+      // Findings do scan ou indicador de ausência de problemas
       if (hasFail) {
-        let fy = y + headerH;
         enriched.forEach((ef, fi) => {
           const fColor = ef.critical ? C.critical : C.warning;
           doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(fColor).fill();
@@ -961,25 +1002,27 @@ async function buildTechnicalReport(
              .text(ef.text, MARGIN + 48, fy, { width: FIND_W });
           fy += findingHeights[fi];
         });
-      } else if (isNull && !s.scannable) {
-        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.muted).fill();
-        doc.fontSize(7.5).font("Sans").fillColor(C.muted)
-           .text(
-             "Não avaliável por scan — requer questionário de autoavaliação (medida organizacional não observável externamente).",
-             MARGIN + 48, y + headerH, { width: FIND_W }
-           );
-      } else if (isNull) {
-        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.muted).fill();
-        doc.fontSize(7.5).font("Sans").fillColor(C.muted)
-           .text("Sem dados suficientes para avaliação.", MARGIN + 48, y + headerH, { width: FIND_W });
-      } else if (!s.scannable && s.source === "questionnaire") {
-        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.brand).fill();
-        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
-           .text("Score obtido via Questionário NIS2 (medida organizacional).", MARGIN + 48, y + headerH, { width: FIND_W });
-      } else {
-        doc.rect(MARGIN + 38, y + headerH, 6, 6).fillColor(C.success).fill();
+      } else if (!isNull && s.scannable) {
+        doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(C.success).fill();
         doc.fontSize(7.5).font("Sans").fillColor(C.success)
-           .text("Sem problemas detetados neste domínio.", MARGIN + 48, y + headerH, { width: FIND_W });
+           .text(noIssuesText, MARGIN + 48, fy, { width: FIND_W });
+        fy += noIssuesH;
+      }
+
+      // Nota de divergência (s.divergent)
+      if (s.divergent) {
+        doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(C.warning).fill();
+        doc.fontSize(7.5).font("Sans").fillColor(C.warning)
+           .text(divText, MARGIN + 48, fy, { width: FIND_W });
+        fy += divH;
+      }
+
+      // Referência cruzada ao Relatório de Autoavaliação
+      if (showCrossRef) {
+        doc.rect(MARGIN + 38, fy + 1, 6, 6).fillColor(C.brand).fill();
+        doc.fontSize(7.5).font("Sans").fillColor(C.brand)
+           .text(crossRefText, MARGIN + 48, fy, { width: FIND_W });
+        fy += crossRefH;
       }
 
       doc.moveTo(MARGIN, y + rowH - 2).lineTo(PAGE_W - MARGIN, y + rowH - 2)
