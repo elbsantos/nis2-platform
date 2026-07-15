@@ -396,17 +396,17 @@ async function buildExecutiveReport(
       if (highs.length > 0) {
         execEnsure(36);
         doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#fff7f0").fill();
-        doc.rect(MARGIN, y, 4, 22).fillColor(C.danger).fill();
-        doc.fontSize(9).font("Sans-Bold").fillColor(C.danger)
+        doc.rect(MARGIN, y, 4, 22).fillColor(C.high).fill();
+        doc.fontSize(9).font("Sans-Bold").fillColor(C.high)
            .text(
              `ALTAS (${highs.length}) — Resolução recomendada em 7 dias`,
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
            );
         y += 24;
         rcaResult.groups.filter(g => g.counts.high > 0)
-          .forEach(g => drawGroup(g, C.danger, "high"));
+          .forEach(g => drawGroup(g, C.high, "high"));
         rcaResult.individuals.filter(i => i.severity === "high")
-          .forEach(v => drawExecIndividual(v, C.danger));
+          .forEach(v => drawExecIndividual(v, C.high));
         execEnsure(14);
         doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
@@ -447,18 +447,18 @@ async function buildExecutiveReport(
       // BAIXAS — grupos com lows + individuais baixos
       if (lows.length > 0) {
         execEnsure(36);
-        doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#f0fdf4").fill();
-        doc.rect(MARGIN, y, 4, 22).fillColor(C.success).fill();
-        doc.fontSize(9).font("Sans-Bold").fillColor("#166534")
+        doc.rect(MARGIN, y, CONTENT_W, 22).fillColor("#eff6ff").fill();
+        doc.rect(MARGIN, y, 4, 22).fillColor(C.low).fill();
+        doc.fontSize(9).font("Sans-Bold").fillColor(C.low)
            .text(
              `BAIXAS (${lows.length}) — Resolução recomendada em 90 dias`,
              MARGIN + 12, y + 6, { width: CONTENT_W - 16 }
            );
         y += 24;
         rcaResult.groups.filter(g => g.counts.low > 0)
-          .forEach(g => drawGroup(g, C.success, "low"));
+          .forEach(g => drawGroup(g, C.low, "low"));
         rcaResult.individuals.filter(i => i.severity === "low")
-          .forEach(v => drawExecIndividual(v, C.success));
+          .forEach(v => drawExecIndividual(v, C.low));
         execEnsure(14);
         doc.fontSize(7.5).font("Sans").fillColor(C.brand)
            .text("→ Detalhe técnico completo no Relatório Técnico.", MARGIN + 22, y);
