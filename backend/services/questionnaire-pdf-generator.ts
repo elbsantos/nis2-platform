@@ -236,7 +236,7 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
       const bSlugW   = 20;
       const bTitleW  = 150;
       const bCountW  = 24;
-      const bBarW    = barsColW - bSlugW - bTitleW - bCountW - 12;  // 77
+      const bBarW    = Math.max(0, barsColW - bSlugW - bTitleW - bCountW - 12);  // 77
 
       doc.fontSize(7).font("Sans");
       const barLineH  = doc.currentLineHeight();
