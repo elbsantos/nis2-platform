@@ -289,29 +289,44 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
     // ── ROW C: Top prioridades do plano de ação ─────────────────────────────
     if (gaps.length > 0) {
       const cardHeaderH = doc.fontSize(7.5).font("Sans-Bold").heightOfString("X", {});
-      const cardQH      = doc.fontSize(8).font("Sans-Bold").heightOfString("X", { lineBreak: false });
       const cardPad     = 4;
-      const singleCardH = cardPad + cardHeaderH + 4 + cardQH + cardPad;
       const cardGap     = 4;
       const top3TitleH  = 14;
+      const cardQW      = CW - 16;
 
-      const maxCards = Math.min(
-        Math.min(3, gaps.length),
-        Math.max(0, Math.floor((CONTENT_BOTTOM - y - top3TitleH) / (singleCardH + cardGap))),
-      );
+      doc.fontSize(8).font("Sans-Bold");
+      const qLineH = doc.currentLineHeight();
+
+      // Pré-medir até 3 candidatos — qH real por cartão, clampado a 2 linhas
+      const candidates = gaps.slice(0, 3).map((gap) => {
+        const rawQH  = doc.fontSize(8).font("Sans-Bold").heightOfString(gap.question, { width: cardQW });
+        const qH     = Math.min(rawQH, 2 * qLineH);
+        const cardH  = cardPad + cardHeaderH + 4 + qH + cardPad;
+        return { gap, qH, cardH };
+      });
+
+      // maxCards com alturas reais — válvula top-3 → top-2 → top-1
+      let roomUsed = y + top3TitleH;
+      let maxCards = 0;
+      for (const { cardH } of candidates) {
+        const needed = (maxCards > 0 ? cardGap : 0) + cardH;
+        if (roomUsed + needed > CONTENT_BOTTOM) break;
+        roomUsed += needed;
+        maxCards++;
+      }
 
       if (maxCards > 0) {
         doc.fontSize(9).font("Sans-Bold").fillColor(C.text)
            .text("Top Prioridades do Plano de Ação", MARGIN, y);
         y += top3TitleH;
 
-        gaps.slice(0, maxCards).forEach((gap, i) => {
+        candidates.slice(0, maxCards).forEach(({ gap, qH, cardH }, i) => {
           if (i > 0) y += cardGap;
           const rowBg       = i % 2 === 0 ? "#f8fafc" : C.white;
           const circleColor = gap.answer === "no" ? C.danger : C.warning;
-          doc.rect(MARGIN, y, CW, singleCardH).fillColor(rowBg).fill();
-          doc.rect(MARGIN, y, CW, singleCardH).strokeColor(C.border).lineWidth(0.3).stroke();
-          doc.rect(MARGIN, y, 3, singleCardH).fillColor(circleColor).fill();
+          doc.rect(MARGIN, y, CW, cardH).fillColor(rowBg).fill();
+          doc.rect(MARGIN, y, CW, cardH).strokeColor(C.border).lineWidth(0.3).stroke();
+          doc.rect(MARGIN, y, 3, cardH).fillColor(circleColor).fill();
 
           const answerLabel = gap.answer === "no" ? "Não cumprido" : "Parcial";
           doc.fontSize(7.5).font("Sans-Bold").fillColor(C.brand)
@@ -321,9 +336,9 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
 
           doc.fontSize(8).font("Sans-Bold").fillColor(C.text);
           doc.text(gap.question, MARGIN + 8, y + cardPad + cardHeaderH + 4,
-                   { width: CW - 16, height: doc.currentLineHeight(), ellipsis: true });
+                   { width: cardQW, height: 2 * qLineH, ellipsis: true });
 
-          y += singleCardH;
+          y += cardH;
         });
       }
     }
