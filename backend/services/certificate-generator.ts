@@ -1,26 +1,12 @@
 /**
- * server/services/certificate-generator.ts
+ * backend/services/certificate-generator.ts
  *
  * Generates a PDF completion certificate for the NIS2 course.
- * Uploads to Hetzner Object Storage and returns the public URL.
+ * Returns a Buffer (base64 conversion done at the router level).
  */
 
 import PDFDocument from "pdfkit";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-function getS3Client(): S3Client {
-  return new S3Client({
-    region:   process.env.STORAGE_REGION   ?? "eu-central-1",
-    endpoint: process.env.STORAGE_ENDPOINT ?? "https://fsn1.your-objectstorage.com",
-    credentials: {
-      accessKeyId:     process.env.STORAGE_ACCESS_KEY ?? "",
-      secretAccessKey: process.env.STORAGE_SECRET_KEY ?? "",
-    },
-    forcePathStyle: true,
-  });
-}
-
-const BUCKET   = process.env.STORAGE_BUCKET ?? "nis2pt-reports";
 const C = {
   brand:  "#1d4ed8",
   gold:   "#b45309",
@@ -29,30 +15,10 @@ const C = {
   border: "#e5e7eb",
 };
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
-
-export async function generateCertificate(opts: {
-  userId: number;
+export async function generateCertificateBuffer(opts: {
   userName: string;
   orgName: string;
   completedAt: Date;
-  overallScore: number;
-}): Promise<string> {
-  const buffer = await buildCertificate(opts);
-  return uploadCertificate(buffer, opts.userId);
-}
-
-// ---------------------------------------------------------------------------
-// PDF builder
-// ---------------------------------------------------------------------------
-
-async function buildCertificate(opts: {
-  userName: string;
-  orgName: string;
-  completedAt: Date;
-  overallScore: number;
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc    = new PDFDocument({ size: "A4", layout: "landscape", margin: 60,
@@ -81,7 +47,7 @@ async function buildCertificate(opts: {
        .text("CISPLAN", 0, 52, { align: "center", width: W });
 
     doc.fontSize(9).fillColor(C.muted).font("Helvetica")
-       .text("Conformidade NIS2 para PMEs Portuguesas | nis2pt.pt", 0, 70, { align: "center", width: W });
+       .text("Conformidade NIS2 para PMEs Portuguesas", 0, 70, { align: "center", width: W });
 
     // ── Decorative rule ──
     doc.moveTo(W / 2 - 120, 92).lineTo(W / 2 + 120, 92)
@@ -93,48 +59,40 @@ async function buildCertificate(opts: {
 
     // ── Body text ──
     doc.fontSize(12).fillColor(C.muted).font("Helvetica")
-       .text("Este certificado é atribuído a", 0, 160, { align: "center", width: W });
+       .text("Este certificado é atribuído a", 0, 165, { align: "center", width: W });
 
     // ── Recipient name ──
     doc.fontSize(28).fillColor(C.text).font("Helvetica-Bold")
-       .text(opts.userName, 0, 182, { align: "center", width: W });
+       .text(opts.userName, 0, 187, { align: "center", width: W });
 
     // ── Underline name ──
     const nameWidth = Math.min(doc.widthOfString(opts.userName, { fontSize: 28 } as any) + 40, 400);
-    doc.moveTo(W / 2 - nameWidth / 2, 218)
-       .lineTo(W / 2 + nameWidth / 2, 218)
+    doc.moveTo(W / 2 - nameWidth / 2, 223)
+       .lineTo(W / 2 + nameWidth / 2, 223)
        .strokeColor(C.gold).lineWidth(1.5).stroke();
 
     // ── Course and org ──
     doc.fontSize(12).fillColor(C.muted).font("Helvetica")
-       .text("pela conclusão com sucesso do curso", 0, 232, { align: "center", width: W });
+       .text("pela conclusão com sucesso do curso", 0, 237, { align: "center", width: W });
 
     doc.fontSize(15).fillColor(C.brand).font("Helvetica-Bold")
-       .text("NIS2 para PMEs em Portugal", 0, 252, { align: "center", width: W });
+       .text("NIS2 para PMEs em Portugal", 0, 257, { align: "center", width: W });
 
     doc.fontSize(11).fillColor(C.muted).font("Helvetica")
-       .text(`em representação de ${opts.orgName}`, 0, 276, { align: "center", width: W });
-
-    // ── Score badge ──
-    const bx = W / 2 - 44, by = 305;
-    doc.roundedRect(bx, by, 88, 48, 8).fillColor(C.brand).fill();
-    doc.fontSize(24).fillColor("white").font("Helvetica-Bold")
-       .text(String(opts.overallScore), bx, by + 4, { width: 88, align: "center" });
-    doc.fontSize(9).fillColor("white").font("Helvetica")
-       .text("/ 100  Score NIS2", bx, by + 30, { width: 88, align: "center" });
+       .text(`em representação de ${opts.orgName}`, 0, 281, { align: "center", width: W });
 
     // ── Date ──
     const dateStr = opts.completedAt.toLocaleDateString("pt-PT", {
       day: "numeric", month: "long", year: "numeric",
     });
     doc.fontSize(10).fillColor(C.muted).font("Helvetica")
-       .text(`Concluído em ${dateStr}`, 0, 370, { align: "center", width: W });
+       .text(`Concluído em ${dateStr}`, 0, 320, { align: "center", width: W });
 
     // ── Signature line ──
-    doc.moveTo(W / 2 - 80, 415).lineTo(W / 2 + 80, 415)
+    doc.moveTo(W / 2 - 80, 365).lineTo(W / 2 + 80, 365)
        .strokeColor(C.muted).lineWidth(0.5).stroke();
     doc.fontSize(9).fillColor(C.muted).font("Helvetica")
-       .text("CISPLAN", 0, 420, { align: "center", width: W });
+       .text("CISPLAN", 0, 370, { align: "center", width: W });
 
     // ── Footer ──
     doc.fontSize(8).fillColor(C.muted)
@@ -145,30 +103,4 @@ async function buildCertificate(opts: {
 
     doc.end();
   });
-}
-
-// ---------------------------------------------------------------------------
-// S3 upload
-// ---------------------------------------------------------------------------
-
-async function uploadCertificate(buffer: Buffer, userId: number): Promise<string> {
-  const key = `certificates/${userId}/nis2-certificate-${Date.now()}.pdf`;
-
-  if (!process.env.STORAGE_ACCESS_KEY) {
-    console.warn(`[Certificate] Storage not configured — skipping upload. Key: ${key}`);
-    return `https://storage.nis2pt.pt/${key}`;
-  }
-
-  const client = getS3Client();
-  await client.send(
-    new PutObjectCommand({
-      Bucket:      BUCKET,
-      Key:         key,
-      Body:        buffer,
-      ContentType: "application/pdf",
-      ACL:         "public-read",
-    })
-  );
-
-  return `${process.env.STORAGE_PUBLIC_URL ?? "https://storage.nis2pt.pt"}/${key}`;
 }

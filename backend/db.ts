@@ -425,7 +425,7 @@ export async function markLessonComplete(data: {
   organizationId: number;
   moduleId: string;
   lessonId: string;
-  certificateUrl?: string;
+  certificateIssuedAt?: Date;
 }) {
   const existing = await getDb()
     .select({ id: courseProgress.id })
@@ -437,18 +437,18 @@ export async function markLessonComplete(data: {
 
   if (existing.length === 0) {
     return getDb().insert(courseProgress).values({
-      userId:         data.userId,
-      organizationId: data.organizationId,
-      moduleId:       data.moduleId,
-      lessonId:       data.lessonId,
-      certificateUrl: data.certificateUrl,
+      userId:              data.userId,
+      organizationId:      data.organizationId,
+      moduleId:            data.moduleId,
+      lessonId:            data.lessonId,
+      certificateIssuedAt: data.certificateIssuedAt,
     });
   }
 
-  if (data.certificateUrl) {
+  if (data.certificateIssuedAt) {
     return getDb()
       .update(courseProgress)
-      .set({ certificateUrl: data.certificateUrl })
+      .set({ certificateIssuedAt: data.certificateIssuedAt })
       .where(
         and(eq(courseProgress.userId, data.userId), eq(courseProgress.lessonId, data.lessonId))
       );
@@ -467,18 +467,18 @@ export async function getLessonProgress(userId: number, organizationId: number) 
     );
 }
 
-export async function getCertificateUrl(userId: number): Promise<string | null> {
+export async function getCertificateIssuedAt(userId: number): Promise<Date | null> {
   const rows = await getDb()
-    .select({ certificateUrl: courseProgress.certificateUrl })
+    .select({ certificateIssuedAt: courseProgress.certificateIssuedAt })
     .from(courseProgress)
     .where(
       and(
         eq(courseProgress.userId, userId),
-        sql`${courseProgress.certificateUrl} IS NOT NULL`
+        sql`${courseProgress.certificateIssuedAt} IS NOT NULL`
       )
     )
     .limit(1);
-  return rows[0]?.certificateUrl ?? null;
+  return rows[0]?.certificateIssuedAt ?? null;
 }
 
 // ---------------------------------------------------------------------------

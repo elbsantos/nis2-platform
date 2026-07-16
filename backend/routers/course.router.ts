@@ -12,7 +12,7 @@ import { freeProcedure, proProcedure } from "../middlewares/planGuard";
 import {
   markLessonComplete,
   getLessonProgress,
-  getCertificateUrl,
+  getCertificateIssuedAt,
   getUserById,
 } from "../db";
 import {
@@ -21,8 +21,8 @@ import {
   getLessonById,
   type Lesson,
 } from "../services/course-config";
-import { getDocsByLesson }        from "../content/docs-catalog";
-import { generateCertificate }   from "../services/certificate-generator";
+import { getDocsByLesson }              from "../content/docs-catalog";
+import { generateCertificateBuffer }    from "../services/certificate-generator";
 
 // "module-1/lesson-1-1" → "1.1", "module-2/lesson-2-3" → "2.3"
 function toCatalogLessonId(lessonId: string): string {
@@ -165,7 +165,7 @@ export const courseRouter = router({
     }),
 
   /**
-   * Mark lesson as completed and (if all done) generate certificate
+   * Mark lesson as completed and (if all done) record certificateIssuedAt
    */
   markComplete: freeProcedure
     .input(z.object({ lessonId: z.string().max(100) }))
@@ -187,7 +187,6 @@ export const courseRouter = router({
       // Check if all lessons are now complete
       const progress = await getLessonProgress(ctx.user.id, ctx.org.id);
 
-      // Count applicable lessons: free users only complete Module 1 (4 lessons)
       const applicableLessons = getAllLessons().filter(
         (l) => ctx.plan !== "free" || l.moduleId === "module-1"
       );
@@ -195,62 +194,85 @@ export const courseRouter = router({
         progress.some((p) => p.lessonId === l.id)
       );
 
-      let certificateUrl: string | null = null;
+      let certificateIssuedAt: Date | null = null;
 
       if (allDone) {
-        const existing = await getCertificateUrl(ctx.user.id);
-        if (!existing) {
-          const user        = await getUserById(ctx.user.id);
-          const totalScore  = progress.reduce((sum, p) => sum, 0); // placeholder
-
-          certificateUrl = await generateCertificate({
-            userId:       ctx.user.id,
-            userName:     user?.name ?? ctx.user.email,
-            orgName:      ctx.org.name,
-            completedAt:  new Date(),
-            overallScore: 80, // Could be calculated from quiz results
-          });
-
-          // Persist certificate URL on the completed record
-          await markLessonComplete({
-            userId:         ctx.user.id,
-            organizationId: ctx.org.id,
-            moduleId:       lesson.moduleId,
-            lessonId:       lesson.id,
-            certificateUrl,
-          });
+        const existing = await getCertificateIssuedAt(ctx.user.id);
+        if (existing) {
+          certificateIssuedAt = existing;
         } else {
-          certificateUrl = existing;
+          certificateIssuedAt = new Date();
+          await markLessonComplete({
+            userId:              ctx.user.id,
+            organizationId:      ctx.org.id,
+            moduleId:            lesson.moduleId,
+            lessonId:            lesson.id,
+            certificateIssuedAt,
+          });
         }
       }
 
       return {
-        completed:      true,
-        courseComplete: allDone,
-        certificateUrl,
+        completed:           true,
+        courseComplete:      allDone,
+        certificateIssuedAt,
       };
     }),
+
+  /**
+   * Generate certificate on-demand — verifies course completion in DB
+   */
+  certificate: freeProcedure.mutation(async ({ ctx }) => {
+    const progress = await getLessonProgress(ctx.user.id, ctx.org.id);
+    const applicableLessons = getAllLessons().filter(
+      (l) => ctx.plan !== "free" || l.moduleId === "module-1"
+    );
+    const allDone = applicableLessons.every((l) =>
+      progress.some((p) => p.lessonId === l.id)
+    );
+
+    if (!allDone) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Curso não concluído. Completa todas as aulas para acederes ao certificado.",
+      });
+    }
+
+    const user      = await getUserById(ctx.user.id);
+    const issuedAt  = await getCertificateIssuedAt(ctx.user.id);
+
+    const buffer = await generateCertificateBuffer({
+      userName:    user?.name ?? ctx.user.email,
+      orgName:     ctx.org.name,
+      completedAt: issuedAt ?? new Date(),
+    });
+
+    return {
+      pdfBase64: buffer.toString("base64"),
+      filename:  `certificado-cisplan-${ctx.user.id}.pdf`,
+    };
+  }),
 
   /**
    * Get overall course progress summary
    */
   getProgress: freeProcedure.query(async ({ ctx }) => {
-    const progress = await getLessonProgress(ctx.user.id, ctx.org.id);
-    const certUrl  = await getCertificateUrl(ctx.user.id);
+    const progress       = await getLessonProgress(ctx.user.id, ctx.org.id);
+    const issuedAt       = await getCertificateIssuedAt(ctx.user.id);
 
     const applicableLessons = getAllLessons().filter(
       (l) => ctx.plan !== "free" || l.moduleId === "module-1"
     );
 
     return {
-      completed:      progress.length,
-      total:          TOTAL_LESSONS,
-      applicable:     applicableLessons.length,
-      completedIds:   progress.map((p) => p.lessonId),
-      courseComplete: applicableLessons.every((l) =>
+      completed:           progress.length,
+      total:               TOTAL_LESSONS,
+      applicable:          applicableLessons.length,
+      completedIds:        progress.map((p) => p.lessonId),
+      courseComplete:      applicableLessons.every((l) =>
         progress.some((p) => p.lessonId === l.id)
       ),
-      certificateUrl: certUrl,
+      certificateIssuedAt: issuedAt,
     };
   }),
 });

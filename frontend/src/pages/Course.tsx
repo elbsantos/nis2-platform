@@ -117,7 +117,24 @@ function ModuleCard({ module, completedIds }: {
 // Certificate card
 // ---------------------------------------------------------------------------
 
-function CertificateCard({ url }: { url: string }) {
+function CertificateCard() {
+  const certMut = trpc.course.certificate.useMutation();
+
+  function download() {
+    certMut.mutate(undefined, {
+      onSuccess: ({ pdfBase64, filename }) => {
+        const bytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
+        const blob  = new Blob([bytes], { type: "application/pdf" });
+        const url   = URL.createObjectURL(blob);
+        const a     = document.createElement("a");
+        a.href      = url;
+        a.download  = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+    });
+  }
+
   return (
     <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl p-6 text-white text-center">
       <div className="text-4xl mb-3"><IconCert /></div>
@@ -125,14 +142,13 @@ function CertificateCard({ url }: { url: string }) {
       <p className="text-blue-200 text-sm mb-4">
         Concluíste o curso NIS2 para PMEs em Portugal com sucesso.
       </p>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-block px-6 py-2.5 bg-white text-blue-700 font-semibold text-sm rounded-lg hover:bg-blue-50 transition-colors"
+      <button
+        onClick={download}
+        disabled={certMut.isPending}
+        className="inline-block px-6 py-2.5 bg-white text-blue-700 font-semibold text-sm rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-60"
       >
-        ↓ Descarregar certificado (PDF)
-      </a>
+        {certMut.isPending ? "A gerar…" : "↓ Descarregar certificado (PDF)"}
+      </button>
     </div>
   );
 }
@@ -171,9 +187,9 @@ export default function Course() {
       </div>
 
       {/* Certificate (if complete) */}
-      {progress?.certificateUrl && (
+      {progress?.certificateIssuedAt && (
         <div className="mb-8">
-          <CertificateCard url={progress.certificateUrl} />
+          <CertificateCard />
         </div>
       )}
 

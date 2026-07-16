@@ -202,8 +202,9 @@ export const courseProgress = mysqlTable(
     organizationId: int("organizationId").notNull(),
     moduleId:       varchar("moduleId", { length: 50 }).notNull(),
     lessonId:       varchar("lessonId", { length: 50 }).notNull(),
-    completedAt:    timestamp("completedAt").notNull().defaultNow(),
-    certificateUrl: varchar("certificateUrl", { length: 500 }),
+    completedAt:          timestamp("completedAt").notNull().defaultNow(),
+    certificateUrl:       varchar("certificateUrl", { length: 500 }),
+    certificateIssuedAt:  timestamp("certificateIssuedAt"),
   },
   (t) => [
     uniqueIndex("uq_user_lesson").on(t.userId, t.lessonId),

@@ -329,7 +329,7 @@ export default function Lesson() {
     onSuccess: (data) => {
       utils.course.getProgress.invalidate();
       utils.course.getModules.invalidate();
-      if (data.courseComplete && data.certificateUrl) {
+      if (data.courseComplete && data.certificateIssuedAt) {
         navigate("/course");
       }
     },
