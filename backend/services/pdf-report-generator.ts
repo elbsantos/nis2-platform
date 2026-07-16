@@ -202,7 +202,7 @@ export async function generateReportBuffer(options: {
 // EXECUTIVE REPORT
 // ---------------------------------------------------------------------------
 
-async function buildExecutiveReport(
+export async function buildExecutiveReport(
   scan: Scan,
   vulns: PdfVuln[],
   org: Org,
@@ -519,12 +519,15 @@ async function buildExecutiveReport(
     y = drawSectionTitle(doc, "Próximos Passos Recomendados", y);
     const steps = buildNextSteps(overall, counts);
     steps.forEach((step, i) => {
+      const stepTextH = doc.fontSize(9).font("Sans").heightOfString(step, { width: CONTENT_W - 28 });
+      const stepH     = Math.max(20, stepTextH + 5) + 8;
+      execEnsure(stepH);
       doc.rect(MARGIN, y, 20, 20).fillColor(C.brand).fill();
       doc.fontSize(9).font("Sans-Bold").fillColor(C.white)
          .text(String(i + 1), MARGIN, y + 6, { width: 20, align: "center" });
       doc.fontSize(9).font("Sans").fillColor(C.text)
          .text(step, MARGIN + 28, y + 5, { width: CONTENT_W - 28 });
-      y += 28;
+      y += stepH;
     });
     y += 10;
 
