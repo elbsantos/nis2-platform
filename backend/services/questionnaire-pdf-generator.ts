@@ -232,7 +232,8 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
       doc.fillColor(C.muted).text(subText, barsColX, y + 13, { width: barsColW });
       barsH = 13 + subH + 4;
 
-      const maxGap   = gapArticles[0].gapCount;
+      // máximo real do array — nunca assumir posição (bug sessão #1)
+      const maxGap   = Math.max(...gapArticles.map(m => m.gapCount));
       const bSlugW   = 20;
       const bTitleW  = 150;
       const bCountW  = 24;
@@ -258,11 +259,11 @@ export function generateQuestionnaireReportPdf(data: QReportData): Promise<Buffe
 
         const bx    = barsColX + bSlugW + 4 + bTitleW + 4;
         const barY  = rowsY + (rowH_i - 10) / 2;
-        const bFill = Math.max(3, Math.round((m.gapCount / maxGap) * bBarW));
+        const bFill = Math.min(bBarW, Math.max(3, Math.round((m.gapCount / maxGap) * bBarW)));
         doc.rect(bx, barY, bBarW, 10).fillColor(C.border).fill();
         doc.rect(bx, barY, bFill, 10).fillColor(C.danger).fill();
 
-        doc.fontSize(7.5).font("Sans-Bold").fillColor(C.danger)
+        doc.fontSize(7.5).font("Sans-Bold").fillColor(C.text)
            .text(String(m.gapCount), bx + bBarW + 4, barY, { width: bCountW });
 
         rowsY += rowH_i;
