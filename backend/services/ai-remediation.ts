@@ -12,8 +12,13 @@ import {
   getOrganizationById,
   createRemediationItem,
   getRemediationItemsByScanId,
-  getRemediationItemByCvePrefix,
+  getLibraryByCveId,
+  upsertLibraryEntry,
 } from "../db";
+
+// Increment when remediationPlanner system prompt changes significantly.
+// Library entries with an older version are regenerated via API and updated.
+const REMEDIATION_PROMPT_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -337,31 +342,50 @@ export async function generateRemediationForScan(
   let created = 0;
   for (const vuln of filteredVulns) {
     try {
-      // Cross-scan dedup: reuse existing AI plan for this CVE if one exists for this org
-      const existingItem = await getRemediationItemByCvePrefix(organizationId, vuln.cveId);
-      if (existingItem) {
-        await createRemediationItem({
-          organizationId,
-          scanId,
-          vulnId:       vuln.id > 0 ? vuln.id : undefined,
-          title:        existingItem.title,
-          steps:        (existingItem.steps as Array<{ order: number; instruction: string; platform: string }> | null) ?? [],
-          effort:       existingItem.effort,
-          nis2Articles: (existingItem.nis2Articles as string[] | null) ?? [],
+      // Library lookup: canonical cross-org plan keyed by CVE
+      const libraryEntry = await getLibraryByCveId(vuln.cveId);
+
+      let itemPlan: ParsedPlan;
+
+      if (libraryEntry && libraryEntry.promptVersion === REMEDIATION_PROMPT_VERSION) {
+        // HIT — current version, copy steps directly (no API call)
+        itemPlan = {
+          title:        `${vuln.cveId} — ${vuln.affectedComponent}`,
+          riskSummary:  "Vulnerabilidade requer correção urgente.",
+          steps:        (libraryEntry.steps as Array<{ order: number; instruction: string; platform: string }> | null) ?? [],
+          effort:       libraryEntry.effort as "low" | "medium" | "high",
+          nis2Articles: (libraryEntry.nis2Articles as string[] | null) ?? [],
+        };
+      } else if (libraryEntry) {
+        // HIT — outdated prompt version, regenerate and update library
+        itemPlan = await generatePlanForVuln(vuln, orgContext);
+        await upsertLibraryEntry({
+          cveId:         vuln.cveId,
+          steps:         itemPlan.steps,
+          effort:        itemPlan.effort,
+          nis2Articles:  itemPlan.nis2Articles,
+          promptVersion: REMEDIATION_PROMPT_VERSION,
         });
-        created += 1;
-        continue;
+      } else {
+        // MISS — generate and save to library
+        itemPlan = await generatePlanForVuln(vuln, orgContext);
+        await upsertLibraryEntry({
+          cveId:         vuln.cveId,
+          steps:         itemPlan.steps,
+          effort:        itemPlan.effort,
+          nis2Articles:  itemPlan.nis2Articles,
+          promptVersion: REMEDIATION_PROMPT_VERSION,
+        });
       }
 
-      const plan = await generatePlanForVuln(vuln, orgContext);
       await createRemediationItem({
         organizationId,
         scanId,
-        vulnId:       vuln.id,
-        title:        plan.title,
-        steps:        plan.steps,
-        effort:       plan.effort,
-        nis2Articles: plan.nis2Articles,
+        vulnId:       vuln.id > 0 ? vuln.id : undefined,
+        title:        itemPlan.title,
+        steps:        itemPlan.steps,
+        effort:       itemPlan.effort,
+        nis2Articles: itemPlan.nis2Articles,
       });
       created += 1;
     } catch (err) {

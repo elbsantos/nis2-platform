@@ -415,10 +415,50 @@ export async function getRemediationItemByCvePrefix(orgId: number, cveId: string
 }
 
 // ---------------------------------------------------------------------------
-// Course progress
+// Remediation library
 // ---------------------------------------------------------------------------
 
-import { questionnaireSessions, remediationItems, courseProgress, controlEvidence } from "../database/schema";
+import { questionnaireSessions, remediationItems, courseProgress, controlEvidence, remediationLibrary } from "../database/schema";
+
+export async function getLibraryByCveId(cveId: string) {
+  const rows = await getDb()
+    .select()
+    .from(remediationLibrary)
+    .where(eq(remediationLibrary.cveId, cveId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertLibraryEntry(data: {
+  cveId:         string;
+  steps:         Array<{ order: number; instruction: string; platform: string }>;
+  effort:        "low" | "medium" | "high";
+  nis2Articles:  string[];
+  promptVersion: number;
+}) {
+  await getDb()
+    .insert(remediationLibrary)
+    .values(data)
+    .onDuplicateKeyUpdate({
+      set: {
+        steps:         data.steps,
+        effort:        data.effort,
+        nis2Articles:  data.nis2Articles,
+        promptVersion: data.promptVersion,
+        updatedAt:     new Date(),
+      },
+    });
+  const rows = await getDb()
+    .select()
+    .from(remediationLibrary)
+    .where(eq(remediationLibrary.cveId, data.cveId))
+    .limit(1);
+  return rows[0]!;
+}
+
+// ---------------------------------------------------------------------------
+// Course progress
+// ---------------------------------------------------------------------------
 
 export async function markLessonComplete(data: {
   userId: number;

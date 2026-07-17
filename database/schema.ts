@@ -191,6 +191,29 @@ export const remediationItems = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// Remediation library — canonical cross-org plans keyed by CVE
+// ---------------------------------------------------------------------------
+
+export const remediationLibrary = mysqlTable(
+  "remediation_library",
+  {
+    id:            int("id").autoincrement().primaryKey(),
+    cveId:         varchar("cveId", { length: 50 }).notNull(),
+    steps:         json("steps").$type<
+                     Array<{ order: number; instruction: string; platform: string }>
+                   >(),
+    effort:        mysqlEnum("effort", ["low", "medium", "high"]).notNull().default("medium"),
+    nis2Articles:  json("nis2Articles").$type<string[]>(),
+    promptVersion: int("promptVersion").notNull().default(1),
+    createdAt:     timestamp("createdAt").notNull().defaultNow(),
+    updatedAt:     timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_lib_cve").on(t.cveId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // Course progress
 // ---------------------------------------------------------------------------
 
@@ -248,4 +271,5 @@ export type Organization   = typeof organizations.$inferSelect;
 export type Scan           = typeof scans.$inferSelect;
 export type Vulnerability  = typeof vulnerabilities.$inferSelect;
 export type Subscription   = typeof subscriptions.$inferSelect;
-export type ControlEvidence = typeof controlEvidence.$inferSelect;
+export type ControlEvidence       = typeof controlEvidence.$inferSelect;
+export type RemediationLibraryEntry = typeof remediationLibrary.$inferSelect;
