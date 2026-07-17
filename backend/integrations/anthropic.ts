@@ -112,7 +112,12 @@ async function recordTokenUsage(orgId: number, tokens: number): Promise<void> {
 // Non-streaming — for background jobs (remediation plans, PDF summaries)
 // ---------------------------------------------------------------------------
 
-export async function chat(opts: ChatOptions): Promise<string> {
+export interface ChatResult {
+  text:       string;
+  stopReason: string;
+}
+
+export async function chat(opts: ChatOptions): Promise<ChatResult> {
   // Protection 3: AI feature flag
   if (process.env.AI_ENABLED === "false") {
     throw new Error("[Anthropic] Funcionalidades AI desactivadas (AI_ENABLED=false)");
@@ -148,7 +153,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
 
   const block = response.content[0];
   if (block.type !== "text") throw new Error("[Anthropic] Unexpected content type");
-  return block.text;
+  return { text: block.text, stopReason: response.stop_reason ?? "end_turn" };
 }
 
 // ---------------------------------------------------------------------------

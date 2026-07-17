@@ -544,7 +544,7 @@ export async function explainControl(
     .filter(Boolean)
     .join(" | ");
 
-  return chat({
+  const { text } = await chat({
     system: SYSTEM_PROMPTS.questionnaireGuide,
     messages: [
       {
@@ -562,4 +562,5 @@ Inclui: (1) porquê este controlo existe na lei, (2) o que significa na prática
     orgId: context.orgId,
     plan:  context.plan,
   });
+  return text;
 }

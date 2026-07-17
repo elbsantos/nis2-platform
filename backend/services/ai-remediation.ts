@@ -227,16 +227,29 @@ Segue rigorosamente este formato:
 
 IMPORTANTE: Completa sempre cada frase. Não cortes passos a meio. O público-alvo são gestores de PME sem conhecimento técnico.`;
 
-  const raw = await chat({
+  const { text: raw, stopReason } = await chat({
     system:      SYSTEM_PROMPTS.remediationPlanner,
     messages:    [{ role: "user", content: prompt }],
-    maxTokens:   1500,
+    maxTokens:   3000,
     temperature: 0.2,
     orgId:       orgContext.orgId,
     plan:        orgContext.plan,
   });
 
-  return parseAIPlan(raw, `${vuln.cveId} — ${vuln.affectedComponent}`);
+  const parsed = parseAIPlan(raw, `${vuln.cveId} — ${vuln.affectedComponent}`);
+
+  if (stopReason === "max_tokens" && parsed.steps.length > 0) {
+    parsed.steps.pop();
+    console.warn(`[Remediation] ${vuln.cveId}: resposta truncada (max_tokens) — último passo descartado`);
+  }
+
+  if (parsed.steps.length < 2) {
+    throw new Error(
+      `[Remediation] ${vuln.cveId}: plano insuficiente após descarte — ${parsed.steps.length} passo(s)`
+    );
+  }
+
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
