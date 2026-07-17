@@ -420,18 +420,25 @@ export async function getRemediationItemByCvePrefix(orgId: number, cveId: string
 
 import { questionnaireSessions, remediationItems, courseProgress, controlEvidence, remediationLibrary } from "../database/schema";
 
-export async function getLibraryByCveId(cveId: string) {
+export async function getLibraryByCveIdAndOsKey(cveId: string, osKey: string) {
   const rows = await getDb()
     .select()
     .from(remediationLibrary)
-    .where(eq(remediationLibrary.cveId, cveId))
+    .where(
+      and(
+        eq(remediationLibrary.cveId, cveId),
+        eq(remediationLibrary.osKey, osKey)
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
 
 export async function upsertLibraryEntry(data: {
   cveId:         string;
+  osKey:         string;
   steps:         Array<{ order: number; instruction: string; platform: string }>;
+  riskSummary:   string;
   effort:        "low" | "medium" | "high";
   nis2Articles:  string[];
   promptVersion: number;
@@ -442,6 +449,7 @@ export async function upsertLibraryEntry(data: {
     .onDuplicateKeyUpdate({
       set: {
         steps:         data.steps,
+        riskSummary:   data.riskSummary,
         effort:        data.effort,
         nis2Articles:  data.nis2Articles,
         promptVersion: data.promptVersion,
@@ -451,7 +459,12 @@ export async function upsertLibraryEntry(data: {
   const rows = await getDb()
     .select()
     .from(remediationLibrary)
-    .where(eq(remediationLibrary.cveId, data.cveId))
+    .where(
+      and(
+        eq(remediationLibrary.cveId, data.cveId),
+        eq(remediationLibrary.osKey, data.osKey)
+      )
+    )
     .limit(1);
   return rows[0]!;
 }

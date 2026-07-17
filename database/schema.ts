@@ -199,9 +199,11 @@ export const remediationLibrary = mysqlTable(
   {
     id:            int("id").autoincrement().primaryKey(),
     cveId:         varchar("cveId", { length: 50 }).notNull(),
+    osKey:         varchar("osKey", { length: 20 }).notNull().default("generic"),
     steps:         json("steps").$type<
                      Array<{ order: number; instruction: string; platform: string }>
                    >(),
+    riskSummary:   text("riskSummary"),
     effort:        mysqlEnum("effort", ["low", "medium", "high"]).notNull().default("medium"),
     nis2Articles:  json("nis2Articles").$type<string[]>(),
     promptVersion: int("promptVersion").notNull().default(1),
@@ -209,7 +211,7 @@ export const remediationLibrary = mysqlTable(
     updatedAt:     timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
   },
   (t) => [
-    uniqueIndex("uq_lib_cve").on(t.cveId),
+    uniqueIndex("uq_lib_cve_os").on(t.cveId, t.osKey),
   ]
 );
 

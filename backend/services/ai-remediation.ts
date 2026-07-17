@@ -12,7 +12,7 @@ import {
   getOrganizationById,
   createRemediationItem,
   getRemediationItemsByScanId,
-  getLibraryByCveId,
+  getLibraryByCveIdAndOsKey,
   upsertLibraryEntry,
 } from "../db";
 
@@ -30,7 +30,7 @@ interface RemediationStep {
   platform: string;
 }
 
-interface ParsedPlan {
+export interface ParsedPlan {
   title: string;
   riskSummary: string;
   steps: RemediationStep[];
@@ -38,21 +38,47 @@ interface ParsedPlan {
   nis2Articles: string[];
 }
 
+// Normalises a raw OS string from scan results into one of the three library keys.
+// The scanner (scan-executor.ts) does not currently perform OS detection, so
+// detectedOS is always null and this function always returns 'generic'.
+// When OS detection is added, update scan-executor.ts to populate scan.results.os.
+export function normalizeOsKey(detectedOS: string | null): "linux" | "windows" | "generic" {
+  if (!detectedOS || typeof detectedOS !== "string") return "generic";
+  if (/linux|ubuntu|debian/i.test(detectedOS)) return "linux";
+  if (/windows/i.test(detectedOS)) return "windows";
+  return "generic";
+}
+
+// Performs the two-step library lookup (exact osKey, then 'generic' fallback).
+// Exported for testing.
+export async function lookupLibrary(cveId: string, osKey: string) {
+  const exact = await getLibraryByCveIdAndOsKey(cveId, osKey);
+  if (exact && exact.promptVersion === REMEDIATION_PROMPT_VERSION) return exact;
+
+  if (osKey !== "generic") {
+    const generic = await getLibraryByCveIdAndOsKey(cveId, "generic");
+    if (generic && generic.promptVersion === REMEDIATION_PROMPT_VERSION) return generic;
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // AI plan parser
 // ---------------------------------------------------------------------------
 
-function stripMarkdown(text: string): string {
+export function stripMarkdown(text: string): string {
   return text
-    .replace(/\*\*(.+?)\*\*/g, "$1")  // **bold** → bold
-    .replace(/__(.+?)__/g, "$1")       // __bold__ → bold
-    .replace(/\*([^*]+)\*/g, "$1")     // *italic* → italic
-    .replace(/_([^_]+)_/g, "$1")       // _italic_ → italic
-    .replace(/`([^`]+)`/g, "$1")       // `code` → code
+    .replace(/^#{1,6}\s+/g, "")        // ### headers → remove prefix
+    .replace(/\*\*(.+?)\*\*/g, "$1")   // **bold** → bold
+    .replace(/__(.+?)__/g, "$1")        // __bold__ → bold
+    .replace(/\*([^*]+)\*/g, "$1")      // *italic* → italic
+    .replace(/_([^_]+)_/g, "$1")        // _italic_ → italic
+    .replace(/`([^`]+)`/g, "$1")        // `code` → code
     .trim();
 }
 
-function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
+export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
   const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
 
   const steps: RemediationStep[] = [];
@@ -324,12 +350,11 @@ export async function generateRemediationForScan(
 
   if (filteredVulns.length === 0) return 0;
 
-  const scanResults = scan.results as any;
-  const detectedOS: string | null =
-    scanResults?.osDetection?.name ??
-    scanResults?.osDetection ??
-    scanResults?.os ??
-    null;
+  // The scanner (scan-executor.ts) does not perform OS detection.
+  // detectedOS is always null; osKey is always 'generic'.
+  // When OS detection is added to the scanner, update this line to extract it.
+  const detectedOS: string | null = null;
+  const osKey = normalizeOsKey(detectedOS);
 
   const orgContext = {
     orgId:      organizationId,
@@ -342,36 +367,28 @@ export async function generateRemediationForScan(
   let created = 0;
   for (const vuln of filteredVulns) {
     try {
-      // Library lookup: canonical cross-org plan keyed by CVE
-      const libraryEntry = await getLibraryByCveId(vuln.cveId);
+      // Two-step library lookup: (cveId, osKey) then (cveId, 'generic') fallback
+      const libraryEntry = await lookupLibrary(vuln.cveId, osKey);
 
       let itemPlan: ParsedPlan;
 
-      if (libraryEntry && libraryEntry.promptVersion === REMEDIATION_PROMPT_VERSION) {
-        // HIT — current version, copy steps directly (no API call)
+      if (libraryEntry) {
+        // HIT — current version and compatible osKey, copy steps directly (no API call)
         itemPlan = {
           title:        `${vuln.cveId} — ${vuln.affectedComponent}`,
-          riskSummary:  "Vulnerabilidade requer correção urgente.",
+          riskSummary:  libraryEntry.riskSummary ?? "",
           steps:        (libraryEntry.steps as Array<{ order: number; instruction: string; platform: string }> | null) ?? [],
           effort:       libraryEntry.effort as "low" | "medium" | "high",
           nis2Articles: (libraryEntry.nis2Articles as string[] | null) ?? [],
         };
-      } else if (libraryEntry) {
-        // HIT — outdated prompt version, regenerate and update library
-        itemPlan = await generatePlanForVuln(vuln, orgContext);
-        await upsertLibraryEntry({
-          cveId:         vuln.cveId,
-          steps:         itemPlan.steps,
-          effort:        itemPlan.effort,
-          nis2Articles:  itemPlan.nis2Articles,
-          promptVersion: REMEDIATION_PROMPT_VERSION,
-        });
       } else {
-        // MISS — generate and save to library
+        // MISS or outdated version — generate via API and save/update library
         itemPlan = await generatePlanForVuln(vuln, orgContext);
         await upsertLibraryEntry({
           cveId:         vuln.cveId,
+          osKey,
           steps:         itemPlan.steps,
+          riskSummary:   itemPlan.riskSummary,
           effort:        itemPlan.effort,
           nis2Articles:  itemPlan.nis2Articles,
           promptVersion: REMEDIATION_PROMPT_VERSION,
