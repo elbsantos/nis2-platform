@@ -304,7 +304,7 @@ export async function generateRemediationForScan(
   scanId: number,
   organizationId: number,
   plan?: string
-): Promise<number> {
+): Promise<{ created: number; skipped: number; total: number }> {
   const [scan, org] = await Promise.all([
     getScanById(scanId),
     getOrganizationById(organizationId),
@@ -315,9 +315,14 @@ export async function generateRemediationForScan(
     throw new Error("Sem permissão para aceder a este scan");
   }
 
-  // Skip if plans already exist for this scan
+  // Load existing items once — build a set of cveIds to allow per-vuln skip
+  // (enables partial resume when a previous batch was interrupted)
   const existing = await getRemediationItemsByScanId(scanId);
-  if (existing.length > 0) return existing.length;
+  const existingCveIds = new Set<string>(
+    existing
+      .map((item) => { const m = (item.title ?? "").match(/^(CVE-\S+)/i); return m ? m[1] : null; })
+      .filter((id): id is string => id !== null)
+  );
 
   // Try vulnerabilities table first; fall back to scan.results JSON for synthetic vulns
   // (email/HTTP/TLS/dark-web findings are stored only in scan.results, not in the table)
@@ -348,7 +353,7 @@ export async function generateRemediationForScan(
     (v) => v.cveId?.trim() && v.description?.trim()
   );
 
-  if (filteredVulns.length === 0) return 0;
+  if (filteredVulns.length === 0) return { created: 0, skipped: 0, total: 0 };
 
   // The scanner (scan-executor.ts) does not perform OS detection.
   // detectedOS is always null; osKey is always 'generic'.
@@ -365,8 +370,13 @@ export async function generateRemediationForScan(
 
   // Process sequentially to avoid rate limiting
   let created = 0;
+  let skipped = 0;
   for (const vuln of filteredVulns) {
     try {
+      if (existingCveIds.has(vuln.cveId)) {
+        skipped += 1;
+        continue;
+      }
       // Two-step library lookup: (cveId, osKey) then (cveId, 'generic') fallback
       const libraryEntry = await lookupLibrary(vuln.cveId, osKey);
 
@@ -410,5 +420,5 @@ export async function generateRemediationForScan(
     }
   }
 
-  return created;
+  return { created, skipped, total: filteredVulns.length };
 }

@@ -51,8 +51,8 @@ export const remediationRouter = router({
         });
       }
 
-      const count = await generateRemediationForScan(input.scanId, ctx.org.id, ctx.plan);
-      return { generated: count };
+      const result = await generateRemediationForScan(input.scanId, ctx.org.id, ctx.plan);
+      return { generated: result.created };
     }),
 
   /**

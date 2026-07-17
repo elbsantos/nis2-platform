@@ -322,10 +322,71 @@ describe("generateRemediationForScan — library integration", () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("scan já tem items → retorna contagem existente sem chamar chat()", async () => {
-    mockGetExisting.mockResolvedValue([{ id: 1 }, { id: 2 }]);
-    const count = await generateRemediationForScan(1, 42, "pro");
-    expect(count).toBe(2);
+});
+
+// ---------------------------------------------------------------------------
+// Guard por vulnerabilidade (C9)
+// ---------------------------------------------------------------------------
+
+const FAKE_SCAN_5 = {
+  ...FAKE_SCAN,
+  results: {
+    vulnerabilities: [
+      { cveId: "CVE-A", severity: "high",     cvssScore: 7, description: "Desc CVE-A longa o suficiente para passar no filtro", affectedService: "svc-a", port: 80, remediationHint: null },
+      { cveId: "CVE-B", severity: "medium",   cvssScore: 5, description: "Desc CVE-B longa o suficiente para passar no filtro", affectedService: "svc-b", port: 80, remediationHint: null },
+      { cveId: "CVE-C", severity: "low",      cvssScore: 3, description: "Desc CVE-C longa o suficiente para passar no filtro", affectedService: "svc-c", port: 80, remediationHint: null },
+      { cveId: "CVE-D", severity: "high",     cvssScore: 8, description: "Desc CVE-D longa o suficiente para passar no filtro", affectedService: "svc-d", port: 80, remediationHint: null },
+      { cveId: "CVE-E", severity: "critical", cvssScore: 9, description: "Desc CVE-E longa o suficiente para passar no filtro", affectedService: "svc-e", port: 80, remediationHint: null },
+    ],
+  },
+};
+
+describe("generateRemediationForScan — guard por vulnerabilidade (C9)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupCommonMocks();
+  });
+
+  it("(a) todos os vulns já têm item → skipped=1, created=0, sem chat", async () => {
+    mockGetExisting.mockResolvedValue([{ id: 10, title: "CVE-2024-9999 — nginx" }]);
+    const result = await generateRemediationForScan(1, 42, "pro");
+    expect(result).toEqual({ created: 0, skipped: 1, total: 1 });
     expect(mockChat).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("(b) 2 de 5 vulns em falta → created=2, skipped=3, total=5", async () => {
+    mockGetScan.mockResolvedValue(FAKE_SCAN_5);
+    mockGetExisting.mockResolvedValue([
+      { id: 1, title: "CVE-A — svc-a" },
+      { id: 2, title: "CVE-B — svc-b" },
+      { id: 3, title: "CVE-C — svc-c" },
+    ]);
+    mockGetLibrary.mockResolvedValue(null);
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+    const result = await generateRemediationForScan(1, 42, "pro");
+    expect(result.created).toBe(2);
+    expect(result.skipped).toBe(3);
+    expect(result.total).toBe(5);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("(c) item apagado + biblioteca sem entrada → regenera via API", async () => {
+    mockGetExisting.mockResolvedValue([]);
+    mockGetLibrary.mockResolvedValue(null);
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+    const result = await generateRemediationForScan(1, 42, "pro");
+    expect(result).toEqual({ created: 1, skipped: 0, total: 1 });
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("(d) item apagado + biblioteca com entrada actual → usa biblioteca, sem chat", async () => {
+    mockGetExisting.mockResolvedValue([]);
+    mockGetLibrary.mockResolvedValue(LIBRARY_ENTRY_V2);
+    const result = await generateRemediationForScan(1, 42, "pro");
+    expect(result).toEqual({ created: 1, skipped: 0, total: 1 });
+    expect(mockChat).not.toHaveBeenCalled();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 });
