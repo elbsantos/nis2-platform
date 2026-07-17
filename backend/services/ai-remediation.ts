@@ -320,8 +320,15 @@ export async function generateRemediationForScan(
   const existing = await getRemediationItemsByScanId(scanId);
   const existingCveIds = new Set<string>(
     existing
-      .map((item) => { const m = (item.title ?? "").match(/^(CVE-\S+)/i); return m ? m[1] : null; })
-      .filter((id): id is string => id !== null)
+      .map((item) => {
+        const title = item.title ?? "";
+        if (!title.includes(" — ")) {
+          if (title) console.warn(`[Remediation] título sem separador — ignorado no guard: "${title}"`);
+          return null;
+        }
+        return title.split(" — ")[0].trim();
+      })
+      .filter((id): id is string => id !== null && id.length > 0)
   );
 
   // Try vulnerabilities table first; fall back to scan.results JSON for synthetic vulns

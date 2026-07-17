@@ -393,6 +393,57 @@ describe("generateRemediationForScan — guard por vulnerabilidade (C9)", () => 
 });
 
 // ---------------------------------------------------------------------------
+// C11 — guard reconhece qualquer formato de identificador (split no separador)
+// ---------------------------------------------------------------------------
+
+const FAKE_SCAN_NIS2 = {
+  ...FAKE_SCAN,
+  results: {
+    vulnerabilities: [
+      {
+        cveId: "NIS2-SSH-OUTDATED",
+        severity: "high",
+        cvssScore: 7.5,
+        description: "Servidor SSH desactualizado e vulnerável a exploração remota",
+        affectedService: "ssh",
+        port: 22,
+        remediationHint: "Update SSH server",
+      },
+    ],
+  },
+};
+
+describe("generateRemediationForScan — guard formato identificador (C11)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupCommonMocks();
+  });
+
+  it("(a) NIS2-SSH-OUTDATED reconhecido via split → skip, sem chamada API", async () => {
+    mockGetScan.mockResolvedValue(FAKE_SCAN_NIS2);
+    mockGetExisting.mockResolvedValue([
+      { id: 167, title: "NIS2-SSH-OUTDATED — ssh (porta 22)" },
+    ]);
+    const result = await generateRemediationForScan(1, 42, "pro");
+    expect(result).toEqual({ created: 0, skipped: 1, total: 1 });
+    expect(mockChat).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("(b) título sem separador ' — ' → warning + tratado como inexistente", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockGetExisting.mockResolvedValue([{ id: 10, title: "Título malformado" }]);
+    mockGetLibrary.mockResolvedValue(null);
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+    const result = await generateRemediationForScan(1, 42, "pro");
+    expect(result.created).toBe(1);
+    expect(result.skipped).toBe(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("título sem separador"));
+    warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // countEligibleVulns (C10)
 // ---------------------------------------------------------------------------
 
