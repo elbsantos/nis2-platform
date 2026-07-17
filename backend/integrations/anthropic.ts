@@ -290,7 +290,9 @@ Artigo NIS2: Art. 21(2)(x)
 - Cada frase deve ser COMPLETA — NUNCA cortes uma instrução a meio
 - Texto dos passos em texto simples, SEM markdown — sem **negrito**, *itálico*, \`backticks\` ou blocos de código nas instruções; escreve os comandos directamente no texto (ex.: "executa apt-get update" e não "executa \`apt-get update\`")
 - Máximo 6 passos por opção (não conta o passo de validação final)
-- NÃO inventas soluções — se não há solução documentada, diz-o explicitamente`,
+- NÃO inventas soluções — se não há solução documentada, diz-o explicitamente
+- URLs: inclui APENAS endereços de fontes oficiais que conheces com certeza absoluta (site do fabricante do software afectado, nvd.nist.gov, documentação oficial). Se não tens a certeza de que uma URL existe, refere a ferramenta pelo NOME sem link (ex.: "usa a ferramenta Shodan" em vez de inventar um endereço). NUNCA inventes endereços de verificadores online.
+- Para o PuTTY, refere "o site oficial do PuTTY (projeto de Simon Tatham)" sem URL.`,
 
   /**
    * Executive report summary — translates technical findings to business language
