@@ -123,6 +123,10 @@ export default function ScanResults() {
   const vulnCount = (results?.vulnerabilities as unknown[] | undefined)?.length
     ?? results?.vulnerabilitiesFound
     ?? 0;
+  // Vulns com cveId e description válidos — mesma lógica de filtro do backend.
+  const eligibleCount = (results?.vulnerabilities as Array<{ cveId?: string; description?: string }> | undefined)
+    ?.filter((v) => v.cveId?.trim() && v.description?.trim())
+    .length ?? 0;
   const critical  = results?.criticalCount ?? 0;
   const high      = results?.highCount ?? 0;
   const medium    = results?.mediumCount ?? 0;
@@ -143,9 +147,17 @@ export default function ScanResults() {
               Scan #{scan.id} · {new Date(scan.completedAt ?? scan.createdAt).toLocaleString("pt-PT")}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap items-start">
             <PdfButton scanId={scan.id} type="executive" label="PDF Executivo" />
             <PdfButton scanId={scan.id} type="technical" label="PDF Técnico" />
+            {eligibleCount > 0 && (
+              <Link
+                to={`/remediation?scanId=${scan.id}`}
+                className="px-4 py-2 bg-blue-700 text-white text-lg font-medium rounded-md hover:bg-blue-800 transition-colors whitespace-nowrap"
+              >
+                Planos de Remediação IA
+              </Link>
+            )}
           </div>
         </div>
 
@@ -240,11 +252,6 @@ export default function ScanResults() {
             className="px-5 py-3 border border-[#1e3a5f] text-xl rounded-md text-slate-300 hover:bg-[#152744]"
           >
             Ver histórico
-          </Link>
-          <Link to={`/remediation?scanId=${scan.id}`}
-            className="px-5 py-3 bg-red-700 text-white text-xl font-medium rounded-md hover:bg-red-800"
-          >
-            Gerar plano de remediação IA
           </Link>
         </div>
       </div>
