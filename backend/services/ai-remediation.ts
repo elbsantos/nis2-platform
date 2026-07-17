@@ -37,6 +37,16 @@ interface ParsedPlan {
 // AI plan parser
 // ---------------------------------------------------------------------------
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")  // **bold** → bold
+    .replace(/__(.+?)__/g, "$1")       // __bold__ → bold
+    .replace(/\*([^*]+)\*/g, "$1")     // *italic* → italic
+    .replace(/_([^_]+)_/g, "$1")       // _italic_ → italic
+    .replace(/`([^`]+)`/g, "$1")       // `code` → code
+    .trim();
+}
+
 function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
   const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
 
@@ -69,12 +79,14 @@ function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
       currentPlatform = "all";
       continue;
     }
+    // Skip any remaining markdown headers (e.g. "## Bloco 2")
+    if (/^#+/.test(line)) continue;
 
     // Numbered steps: "1. ...", "2. ..."
     const stepMatch = line.match(/^(\d+)\.\s+(.+)/);
     if (stepMatch) {
       globalOrder += 1;
-      const instruction = stepMatch[2];
+      const instruction = stripMarkdown(stepMatch[2]);
 
       // If not inside an OS section, try to infer from instruction text
       let platform = currentPlatform;
@@ -108,7 +120,7 @@ function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
 
     // First substantial non-step line = risk summary
     if (!riskSummary && line.length > 30) {
-      riskSummary = line;
+      riskSummary = stripMarkdown(line);
     }
   }
 

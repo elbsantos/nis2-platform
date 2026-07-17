@@ -282,7 +282,7 @@ Artigo NIS2: Art. 21(2)(x)
 - NUNCA mistures passos de Linux e Windows na mesma lista numerada sem cabeçalho de opção
 - NUNCA repitas o mesmo passo entre Opção A e Opção B
 - Cada frase deve ser COMPLETA — NUNCA cortes uma instrução a meio
-- Usa blocos de código para TODOS os comandos: \`comando\` (inline) ou \`\`\`bloco\`\`\` (sequências)
+- Texto dos passos em texto simples, SEM markdown — sem **negrito**, *itálico*, \`backticks\` ou blocos de código nas instruções; escreve os comandos directamente no texto (ex.: "executa apt-get update" e não "executa \`apt-get update\`")
 - Máximo 6 passos por opção (não conta o passo de validação final)
 - NÃO inventas soluções — se não há solução documentada, diz-o explicitamente`,
 
