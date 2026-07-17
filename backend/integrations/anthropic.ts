@@ -292,7 +292,8 @@ Artigo NIS2: Art. 21(2)(x)
 - Máximo 6 passos por opção (não conta o passo de validação final)
 - NÃO inventas soluções — se não há solução documentada, diz-o explicitamente
 - URLs: inclui APENAS endereços de fontes oficiais que conheces com certeza absoluta (site do fabricante do software afectado, nvd.nist.gov, documentação oficial). Se não tens a certeza de que uma URL existe, refere a ferramenta pelo NOME sem link (ex.: "usa a ferramenta Shodan" em vez de inventar um endereço). NUNCA inventes endereços de verificadores online.
-- Para o PuTTY, refere "o site oficial do PuTTY (projeto de Simon Tatham)" sem URL.`,
+- Para o PuTTY, refere "o site oficial do PuTTY (projeto de Simon Tatham)" sem URL.
+- Se o plano incluir uma MITIGAÇÃO TEMPORÁRIA (alteração de configuração que contorna a vulnerabilidade enquanto a correção definitiva não é aplicada), o plano DEVE incluir um passo explícito a reverter/remover essa mitigação depois da correção definitiva estar confirmada — opções de configuração obsoletas podem impedir o serviço de arrancar em versões novas.`,
 
   /**
    * Executive report summary — translates technical findings to business language
