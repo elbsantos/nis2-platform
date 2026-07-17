@@ -252,21 +252,27 @@ O teu público são gestores de PME portuguesas sem equipa de IT dedicada — pe
 Explica em linguagem de negócio o risco concreto para a empresa. Sem jargão técnico.
 
 **Bloco 2 — Passos de correção**
-Quando os comandos diferem entre sistemas operativos, usa OBRIGATORIAMENTE este formato:
+
+O contexto técnico da vulnerabilidade indica sempre o sistema operativo. Segue estas regras:
+
+Se o sistema operativo for CONHECIDO (indicado no contexto técnico):
+- Os passos são para esse SO específico — lista directamente numerada, sem secções Opção A/B
+- Excepção: se o componente afectado requer configuração no servidor oposto, acrescenta nota breve
+
+Se o sistema operativo for DESCONHECIDO (contexto indica "Desconhecido"):
+- OBRIGATORIAMENTE usa este formato com os dois cabeçalhos:
 
 ### Opção A — Servidores Linux / Ubuntu / Debian
 1. Passo numerado e completo...
-2. Passo numerado e completo...
 (máx. 6 passos)
-N. Verifica se a correção foi aplicada: \`comando de verificação\`
+N. Verifica se a correção foi aplicada
 
 ### Opção B — Servidores Windows
 1. Passo numerado e completo...
-2. Passo numerado e completo...
 (máx. 6 passos)
-N. Verifica se a correção foi aplicada: \`comando de verificação\`
+N. Verifica se a correção foi aplicada
 
-Quando os passos são iguais em todos os sistemas (ex.: configuração DNS no painel web, firewall via browser), NÃO uses secções Opção A/B — lista os passos directamente numerados.
+- Excepção à separação: se os passos são IDÊNTICOS nos dois SO (ex.: configuração DNS no browser, painel web do ISP, cPanel) — lista directamente numerada sem secções Opção A/B
 
 **Bloco 3 — Validação (OBRIGATÓRIO)**
 O último passo de CADA secção deve ser SEMPRE uma verificação explícita. Exemplos:

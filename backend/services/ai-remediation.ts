@@ -91,8 +91,8 @@ function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
       // If not inside an OS section, try to infer from instruction text
       let platform = currentPlatform;
       if (platform === "all") {
-        if (/windows/i.test(instruction))                          platform = "windows";
-        else if (/linux|ubuntu|debian|apt\s|apt-get/i.test(instruction)) platform = "linux";
+        if (/windows|powershell|iis\b|xampp|sc\.exe|get-service|\.msi\b/i.test(instruction)) platform = "windows";
+        else if (/linux|ubuntu|debian|apt[\s-]|apt-get/i.test(instruction)) platform = "linux";
         else if (/macos|mac\s*os/i.test(instruction))             platform = "macos";
         else if (/azure|aws|cloud/i.test(instruction))            platform = "cloud";
       }
@@ -213,9 +213,15 @@ async function generatePlanForVuln(
     port?: number | null;
     remediation?: string | null;
   },
-  orgContext: { name: string; sector?: string | null; size?: string | null; orgId?: number; plan?: string; target?: string }
+  orgContext: { orgId?: number; plan?: string; target?: string; detectedOS?: string | null }
 ): Promise<ParsedPlan> {
   const emailCtx = buildEmailContext(vuln.cveId, vuln.affectedComponent, orgContext.target ?? "");
+
+  const osLine = emailCtx
+    ? ""
+    : orgContext.detectedOS
+      ? `**Sistema operativo detectado:** ${orgContext.detectedOS}`
+      : "**Sistema operativo:** Desconhecido — usa OBRIGATORIAMENTE ### Opção A (Linux/Ubuntu/Debian) e ### Opção B (Windows)";
 
   const prompt = `Gera um plano de remediação para a seguinte vulnerabilidade detetada numa PME portuguesa:
 
@@ -224,16 +230,11 @@ async function generatePlanForVuln(
 **Componente afetado:** ${vuln.affectedComponent}${vuln.port ? ` (porta ${vuln.port})` : ""}
 **Descrição:** ${vuln.description}
 ${vuln.remediation ? `**Remediação sugerida pelo scanner:** ${vuln.remediation}` : ""}
-
-**Contexto da organização:**
-- Nome: ${orgContext.name}
-- Sector: ${orgContext.sector ?? "não especificado"}
-- Dimensão: ${orgContext.size ?? "PME"}
-${emailCtx ? emailCtx : ""}
+${osLine ? osLine + "\n" : ""}${emailCtx ? emailCtx : ""}
 
 Segue rigorosamente este formato:
 1. Uma ou duas frases explicando o risco concreto para esta empresa (linguagem simples, sem jargão)
-2. Passos de correção numerados e concretos${emailCtx ? " (sem separação por SO — seguir as instruções do contexto acima)" : " separados por SO (usa ### Windows e ### Linux / Ubuntu / Debian quando os passos diferem — máx. 6 por SO, sem repetições entre secções)"}
+2. Passos de correção numerados e concretos${emailCtx ? " (sem separação por SO — seguir as instruções do contexto acima)" : ""}
 3. Indica "Esforço: Baixo/Médio/Alto"
 4. Indica os artigos NIS2 relevantes (ex.: Art. 21(2)(e))
 
@@ -318,13 +319,18 @@ export async function generateRemediationForScan(
 
   if (filteredVulns.length === 0) return 0;
 
+  const scanResults = scan.results as any;
+  const detectedOS: string | null =
+    scanResults?.osDetection?.name ??
+    scanResults?.osDetection ??
+    scanResults?.os ??
+    null;
+
   const orgContext = {
-    name:   org?.name ?? "Organização",
-    sector: org?.sector,
-    size:   org?.size,
-    orgId:  organizationId,
+    orgId:      organizationId,
     plan,
-    target: scan.target ?? "",
+    target:     scan.target ?? "",
+    detectedOS,
   };
 
   // Process sequentially to avoid rate limiting
