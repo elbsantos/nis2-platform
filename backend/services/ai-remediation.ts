@@ -72,9 +72,9 @@ export function stripMarkdown(text: string): string {
     .replace(/^#{1,6}\s+/g, "")        // ### headers → remove prefix
     .replace(/\*\*(.+?)\*\*/g, "$1")   // **bold** → bold
     .replace(/__(.+?)__/g, "$1")        // __bold__ → bold
-    .replace(/\*([^*]+)\*/g, "$1")      // *italic* → italic
-    .replace(/_([^_]+)_/g, "$1")        // _italic_ → italic
     .replace(/`([^`]+)`/g, "$1")        // `code` → code
+    // NOTE: single * and _ rules omitted — they corrupt shell globs (*.pem)
+    // and underscore identifiers (my_custom_config).
     .trim();
 }
 

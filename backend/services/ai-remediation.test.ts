@@ -70,6 +70,14 @@ describe("stripMarkdown", () => {
     expect(stripMarkdown("### Bloco 2 — Passos")).toBe("Bloco 2 — Passos");
   });
 
+  it("preserves shell globs — chmod 600 *.pem", () => {
+    expect(stripMarkdown("chmod 600 *.pem e verifica *.crt")).toBe("chmod 600 *.pem e verifica *.crt");
+  });
+
+  it("preserves underscore identifiers — my_custom_config", () => {
+    expect(stripMarkdown("edita my_custom_config e reinicia")).toBe("edita my_custom_config e reinicia");
+  });
+
   it("handles nested patterns", () => {
     expect(stripMarkdown("**`apt-get`** atualiza pacotes")).toBe("apt-get atualiza pacotes");
   });
