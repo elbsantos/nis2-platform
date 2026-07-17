@@ -1327,7 +1327,7 @@ function buildNextSteps(
   if (counts.medium > 0)
     steps.push(`Agenda a correcção de ${counts.medium} vulnerabilidade(s) de severidade média — esforço estimado baixo a médio, resolução em 30 dias.`);
   steps.push("Completa o Questionário NIS2 (42 controlos Art. 21(2)) na plataforma para um score de conformidade completo.");
-  steps.push("Gera e implementa os Planos de Remediação por IA disponíveis na plataforma para cada vulnerabilidade.");
+  steps.push("Gera e implementa os Planos de Remediação por IA, disponíveis na plataforma para as vulnerabilidades com CVE identificado.");
   if (overall >= 60)
     steps.push("Agenda um re-scan mensal para monitorizar a evolução do score e detectar novas exposições.");
   return steps.slice(0, 6);
