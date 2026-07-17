@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -322,8 +322,11 @@ export default function Remediation() {
   const [statusFilter, setStatusFilter] = useState<Status | undefined>(undefined);
   const [expandedId, setExpandedId]     = useState<number | null>(null);
   const [generating, setGenerating]     = useState(false);
+  const [polling, setPolling]           = useState(false);
   const [genError, setGenError]         = useState<string | null>(null);
-  const [genSuccess, setGenSuccess]     = useState<string | null>(null);
+  const [genMsg, setGenMsg]             = useState<string | null>(null);
+  const noChangeCount                   = useRef(0);
+  const lastDoneRef                     = useRef(-1);
 
   const utils = trpc.useUtils();
 
@@ -332,11 +335,44 @@ export default function Remediation() {
     { refetchOnWindowFocus: false }
   );
 
+  const { data: progress } = trpc.remediation.progress.useQuery(
+    { scanId: scanIdFromUrl! },
+    {
+      enabled: polling && scanIdFromUrl != null,
+      refetchInterval: polling ? 5000 : false,
+    }
+  );
+
+  useEffect(() => {
+    if (!progress || !polling) return;
+    const { done, eligible } = progress;
+    setGenMsg(`A gerar planos… ${done} / ${eligible}`);
+    if (done >= eligible) {
+      setPolling(false);
+      setGenMsg(`${done} planos de remediação gerados com IA.`);
+      utils.remediation.list.invalidate();
+      return;
+    }
+    if (done === lastDoneRef.current) {
+      noChangeCount.current += 1;
+      if (noChangeCount.current >= 6) {
+        setPolling(false);
+        utils.remediation.list.invalidate();
+      }
+    } else {
+      noChangeCount.current = 0;
+      lastDoneRef.current = done;
+    }
+  }, [progress, polling]);
+
   const generateMut = trpc.remediation.generate.useMutation({
     onSuccess: (r) => {
       setGenerating(false);
-      setGenSuccess(`${r.generated} planos de remediação gerados com IA.`);
-      utils.remediation.list.invalidate();
+      lastDoneRef.current = r.existing;
+      noChangeCount.current = 0;
+      setPolling(true);
+      const pending = r.eligible - r.existing;
+      setGenMsg(pending > 0 ? `A gerar ${pending} planos de remediação com IA…` : "Planos já gerados.");
     },
     onError: (err) => {
       setGenerating(false);
@@ -352,7 +388,7 @@ export default function Remediation() {
     if (!scanIdFromUrl) return;
     setGenerating(true);
     setGenError(null);
-    setGenSuccess(null);
+    setGenMsg(null);
     generateMut.mutate({ scanId: scanIdFromUrl });
   }
 
@@ -419,9 +455,9 @@ export default function Remediation() {
       />
 
       {/* Alerts */}
-      {genSuccess && (
-        <div className="mb-5 bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm text-green-400">
-          {genSuccess}
+      {genMsg && (
+        <div className={`mb-5 rounded-lg p-3 text-sm ${polling ? "bg-blue-900/30 border border-blue-700 text-blue-400" : "bg-green-900/30 border border-green-700 text-green-400"}`}>
+          {genMsg}
         </div>
       )}
       {genError && (
@@ -437,10 +473,10 @@ export default function Remediation() {
         <div className="mb-6">
           <button
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || polling}
             className="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 disabled:opacity-50 transition-colors"
           >
-            {generating ? "A gerar com IA…" : "Gerar planos para este scan"}
+            {generating ? "A iniciar…" : polling ? "A gerar…" : "Gerar planos para este scan"}
           </button>
         </div>
       )}

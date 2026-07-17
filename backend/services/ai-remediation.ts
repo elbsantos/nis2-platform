@@ -422,3 +422,20 @@ export async function generateRemediationForScan(
 
   return { created, skipped, total: filteredVulns.length };
 }
+
+// ---------------------------------------------------------------------------
+// Count eligible vulns for a scan (used by progress endpoint)
+// ---------------------------------------------------------------------------
+
+export async function countEligibleVulns(scanId: number): Promise<number> {
+  const [scan, tableVulns] = await Promise.all([
+    getScanById(scanId),
+    getVulnerabilitiesByScanId(scanId),
+  ]);
+  if (!scan) return 0;
+  const vulns: Array<{ cveId?: string | null; description?: string | null }> =
+    tableVulns.length > 0
+      ? tableVulns
+      : ((scan.results as any)?.vulnerabilities ?? []);
+  return vulns.filter((v) => (v as any).cveId?.trim() && (v as any).description?.trim()).length;
+}

@@ -12,8 +12,12 @@ import {
   getRemediationItemsWithScanInfo,
   updateRemediationStatus,
   getScanById,
+  getRemediationItemsByScanId,
 } from "../db";
-import { generateRemediationForScan } from "../services/ai-remediation";
+import {
+  generateRemediationForScan,
+  countEligibleVulns,
+} from "../services/ai-remediation";
 
 export const remediationRouter = router({
   /**
@@ -34,7 +38,8 @@ export const remediationRouter = router({
     }),
 
   /**
-   * Generate AI remediation plans for all vulnerabilities in a scan (pro/mssp)
+   * Start background generation of AI remediation plans for a scan.
+   * Returns immediately with eligible/existing counts for UI progress polling.
    */
   generate: freeProcedure
     .input(z.object({ scanId: z.number().int().positive() }))
@@ -51,8 +56,36 @@ export const remediationRouter = router({
         });
       }
 
-      const result = await generateRemediationForScan(input.scanId, ctx.org.id, ctx.plan);
-      return { generated: result.created };
+      const [existingItems, eligible] = await Promise.all([
+        getRemediationItemsByScanId(input.scanId),
+        countEligibleVulns(input.scanId),
+      ]);
+
+      // Fire-and-forget — Railway keeps the process alive after HTTP response
+      void generateRemediationForScan(input.scanId, ctx.org.id, ctx.plan).catch(
+        (err) => console.error("[remediation.generate] background error:", err)
+      );
+
+      return { started: true, eligible, existing: existingItems.length };
+    }),
+
+  /**
+   * Poll progress of background generation for a scan.
+   * Returns done (items created so far) and eligible (total filteredVulns).
+   */
+  progress: freeProcedure
+    .input(z.object({ scanId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const scan = await getScanById(input.scanId);
+      if (!scan) throw new TRPCError({ code: "NOT_FOUND" });
+      if (scan.organizationId !== ctx.org.id) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const [items, eligible] = await Promise.all([
+        getRemediationItemsByScanId(input.scanId),
+        countEligibleVulns(input.scanId),
+      ]);
+      return { done: items.length, eligible };
     }),
 
   /**

@@ -36,6 +36,7 @@ import {
   normalizeOsKey,
   lookupLibrary,
   generateRemediationForScan,
+  countEligibleVulns,
 } from "./ai-remediation";
 import { chat } from "../integrations/anthropic";
 import * as db from "../db";
@@ -388,5 +389,43 @@ describe("generateRemediationForScan — guard por vulnerabilidade (C9)", () => 
     expect(result).toEqual({ created: 1, skipped: 0, total: 1 });
     expect(mockChat).not.toHaveBeenCalled();
     expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// countEligibleVulns (C10)
+// ---------------------------------------------------------------------------
+
+describe("countEligibleVulns", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupCommonMocks();
+  });
+
+  it("retorna 0 quando scan não existe", async () => {
+    mockGetScan.mockResolvedValue(null);
+    const count = await countEligibleVulns(1);
+    expect(count).toBe(0);
+  });
+
+  it("retorna 1 quando scan tem um vuln válido (FAKE_SCAN)", async () => {
+    const count = await countEligibleVulns(1);
+    expect(count).toBe(1);
+  });
+
+  it("conta apenas vulns com cveId e description não vazios", async () => {
+    const SCAN_GAPS = {
+      ...FAKE_SCAN,
+      results: {
+        vulnerabilities: [
+          { cveId: "CVE-A", description: "Desc suficiente para contar", affectedService: "a", cvssScore: 5, severity: "low" },
+          { cveId: "",      description: "Desc suficiente para contar", affectedService: "b", cvssScore: 5, severity: "low" },
+          { cveId: "CVE-C", description: "",                            affectedService: "c", cvssScore: 5, severity: "low" },
+        ],
+      },
+    };
+    mockGetScan.mockResolvedValue(SCAN_GAPS);
+    const count = await countEligibleVulns(1);
+    expect(count).toBe(1);
   });
 });
