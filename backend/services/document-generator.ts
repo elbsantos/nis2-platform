@@ -76,6 +76,13 @@ function cell(value: string | null | undefined, placeholder = ""): string {
   return s;
 }
 
+/** Resumo legível de CVEs para o Inventário de Ativos (coluna H). */
+function summarizeCves(cves: string[]): string {
+  if (cves.length === 0) return "—";
+  if (cves.length <= 3) return cves.join(", ");
+  return `${cves.length} CVEs conhecidos — ver Registo de Riscos e relatório técnico`;
+}
+
 // ---------------------------------------------------------------------------
 // C15 — Registo de Riscos
 // ---------------------------------------------------------------------------
@@ -178,6 +185,7 @@ export async function generateRegistoRiscos(scanId: number, orgId: number): Prom
   // Load workbook
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(TEMPLATE_PATHS.registoRiscos);
+  wb.calcProperties.fullCalcOnLoad = true;
   const sheet = wb.getWorksheet("🎯 REGISTO DE RISCOS");
   if (!sheet) throw new Error('[Documentos] Folha "🎯 REGISTO DE RISCOS" não encontrada no template');
 
@@ -250,6 +258,7 @@ export async function generateInventarioAtivos(scanId: number, orgId: number): P
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(TEMPLATE_PATHS.inventarioAtivos);
+  wb.calcProperties.fullCalcOnLoad = true;
   const sheet = wb.getWorksheet("🌐 SUPERFÍCIE EXTERNA");
   if (!sheet) throw new Error('[Documentos] Folha "🌐 SUPERFÍCIE EXTERNA" não encontrada no template');
 
@@ -264,9 +273,9 @@ export async function generateInventarioAtivos(scanId: number, orgId: number): P
   for (let i = 0; i < ports.length; i++) {
     const rowNum = 6 + i;
     const p = ports[i];
-    const banner = [p.product, p.version].filter(Boolean).join(" ");
-    const cves   = (p.cves ?? []).join(", ");
-    const obs    = i === 0 && keyAssets.length > 0
+    const banner      = [p.product, p.version].filter(Boolean).join(" ");
+    const cvesSummary = summarizeCves(p.cves ?? []);
+    const obs         = i === 0 && keyAssets.length > 0
       ? `Ativos-chave: ${keyAssets.join(", ")}`
       : null;
 
@@ -277,7 +286,7 @@ export async function generateInventarioAtivos(scanId: number, orgId: number): P
     row.getCell(5).value  = p.port;                            // E: Porto
     row.getCell(6).value  = cell(p.service ?? "");             // F: Serviço Detetado
     row.getCell(7).value  = cell(banner);                      // G: Versão / Banner
-    row.getCell(8).value  = cell(cves);                        // H: Vulnerabilidades (CVEs)
+    row.getCell(8).value  = cvesSummary;                       // H: Vulnerabilidades (CVEs)
     row.getCell(9).value  = null;                              // I: Criticidade — preencher manualmente
     row.getCell(10).value = null;                              // J: Responsável — preencher manualmente
     row.getCell(11).value = obs;                               // K: Observações

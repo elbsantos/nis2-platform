@@ -14,8 +14,9 @@ import fs from "fs";
 // ---------------------------------------------------------------------------
 
 // Tracking state de escritas de células — reset em afterEach
-let _cellWrites: Map<string, any> = new Map();
-let _headerWrites: Map<string, any> = new Map();
+let _cellWrites:   Map<string, any>    = new Map();
+let _headerWrites: Map<string, any>    = new Map();
+let _calcProps:    Record<string, any> = {};
 
 vi.mock("exceljs", () => {
   const makeRow = (rowNum: number) => ({
@@ -47,6 +48,7 @@ vi.mock("exceljs", () => {
   return {
     default: {
       Workbook: class MockWorkbook {
+        calcProperties = _calcProps;
         xlsx = {
           readFile: vi.fn().mockResolvedValue(undefined),
           writeBuffer: vi.fn().mockResolvedValue(Buffer.from("DUMMY_XLSX")),
@@ -131,6 +133,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   _cellWrites   = new Map();
   _headerWrites = new Map();
+  _calcProps    = {};
 });
 
 // ===========================================================================
@@ -587,7 +590,7 @@ describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
     // Linha 7 — segundo porto (SSH)
     expect(_cellWrites.get("7:5")).toBe(22);
     expect(_cellWrites.get("7:6")).toBe("ssh");
-    expect(_cellWrites.get("7:8")).toBe("");              // sem CVEs → string vazia
+    expect(_cellWrites.get("7:8")).toBe("—");              // 0 CVEs → "—"
   });
 
   it("endereço IP vazio quando resolvedIp ausente (nunca 'N/D')", async () => {
@@ -653,5 +656,100 @@ describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
     await generateInventarioAtivos(1, 1);
 
     expect(_cellWrites.has("6:3")).toBe(false);
+  });
+});
+
+// ===========================================================================
+// C16-fix — CVEs resumidos, fullCalcOnLoad, portos unknown
+// ===========================================================================
+
+describe("generateInventarioAtivos — CVEs resumidos (C16-fix)", () => {
+  const makeScanWithPort = (cves: string[]) => ({
+    ...FAKE_SCAN,
+    target: "exemplo.pt",
+    results: {
+      resolvedIp: "1.2.3.4",
+      openPorts: [{ port: 80, protocol: "tcp", service: "http", product: "nginx", version: "1.18.0", cves }],
+      vulnerabilities: [],
+    },
+  } as any);
+
+  it("mais de 3 CVEs → contagem com referência cruzada (não a lista)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    const cves108 = Array.from({ length: 108 }, (_, i) => `CVE-2021-${String(i).padStart(5, "0")}`);
+    vi.mocked(db.getScanById).mockResolvedValue(makeScanWithPort(cves108));
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    const h = _cellWrites.get("6:8") as string;
+    expect(h).toBe("108 CVEs conhecidos — ver Registo de Riscos e relatório técnico");
+    expect(h).not.toContain("CVE-2021-");
+  });
+
+  it("3 CVEs → lista os 3 (poucos, cabem)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(makeScanWithPort(["CVE-A", "CVE-B", "CVE-C"]));
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_cellWrites.get("6:8")).toBe("CVE-A, CVE-B, CVE-C");
+  });
+
+  it("0 CVEs → '—' (não string vazia nem null)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(makeScanWithPort([]));
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_cellWrites.get("6:8")).toBe("—");
+  });
+
+  it("porto com serviço 'unknown' consta na saída (sem filtro por serviço)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      target: "exemplo.pt",
+      results: {
+        resolvedIp: "1.2.3.4",
+        openPorts: [{ port: 4444, protocol: "tcp", service: "unknown", cves: [] }],
+        vulnerabilities: [],
+      },
+    } as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_cellWrites.get("6:5")).toBe(4444);       // porto presente
+    expect(_cellWrites.get("6:6")).toBe("unknown");  // serviço registado
+  });
+});
+
+describe("fullCalcOnLoad — fórmulas recalculadas à abertura (C16-fix)", () => {
+  it("generateRegistoRiscos activa fullCalcOnLoad no workbook", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(FAKE_SCAN);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+
+    await generateRegistoRiscos(1, 1);
+
+    expect(_calcProps.fullCalcOnLoad).toBe(true);
+  });
+
+  it("generateInventarioAtivos activa fullCalcOnLoad no workbook", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      results: { resolvedIp: "1.2.3.4", openPorts: [], vulnerabilities: [] },
+    } as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_calcProps.fullCalcOnLoad).toBe(true);
   });
 });
