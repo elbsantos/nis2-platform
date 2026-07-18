@@ -80,7 +80,8 @@ function cell(value: string | null | undefined, placeholder = ""): string {
 // C15 — Registo de Riscos
 // ---------------------------------------------------------------------------
 
-const MAX_RISK_ROWS = 30;
+const MAX_RISK_ROWS  = 30;
+const MAX_ASSET_ROWS = 18;
 
 export interface RiskGroup {
   affectedComponent: string;
@@ -98,6 +99,15 @@ type RawVuln = {
   cvssScore?: string | number | null;
   description?: string | null;
   affectedComponent?: string | null;
+};
+
+type RawPort = {
+  port: number;
+  protocol?: string;
+  service?: string;
+  product?: string;
+  version?: string;
+  cves?: string[];
 };
 
 /**
@@ -227,9 +237,53 @@ export async function generateRegistoRiscos(scanId: number, orgId: number): Prom
 
 export async function generateInventarioAtivos(scanId: number, orgId: number): Promise<Buffer> {
   requireTemplate(TEMPLATE_PATHS.inventarioAtivos);
+
+  const [scan, org] = await Promise.all([
+    getScanById(scanId),
+    getOrganizationById(orgId),
+  ]);
+  if (!scan || !org) throw new Error("[Documentos] Scan ou organização não encontrados");
+
+  const results    = (scan.results as any) ?? {};
+  const resolvedIp = typeof results.resolvedIp === "string" ? results.resolvedIp : "";
+  const rawPorts: RawPort[] = Array.isArray(results.openPorts) ? results.openPorts : [];
+
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(TEMPLATE_PATHS.inventarioAtivos);
-  // C16: mapeamento de openPorts + resolvedIp, linhas 6-23
+  const sheet = wb.getWorksheet("🌐 SUPERFÍCIE EXTERNA");
+  if (!sheet) throw new Error('[Documentos] Folha "🌐 SUPERFÍCIE EXTERNA" não encontrada no template');
+
+  sheet.getCell("B3").value = `Empresa: ${org.name}`;
+  sheet.getCell("F3").value =
+    `Origem: Scan CISPLAN #${scanId} de ${formatDate(scan.createdAt)} | Preenchido automaticamente — rever`;
+
+  const keyAssets: string[] =
+    Array.isArray(org.keyAssets) && org.keyAssets.length > 0 ? org.keyAssets : [];
+
+  const ports = rawPorts.slice(0, MAX_ASSET_ROWS);
+  for (let i = 0; i < ports.length; i++) {
+    const rowNum = 6 + i;
+    const p = ports[i];
+    const banner = [p.product, p.version].filter(Boolean).join(" ");
+    const cves   = (p.cves ?? []).join(", ");
+    const obs    = i === 0 && keyAssets.length > 0
+      ? `Ativos-chave: ${keyAssets.join(", ")}`
+      : null;
+
+    const row = sheet.getRow(rowNum);
+    // B (col 2): ID pré-definido (EXT001…) — NÃO sobrescrever
+    row.getCell(3).value  = cell(scan.target, "");             // C: Domínio / Host
+    row.getCell(4).value  = resolvedIp;                        // D: Endereço IP (vazio se ausente)
+    row.getCell(5).value  = p.port;                            // E: Porto
+    row.getCell(6).value  = cell(p.service ?? "");             // F: Serviço Detetado
+    row.getCell(7).value  = cell(banner);                      // G: Versão / Banner
+    row.getCell(8).value  = cell(cves);                        // H: Vulnerabilidades (CVEs)
+    row.getCell(9).value  = null;                              // I: Criticidade — preencher manualmente
+    row.getCell(10).value = null;                              // J: Responsável — preencher manualmente
+    row.getCell(11).value = obs;                               // K: Observações
+    row.commit();
+  }
+
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

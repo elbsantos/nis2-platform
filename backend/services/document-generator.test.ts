@@ -198,6 +198,8 @@ describe("document-generator — Buffer base64 com template dummy", () => {
 
   it("generateInventarioAtivos devolve Buffer não vazio", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(FAKE_SCAN);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
     const buf = await generateInventarioAtivos(1, 1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
@@ -513,5 +515,143 @@ describe("generateRegistoRiscos — riskSummary da biblioteca (C15)", () => {
 
     expect(_cellWrites.has("8:8")).toBe(false); // H: Nível de Risco (fórmula)
     expect(_cellWrites.has("8:9")).toBe(false); // I: Classificação (fórmula)
+  });
+});
+
+// ===========================================================================
+// C16 — generateInventarioAtivos: mapeamento de openPorts + resolvedIp
+// ===========================================================================
+
+describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
+  const PORT_HTTP = {
+    port: 80, protocol: "tcp", service: "http",
+    product: "nginx", version: "1.18.0", cves: ["CVE-2021-1234"],
+  };
+  const PORT_SSH = {
+    port: 22, protocol: "tcp", service: "ssh",
+    product: "OpenSSH", version: "7.9", cves: [],
+  };
+
+  const SCAN_WITH_PORTS = {
+    ...FAKE_SCAN,
+    target: "exemplo.pt",
+    results: {
+      resolvedIp: "1.2.3.4",
+      openPorts: [PORT_HTTP, PORT_SSH],
+      vulnerabilities: [],
+    },
+  } as any;
+
+  const ORG_WITH_ASSETS = {
+    ...FAKE_ORG,
+    keyAssets: ["servidor web", "base de dados"],
+  } as any;
+
+  it("B3 preenchido com nome da empresa", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_headerWrites.get("B3")).toContain("Empresa Teste Lda");
+  });
+
+  it("F3 preenchido com Origem: Scan CISPLAN #<id>", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(42, 1);
+
+    const f3 = _headerWrites.get("F3") as string;
+    expect(f3).toContain("Scan CISPLAN #42");
+    expect(f3).toContain("Preenchido automaticamente");
+  });
+
+  it("1 linha por porto — target, IP, porto, serviço, versão, CVEs mapeados", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    // Linha 6 — primeiro porto (HTTP)
+    expect(_cellWrites.get("6:3")).toBe("exemplo.pt");    // C: Domínio/Host
+    expect(_cellWrites.get("6:4")).toBe("1.2.3.4");       // D: IP
+    expect(_cellWrites.get("6:5")).toBe(80);              // E: Porto
+    expect(_cellWrites.get("6:6")).toBe("http");          // F: Serviço
+    expect(_cellWrites.get("6:7")).toBe("nginx 1.18.0");  // G: Versão/Banner
+    expect(_cellWrites.get("6:8")).toBe("CVE-2021-1234"); // H: CVEs
+
+    // Linha 7 — segundo porto (SSH)
+    expect(_cellWrites.get("7:5")).toBe(22);
+    expect(_cellWrites.get("7:6")).toBe("ssh");
+    expect(_cellWrites.get("7:8")).toBe("");              // sem CVEs → string vazia
+  });
+
+  it("endereço IP vazio quando resolvedIp ausente (nunca 'N/D')", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      target: "exemplo.pt",
+      results: { openPorts: [PORT_HTTP], vulnerabilities: [] },
+    } as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    const ip = _cellWrites.get("6:4");
+    expect(ip).toBe("");
+    expect(ip).not.toBe("N/D");
+    expect(ip).not.toBe(null);
+  });
+
+  it("keyAssets em Observações da primeira linha — linhas seguintes sem observações", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(ORG_WITH_ASSETS);
+
+    await generateInventarioAtivos(1, 1);
+
+    const obs1 = _cellWrites.get("6:11") as string;
+    expect(obs1).toContain("servidor web");
+    expect(obs1).toContain("base de dados");
+    // Linha 7: observações nulas
+    expect(_cellWrites.get("7:11")).toBeNull();
+  });
+
+  it("Observações da primeira linha são nulas quando sem keyAssets", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG); // sem keyAssets
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_cellWrites.get("6:11")).toBeNull();
+  });
+
+  it("Criticidade (col 9) e Responsável (col 10) escritos como null", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_cellWrites.get("6:9")).toBeNull();  // I: Criticidade
+    expect(_cellWrites.get("6:10")).toBeNull(); // J: Responsável
+  });
+
+  it("sem portos — nenhuma linha de dados escrita", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      results: { resolvedIp: "1.2.3.4", openPorts: [], vulnerabilities: [] },
+    } as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_cellWrites.has("6:3")).toBe(false);
   });
 });
