@@ -52,6 +52,7 @@ export interface AgentlessScanResult {
   scanId: number;
   success: boolean;
   target: string;
+  resolvedIp?: string;
   openPorts: PortFinding[];
   vulnerabilities: VulnFinding[];
   indeterminateCves: IndeterminateCveFinding[];
@@ -1063,6 +1064,7 @@ export async function executeAgentlessScan(
       scanLimitations,                                        // limitações de verificação deste scan
       // vulnerabilitiesFound gravado em separado foi eliminado (CORREÇÃO 4):
       // o total é results.vulnerabilities.length — uma única fonte de verdade.
+      resolvedIp: shodanData?.ip,                             // IP resolvido pelo Shodan (opcional)
       criticalCount: vulns.filter((v) => v.severity === "critical").length,
       highCount: vulns.filter((v) => v.severity === "high").length,
       mediumCount: vulns.filter((v) => v.severity === "medium").length,
@@ -1081,6 +1083,7 @@ export async function executeAgentlessScan(
       scanId: options.scanId,
       success: true,
       target: options.target,
+      resolvedIp: shodanData?.ip,
       openPorts: allPorts,
       vulnerabilities: vulns,
       indeterminateCves,

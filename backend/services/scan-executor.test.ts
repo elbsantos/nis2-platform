@@ -328,6 +328,43 @@ describe("executeAgentlessScan", () => {
     expect(outdated).toBeDefined();
   });
 
+  // ── C14a: resolvedIp ───────────────────────────────────────────────────────
+
+  it("grava resolvedIp em results quando Shodan devolve IP", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "69.46.46.45",
+      hostnames: [],
+      tags: [],
+      cpes: [],
+      vulns: [],
+      ports: [],
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.resolvedIp).toBe("69.46.46.45");
+    // updateScanStatus chamado com completed + resolvedIp no objeto results
+    const completedCall = vi.mocked(updateScanStatus).mock.calls
+      .find((c) => c[1] === "completed");
+    expect(completedCall?.[4]).toMatchObject({ resolvedIp: "69.46.46.45" });
+  });
+
+  it("resolvedIp ausente quando shodanData é null — scans antigos não partem leitores", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue(null as any);
+
+    const result = await executeAgentlessScan({
+      scanId: 1, organizationId: 1, target: "example.com", mode: "sme",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.resolvedIp).toBeUndefined();
+  });
+
   it("enriquece porto 80 com banner Server e CVEs via CPE quando InternetDB nao tem versao", async () => {
     vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
 
