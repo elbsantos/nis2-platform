@@ -40,3 +40,9 @@ drizzle/meta/
 tmp/
 temp/
 *.tmp
+
+# Scripts de sessão (utilitários locais — nunca comprometer)
+_*.ts
+registo-riscos-scan*.xlsx
+inventario-ativos-scan*.xlsx
+psi-cisplan*.docx

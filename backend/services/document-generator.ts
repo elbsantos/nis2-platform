@@ -66,6 +66,15 @@ function formatDate(d: Date | null | undefined): string {
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 const SEVERITY_PT: Record<string, string>    = { critical: "Crítica", high: "Alta", medium: "Média", low: "Baixa" };
 const SEVERITY_PROB: Record<string, number>  = { critical: 5, high: 4, medium: 3, low: 2 };
+const EFFORT_PT: Record<string, string>      = { low: "baixo", medium: "médio", high: "alto" };
+
+/** Guarda contra nulos/strings espúrias nas células Excel. */
+function cell(value: string | null | undefined, placeholder = ""): string {
+  if (value === null || value === undefined) return placeholder;
+  const s = String(value).trim();
+  if (s === "" || s === "None" || s === "null" || s === "undefined") return placeholder;
+  return s;
+}
 
 // ---------------------------------------------------------------------------
 // C15 — Registo de Riscos
@@ -176,28 +185,31 @@ export async function generateRegistoRiscos(scanId: number, orgId: number): Prom
       ? await lookupLibrary(group.bestCveId, "generic")
       : null;
 
-    const riskDesc = (lib as any)?.riskSummary
-      ?? `[Vulnerabilidade ${group.bestCveId || "CVE"} detetada — ver relatório técnico]`;
+    const riskDesc = cell(
+      (lib as any)?.riskSummary,
+      `[Vulnerabilidade ${group.bestCveId || "CVE"} detetada — ver relatório técnico]`
+    );
 
-    const steps: Array<{ order: number; instruction: string }> =
-      (lib as any)?.steps ?? [];
-    const firstStep = steps.sort((a, b) => a.order - b.order)[0]?.instruction ?? "";
-    const treatment = firstStep
-      ? `${firstStep} — plano completo na plataforma`
-      : "[Gerar plano de remediação IA na plataforma]";
+    const effort   = (lib as any)?.effort as string | undefined;
+    const effortPT = effort ? (EFFORT_PT[effort] ?? effort) : null;
+    const treatment = lib
+      ? `Aplicar o plano de remediação IA disponível na plataforma ` +
+        `(correção/atualização de ${group.affectedComponent}). ` +
+        `Esforço estimado: ${effortPT ?? "indeterminado"}.`
+      : `Gerar o plano de remediação IA na plataforma para este componente.`;
 
     const row = sheet.getRow(rowNum);
     // B (col 2): ID — manter R0x pré-definido no template (não sobrescrever)
-    row.getCell(3).value  = riskDesc;                                      // C: Ameaça / Risco
-    row.getCell(4).value  = group.affectedComponent;                       // D: Ativo(s) Afetado(s)
-    row.getCell(5).value  = SEVERITY_PT[group.severity] ?? group.severity; // E: Categoria
-    row.getCell(6).value  = group.prob;                                    // F: Prob.
-    row.getCell(7).value  = group.impact;                                  // G: Impacto
+    row.getCell(3).value  = riskDesc;                                             // C: Ameaça / Risco
+    row.getCell(4).value  = cell(group.affectedComponent, "Componente desconhecido"); // D: Ativo(s) Afetado(s)
+    row.getCell(5).value  = cell(SEVERITY_PT[group.severity] ?? group.severity);  // E: Categoria
+    row.getCell(6).value  = group.prob;                                            // F: Prob.
+    row.getCell(7).value  = group.impact;                                          // G: Impacto
     // H (col 8) e I (col 9): fórmulas do template — NÃO TOCAR
-    row.getCell(10).value = treatment;                                     // J: Medida de Tratamento
-    // K (col 11): Responsável — deixar vazio
-    // L (col 12): Estado — deixar vazio (dropdown do cliente)
-    row.getCell(13).value = `Scan #${scanId}`;                             // M: Origem
+    row.getCell(10).value = cell(treatment, "Gerar o plano de remediação IA na plataforma para este componente."); // J: Medida de Tratamento
+    row.getCell(11).value = null;                                                   // K: Responsável — explicitamente vazio
+    row.getCell(12).value = null;                                                   // L: Estado — explicitamente vazio
+    row.getCell(13).value = `Scan #${scanId}`;                                     // M: Origem
     row.commit();
   }
 

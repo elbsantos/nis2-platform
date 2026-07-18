@@ -369,7 +369,7 @@ describe("generateRegistoRiscos — riskSummary da biblioteca (C15)", () => {
     );
   });
 
-  it("medida de tratamento usa primeiro passo + sufixo da plataforma", async () => {
+  it("medida de tratamento contém 'plano de remediação IA' e nome do componente", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getScanById).mockResolvedValue({
       ...FAKE_SCAN,
@@ -379,38 +379,53 @@ describe("generateRegistoRiscos — riskSummary da biblioteca (C15)", () => {
     vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
     vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue({
       riskSummary: "Risco de execução remota",
-      steps: [
-        { order: 2, instruction: "Reiniciar o serviço", platform: "generic" },
-        { order: 1, instruction: "Atualizar o pacote", platform: "generic" },
-      ],
+      effort: "high",
+      steps: [{ order: 1, instruction: "apt-get update && apt-get upgrade", platform: "generic" }],
     } as any);
 
     await generateRegistoRiscos(1, 1);
 
-    // J (col 10): deve ser o passo com order=1 (o mais baixo) + sufixo
-    expect(_cellWrites.get("8:10")).toBe(
-      "Atualizar o pacote — plano completo na plataforma"
-    );
+    const treatment = _cellWrites.get("8:10") as string;
+    expect(treatment).toContain("plano de remediação IA");
+    expect(treatment).toContain("Log4j");          // affectedComponent do VULN
+    expect(treatment).toContain("alto");            // effort "high" → PT "alto"
+    expect(treatment).not.toContain("apt-get");     // nunca o passo diagnóstico
   });
 
-  it("fallback de tratamento quando biblioteca não tem steps", async () => {
+  it("medida de tratamento inclui esforço traduzido (low→baixo, medium→médio)", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getScanById).mockResolvedValue({
       ...FAKE_SCAN,
-      results: { vulnerabilities: [VULN] },
+      results: { vulnerabilities: [FAKE_VULN("CVE-2021-1", "medium", 5.0, "nginx")] },
     });
     vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
     vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
     vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue({
-      riskSummary: "Risco de execução remota",
+      riskSummary: "Risco médio",
+      effort: "low",
       steps: [],
     } as any);
 
     await generateRegistoRiscos(1, 1);
 
-    expect(_cellWrites.get("8:10")).toBe(
-      "[Gerar plano de remediação IA na plataforma]"
-    );
+    expect(_cellWrites.get("8:10")).toContain("baixo");
+  });
+
+  it("fallback de tratamento quando sem biblioteca", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      results: { vulnerabilities: [VULN] },
+    });
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+
+    await generateRegistoRiscos(1, 1);
+
+    const treatment = _cellWrites.get("8:10") as string;
+    expect(treatment).toContain("plano de remediação IA");
+    expect(treatment).not.toContain("apt-get");
   });
 
   it("origem (col 13) = Scan #<scanId>", async () => {
@@ -428,7 +443,7 @@ describe("generateRegistoRiscos — riskSummary da biblioteca (C15)", () => {
     expect(_cellWrites.get("8:13")).toBe("Scan #42");
   });
 
-  it("estado (col 12) e responsável (col 11) ficam vazios", async () => {
+  it("estado (col 12) e responsável (col 11) escritos como null (explicitamente vazios)", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getScanById).mockResolvedValue({
       ...FAKE_SCAN,
@@ -440,9 +455,48 @@ describe("generateRegistoRiscos — riskSummary da biblioteca (C15)", () => {
 
     await generateRegistoRiscos(1, 1);
 
-    // nunca escritos
-    expect(_cellWrites.has("8:11")).toBe(false); // K: Responsável
-    expect(_cellWrites.has("8:12")).toBe(false); // L: Estado
+    // escritos como null explícito para evitar serialização "None" pelo ExcelJS
+    expect(_cellWrites.get("8:11")).toBeNull(); // K: Responsável
+    expect(_cellWrites.get("8:12")).toBeNull(); // L: Estado
+  });
+
+  it("Responsável (col 11) nunca contém 'None' — org sem securityOfficerName", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      results: { vulnerabilities: [VULN] },
+    });
+    vi.mocked(db.getOrganizationById).mockResolvedValue({
+      ...FAKE_ORG,
+      securityOfficerName: null,  // campo nulo no Railway
+    });
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+
+    await generateRegistoRiscos(1, 1);
+
+    const val = _cellWrites.get("8:11");
+    expect(val).not.toBe("None");
+    expect(val).not.toBe("null");
+    expect(val).not.toBe("undefined");
+    // null explícito ou não escrito — ambos são aceitáveis
+    expect(val === null || val === "" || val === undefined).toBe(true);
+  });
+
+  it("Estado (col 12) nunca contém string espúria", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      results: { vulnerabilities: [VULN] },
+    });
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+
+    await generateRegistoRiscos(1, 1);
+
+    const val = _cellWrites.get("8:12");
+    expect(val === null || val === "" || val === undefined).toBe(true);
   });
 
   it("fórmulas H e I (cols 8 e 9) nunca são sobrescritas", async () => {
