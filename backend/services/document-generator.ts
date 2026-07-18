@@ -298,10 +298,28 @@ export async function generateInventarioAtivos(scanId: number, orgId: number): P
 
 export async function generatePsi(orgId: number): Promise<Buffer> {
   requireTemplate(TEMPLATE_PATHS.psi);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const today          = new Date();
+  const proximaRevisao = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+
+  const data = {
+    empresa:          cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    nif:              cell(org.taxId,                  "[A PREENCHER: NIF]"),
+    versao:           "1.0",
+    data_aprovacao:   "[A PREENCHER]",
+    aprovado_por:     "[A PREENCHER]",
+    cargo:            "[A PREENCHER]",
+    ciso_nome:        cell(org.securityOfficerName,    "[A PREENCHER: responsável de segurança]"),
+    data_revisao:     "[A PREENCHER]",
+    proxima_revisao:  formatDate(proximaRevisao),
+  };
+
   const content = fs.readFileSync(TEMPLATE_PATHS.psi);
-  const zip = new PizZip(content);
-  const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-  // C17: preenchimento de tags empresa, nif, versao, datas, ciso_nome, etc.
-  doc.render({});
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
   return doc.getZip().generate({ type: "nodebuffer" }) as Buffer;
 }

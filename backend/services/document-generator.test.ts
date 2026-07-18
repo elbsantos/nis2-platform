@@ -14,9 +14,10 @@ import fs from "fs";
 // ---------------------------------------------------------------------------
 
 // Tracking state de escritas de células — reset em afterEach
-let _cellWrites:   Map<string, any>    = new Map();
-let _headerWrites: Map<string, any>    = new Map();
-let _calcProps:    Record<string, any> = {};
+let _cellWrites:    Map<string, any>    = new Map();
+let _headerWrites:  Map<string, any>    = new Map();
+let _calcProps:     Record<string, any> = {};
+let _psiRenderArgs: Record<string, any> | null = null;
 
 vi.mock("exceljs", () => {
   const makeRow = (rowNum: number) => ({
@@ -67,7 +68,7 @@ vi.mock("pizzip", () => ({
 
 vi.mock("docxtemplater", () => ({
   default: class MockDocxtemplater {
-    render = vi.fn();
+    render = vi.fn((data: any) => { _psiRenderArgs = data; });
     getZip = vi.fn().mockReturnValue({
       generate: vi.fn().mockReturnValue(Buffer.from("DUMMY_DOCX")),
     });
@@ -131,9 +132,11 @@ const FAKE_VULN = (
 
 afterEach(() => {
   vi.restoreAllMocks();
-  _cellWrites   = new Map();
-  _headerWrites = new Map();
-  _calcProps    = {};
+  vi.useRealTimers();
+  _cellWrites    = new Map();
+  _headerWrites  = new Map();
+  _calcProps     = {};
+  _psiRenderArgs = null;
 });
 
 // ===========================================================================
@@ -211,6 +214,7 @@ describe("document-generator — Buffer base64 com template dummy", () => {
   it("generatePsi devolve Buffer não vazio", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
     const buf = await generatePsi(1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
@@ -751,5 +755,108 @@ describe("fullCalcOnLoad — fórmulas recalculadas à abertura (C16-fix)", () =
     await generateInventarioAtivos(1, 1);
 
     expect(_calcProps.fullCalcOnLoad).toBe(true);
+  });
+});
+
+// ===========================================================================
+// C17 — generatePsi: PSI auto-preenchida
+// ===========================================================================
+
+describe("generatePsi — PSI auto-preenchida (C17)", () => {
+  const PSI_SETUP = (orgOverride: object = {}) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({
+      ...FAKE_ORG,
+      legalName: "Empresa Teste, Lda.",
+      taxId: "PT509123456",
+      securityOfficerName: "Ana Costa",
+      ...orgOverride,
+    } as any);
+  };
+
+  it("todas as tags preenchidas — nenhum '{' remanescente nos valores", async () => {
+    PSI_SETUP();
+    await generatePsi(1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    const TAGS = ["empresa", "nif", "versao", "data_aprovacao", "aprovado_por",
+                  "cargo", "ciso_nome", "data_revisao", "proxima_revisao"];
+    for (const tag of TAGS) {
+      const v = (_psiRenderArgs as any)[tag];
+      expect(v, `tag "${tag}" não deve ser undefined`).toBeDefined();
+      expect(String(v), `tag "${tag}" não deve conter "{"`)
+        .not.toContain("{");
+    }
+  });
+
+  it("org com legalName → empresa = legalName", async () => {
+    PSI_SETUP({ legalName: "Empresa Legal, SA" });
+    await generatePsi(1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Legal, SA");
+  });
+
+  it("org sem legalName → empresa = name", async () => {
+    PSI_SETUP({ legalName: null });
+    await generatePsi(1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Teste Lda");
+  });
+
+  it("org sem taxId → nif = '[A PREENCHER: NIF]'", async () => {
+    PSI_SETUP({ taxId: null });
+    await generatePsi(1);
+    expect(_psiRenderArgs!.nif).toBe("[A PREENCHER: NIF]");
+  });
+
+  it("org com taxId → nif = taxId", async () => {
+    PSI_SETUP({ taxId: "PT509999999" });
+    await generatePsi(1);
+    expect(_psiRenderArgs!.nif).toBe("PT509999999");
+  });
+
+  it("org sem securityOfficerName → ciso_nome = placeholder", async () => {
+    PSI_SETUP({ securityOfficerName: null });
+    await generatePsi(1);
+    expect(_psiRenderArgs!.ciso_nome).toBe("[A PREENCHER: responsável de segurança]");
+  });
+
+  it("org com securityOfficerName → ciso_nome = nome", async () => {
+    PSI_SETUP({ securityOfficerName: "Carlos Silva" });
+    await generatePsi(1);
+    expect(_psiRenderArgs!.ciso_nome).toBe("Carlos Silva");
+  });
+
+  it("versao = '1.0' sempre", async () => {
+    PSI_SETUP();
+    await generatePsi(1);
+    expect(_psiRenderArgs!.versao).toBe("1.0");
+  });
+
+  it("proxima_revisao = hoje + 1 ano em DD/MM/AAAA", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-03-15"));
+    PSI_SETUP();
+    await generatePsi(1);
+    expect(_psiRenderArgs!.proxima_revisao).toBe("15/03/2026");
+  });
+
+  it("campos manuais ficam com placeholder '[A PREENCHER]'", async () => {
+    PSI_SETUP();
+    await generatePsi(1);
+    expect(_psiRenderArgs!.data_aprovacao).toBe("[A PREENCHER]");
+    expect(_psiRenderArgs!.aprovado_por).toBe("[A PREENCHER]");
+    expect(_psiRenderArgs!.cargo).toBe("[A PREENCHER]");
+    expect(_psiRenderArgs!.data_revisao).toBe("[A PREENCHER]");
+  });
+
+  it("nenhum valor é null, undefined, 'None' ou 'null'", async () => {
+    PSI_SETUP({ legalName: null, taxId: null, securityOfficerName: null });
+    await generatePsi(1);
+    for (const [k, v] of Object.entries(_psiRenderArgs!)) {
+      expect(v, `"${k}" não deve ser null`).not.toBeNull();
+      expect(v, `"${k}" não deve ser undefined`).not.toBeUndefined();
+      expect(String(v), `"${k}" não deve ser 'None'`).not.toBe("None");
+      expect(String(v), `"${k}" não deve ser 'null'`).not.toBe("null");
+    }
   });
 });
