@@ -13,6 +13,7 @@ import { courseRouter }        from "./course.router";
 import { docsRouter }          from "./docs.router";
 import { reportRouter }        from "./report.router";
 import { adminRouter }         from "./admin.router";
+import { documentsRouter }     from "./documents.router";
 
 export const appRouter = router({
   scan:          scanRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   docs:          docsRouter,
   report:        reportRouter,
   admin:         adminRouter,
+  documents:     documentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

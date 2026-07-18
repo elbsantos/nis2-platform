@@ -357,6 +357,21 @@ export async function getUserByOrgId(orgId: number) {
   return getUserById(org.ownerId);
 }
 
+export async function getLatestCompletedScanForOrg(orgId: number) {
+  const rows = await getDb()
+    .select()
+    .from(scans)
+    .where(
+      and(
+        eq(scans.organizationId, orgId),
+        eq(scans.status, "completed")
+      )
+    )
+    .orderBy(desc(scans.completedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 /**
  * Returns the most recent completed scan for the given org+target within the
  * specified TTL window. Used by the scan router to short-circuit repeated scans.
