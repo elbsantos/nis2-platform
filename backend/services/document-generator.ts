@@ -83,6 +83,24 @@ function summarizeCves(cves: string[]): string {
   return `${cves.length} CVEs conhecidos — ver Registo de Riscos e relatório técnico`;
 }
 
+/**
+ * Remove o resultado em cache de todas as células de fórmula do workbook.
+ * Sem <v> no XML, o Excel é obrigado a recalcular ao abrir — mais fiável do
+ * que fullCalcOnLoad sozinho quando os caches do template contêm zeros.
+ */
+function clearFormulaCache(wb: ExcelJS.Workbook): void {
+  wb.eachSheet((sheet) => {
+    sheet.eachRow({ includeEmpty: false }, (row) => {
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        const v = cell.value as ExcelJS.CellValue;
+        if (v !== null && typeof v === "object" && "formula" in (v as object)) {
+          cell.value = { formula: (v as ExcelJS.CellFormulaValue).formula } as ExcelJS.CellFormulaValue;
+        }
+      });
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // C15 — Registo de Riscos
 // ---------------------------------------------------------------------------
@@ -240,6 +258,7 @@ export async function generateRegistoRiscos(scanId: number, orgId: number): Prom
     overRow.commit();
   }
 
+  clearFormulaCache(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -293,6 +312,7 @@ export async function generateInventarioAtivos(scanId: number, orgId: number): P
     row.commit();
   }
 
+  clearFormulaCache(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

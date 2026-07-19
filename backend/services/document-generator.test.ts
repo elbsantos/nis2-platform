@@ -14,10 +14,11 @@ import fs from "fs";
 // ---------------------------------------------------------------------------
 
 // Tracking state de escritas de células — reset em afterEach
-let _cellWrites:    Map<string, any>    = new Map();
-let _headerWrites:  Map<string, any>    = new Map();
-let _calcProps:     Record<string, any> = {};
-let _psiRenderArgs: Record<string, any> | null = null;
+let _cellWrites:       Map<string, any>    = new Map();
+let _headerWrites:     Map<string, any>    = new Map();
+let _calcProps:        Record<string, any> = {};
+let _psiRenderArgs:    Record<string, any> | null = null;
+let _eachSheetCalled:  number = 0;
 
 vi.mock("exceljs", () => {
   const makeRow = (rowNum: number) => ({
@@ -55,6 +56,7 @@ vi.mock("exceljs", () => {
           writeBuffer: vi.fn().mockResolvedValue(Buffer.from("DUMMY_XLSX")),
         };
         getWorksheet = vi.fn(() => makeSheet());
+        eachSheet    = vi.fn(() => { _eachSheetCalled++; });
       },
     },
   };
@@ -133,10 +135,11 @@ const FAKE_VULN = (
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
-  _cellWrites    = new Map();
-  _headerWrites  = new Map();
-  _calcProps     = {};
-  _psiRenderArgs = null;
+  _cellWrites      = new Map();
+  _headerWrites    = new Map();
+  _calcProps       = {};
+  _psiRenderArgs   = null;
+  _eachSheetCalled = 0;
 });
 
 // ===========================================================================
@@ -755,6 +758,37 @@ describe("fullCalcOnLoad — fórmulas recalculadas à abertura (C16-fix)", () =
     await generateInventarioAtivos(1, 1);
 
     expect(_calcProps.fullCalcOnLoad).toBe(true);
+  });
+});
+
+// ===========================================================================
+// clearFormulaCache — garante recálculo sem depender do cache do template
+// ===========================================================================
+
+describe("clearFormulaCache — caches de fórmulas limpos antes de writeBuffer", () => {
+  it("generateRegistoRiscos chama eachSheet para limpar caches", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(FAKE_SCAN);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+
+    await generateRegistoRiscos(1, 1);
+
+    expect(_eachSheetCalled).toBeGreaterThanOrEqual(1);
+  });
+
+  it("generateInventarioAtivos chama eachSheet para limpar caches", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      ...FAKE_SCAN,
+      results: { openPorts: [], resolvedIp: "1.2.3.4" },
+    });
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+
+    await generateInventarioAtivos(1, 1);
+
+    expect(_eachSheetCalled).toBeGreaterThanOrEqual(1);
   });
 });
 
