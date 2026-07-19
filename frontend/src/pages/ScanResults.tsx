@@ -241,6 +241,9 @@ export default function ScanResults() {
           <VulnerabilityListFromScan results={results} />
         </section>
 
+        {/* Documentos NIS2 */}
+        <DocumentsSection scanId={scan.id} eligibleCount={eligibleCount} />
+
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-2">
           <Link to="/scan/start"
@@ -331,6 +334,110 @@ function PdfButton({ scanId, type, label }: { scanId: number; type: "executive" 
       </button>
       {error && <p className="text-red-400 text-sm">{error}</p>}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Documentos NIS2 — download de ficheiros gerados automaticamente
+// ---------------------------------------------------------------------------
+
+function triggerDownload(base64: string, filename: string, contentType: string) {
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const blob  = new Blob([bytes], { type: contentType });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function DocButton({
+  label,
+  onDownload,
+}: {
+  label: string;
+  onDownload: () => Promise<{ fileBase64: string; filename: string; contentType: string }>;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  async function handleClick() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await onDownload();
+      triggerDownload(result.fileBase64, result.filename, result.contentType);
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao gerar documento");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className="px-4 py-2 bg-teal-700 text-white text-lg font-medium rounded-md hover:bg-teal-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+      >
+        {loading ? "A gerar…" : `↓ ${label}`}
+      </button>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+    </div>
+  );
+}
+
+function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleCount: number }) {
+  const registoRiscos = trpc.documents.registoRiscos.useQuery(
+    { scanId },
+    { enabled: false, retry: false }
+  );
+  const inventarioAtivos = trpc.documents.inventarioAtivos.useQuery(
+    { scanId },
+    { enabled: false, retry: false }
+  );
+  const psi = trpc.documents.psi.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
+
+  return (
+    <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
+      <h2 className="text-2xl font-semibold text-white mb-1">Documentos NIS2</h2>
+      <p className="text-slate-400 text-lg mb-5">
+        Documentos pré-preenchidos com os dados do scan — reveja e complete antes de usar.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {eligibleCount > 0 && (
+          <>
+            <DocButton
+              label="Registo de Riscos (.xlsx)"
+              onDownload={async () => {
+                const r = await registoRiscos.refetch();
+                if (!r.data) throw new Error("Sem dados");
+                return r.data;
+              }}
+            />
+            <DocButton
+              label="Inventário de Ativos (.xlsx)"
+              onDownload={async () => {
+                const r = await inventarioAtivos.refetch();
+                if (!r.data) throw new Error("Sem dados");
+                return r.data;
+              }}
+            />
+          </>
+        )}
+        <DocButton
+          label="Política de Segurança (.docx)"
+          onDownload={async () => {
+            const r = await psi.refetch();
+            if (!r.data) throw new Error("Sem dados");
+            return r.data;
+          }}
+        />
+      </div>
+    </section>
   );
 }
 
