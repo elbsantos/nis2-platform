@@ -19,6 +19,20 @@ let _headerWrites:     Map<string, any>    = new Map();
 let _calcProps:        Record<string, any> = {};
 let _psiRenderArgs:    Record<string, any> | null = null;
 let _eachSheetCalled:  number = 0;
+let _painelCellWrites: Map<string, any>    = new Map();
+
+// Valores iniciais de fórmula do Painel de Controlo (simulam o que o template tem).
+// preFillPainel lê cell.value para obter a formula antes de escrever {formula, result}.
+const PAINEL_INITIAL: Record<string, any> = {
+  C5:  { formula: "COUNTA('🎯 REGISTO DE RISCOS'!C8:C40)" },
+  C6:  { formula: "COUNTIF('🎯 REGISTO DE RISCOS'!H8:H40,\">=\"&17)" },
+  C7:  { formula: "COUNTIFS('🎯 REGISTO DE RISCOS'!H8:H40,\">=\"&10,'🎯 REGISTO DE RISCOS'!H8:H40,\"<\"&17)" },
+  C8:  { formula: "COUNTIFS('🎯 REGISTO DE RISCOS'!H8:H40,\">=\"&5,'🎯 REGISTO DE RISCOS'!H8:H40,\"<\"&10)" },
+  C9:  { formula: "COUNTIFS('🎯 REGISTO DE RISCOS'!H8:H40,\">=\"&1,'🎯 REGISTO DE RISCOS'!H8:H40,\"<\"&5)" },
+  C12: { formula: "COUNTIF('🎯 REGISTO DE RISCOS'!L8:L40,\"Em curso\")" },
+  C13: { formula: "COUNTIF('🎯 REGISTO DE RISCOS'!L8:L40,\"Concluído\")" },
+  C14: { formula: "COUNTIF('🎯 REGISTO DE RISCOS'!L8:L40,\"Transferir (Seguro)\")" },
+};
 
 vi.mock("exceljs", () => {
   const makeRow = (rowNum: number) => ({
@@ -47,6 +61,21 @@ vi.mock("exceljs", () => {
     }),
     getRow: vi.fn((rowNum: number) => makeRow(rowNum)),
   });
+  const makePainelSheet = () => ({
+    getCell: vi.fn((addr: string) => {
+      const cell = { value: undefined as any };
+      Object.defineProperty(cell, "value", {
+        get: () => _painelCellWrites.has(addr)
+          ? _painelCellWrites.get(addr)
+          : PAINEL_INITIAL[addr],
+        set: (v: any) => { _painelCellWrites.set(addr, v); },
+        enumerable: true,
+        configurable: true,
+      });
+      return cell;
+    }),
+    getRow: vi.fn(),
+  });
   return {
     default: {
       Workbook: class MockWorkbook {
@@ -55,7 +84,9 @@ vi.mock("exceljs", () => {
           readFile: vi.fn().mockResolvedValue(undefined),
           writeBuffer: vi.fn().mockResolvedValue(Buffer.from("DUMMY_XLSX")),
         };
-        getWorksheet = vi.fn(() => makeSheet());
+        getWorksheet = vi.fn((name: string) =>
+          name === "📈 PAINEL DE CONTROLO" ? makePainelSheet() : makeSheet()
+        );
         eachSheet    = vi.fn(() => { _eachSheetCalled++; });
       },
     },
@@ -96,6 +127,7 @@ import {
   generateInventarioAtivos,
   generatePsi,
   aggregateRiskGroups,
+  preFillPainel,
   CONTENT_TYPES,
 } from "./document-generator";
 import * as db             from "../db";
@@ -135,11 +167,12 @@ const FAKE_VULN = (
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
-  _cellWrites      = new Map();
-  _headerWrites    = new Map();
-  _calcProps       = {};
-  _psiRenderArgs   = null;
-  _eachSheetCalled = 0;
+  _cellWrites       = new Map();
+  _headerWrites     = new Map();
+  _calcProps        = {};
+  _psiRenderArgs    = null;
+  _eachSheetCalled  = 0;
+  _painelCellWrites = new Map();
 });
 
 // ===========================================================================
@@ -789,6 +822,121 @@ describe("clearFormulaCache — caches de fórmulas limpos antes de writeBuffer"
     await generateInventarioAtivos(1, 1);
 
     expect(_eachSheetCalled).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ===========================================================================
+// Painel de Controlo — pré-cálculo de contagens (fix-painel)
+// ===========================================================================
+
+describe("preFillPainel — contagens do Painel pré-calculadas (fix-painel)", () => {
+  // Fixture: 2 CRÍTICO (Nível 20), 1 ALTO (Nível 12), 1 MÉDIO (Nível 6), 1 BAIXO (Nível 3)
+  const VULNS_MIXED = [
+    FAKE_VULN("CVE-A", "critical", 9.8, "comp-A"),  // prob=5 impact=5 → nivel=25 → CRÍTICO
+    FAKE_VULN("CVE-B", "critical", 8.0, "comp-B"),  // prob=5 impact=4 → nivel=20 → CRÍTICO
+    FAKE_VULN("CVE-C", "high",    7.0, "comp-C"),   // prob=4 impact=3 → nivel=12 → ALTO
+    FAKE_VULN("CVE-D", "medium",  5.0, "comp-D"),   // prob=3 impact=2 → nivel=6  → MÉDIO
+    FAKE_VULN("CVE-E", "low",     2.0, "comp-E"),   // prob=2 impact=2 → nivel=4  → BAIXO (? let's check: 4 >= 1 and < 5 → BAIXO)
+  ];
+
+  const SETUP = () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(FAKE_SCAN);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue(VULNS_MIXED as any);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+  };
+
+  it("C5 (Total) = número de grupos escritos", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    expect(_painelCellWrites.get("C5")).toMatchObject({ result: 5 });
+  });
+
+  it("C6 (CRÍTICO) = grupos com Nível >= 17", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    expect(_painelCellWrites.get("C6")).toMatchObject({ result: 2 });
+  });
+
+  it("C7 (ALTO) = grupos com 10 <= Nível < 17", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    expect(_painelCellWrites.get("C7")).toMatchObject({ result: 1 });
+  });
+
+  it("C8 (MÉDIO) = grupos com 5 <= Nível < 10", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    expect(_painelCellWrites.get("C8")).toMatchObject({ result: 1 });
+  });
+
+  it("C9 (BAIXO) = grupos com 1 <= Nível < 5", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    expect(_painelCellWrites.get("C9")).toMatchObject({ result: 1 });
+  });
+
+  it("C12-C14 (Estado) = 0 porque coluna L começa vazia", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    expect(_painelCellWrites.get("C12")).toMatchObject({ result: 0 });
+    expect(_painelCellWrites.get("C13")).toMatchObject({ result: 0 });
+    expect(_painelCellWrites.get("C14")).toMatchObject({ result: 0 });
+  });
+
+  it("células preservam a fórmula original (formula presente no valor escrito)", async () => {
+    SETUP();
+    await generateRegistoRiscos(1, 1);
+    for (const addr of ["C5", "C6", "C7", "C8", "C9", "C12", "C13", "C14"]) {
+      const written = _painelCellWrites.get(addr);
+      expect(written).toBeDefined();
+      expect(typeof written.formula).toBe("string");
+      expect(written.formula.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("sem riscos → Total=0, todas as contagens=0", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(FAKE_SCAN);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue([]);
+    vi.mocked(aiRemediation.lookupLibrary).mockResolvedValue(null);
+
+    await generateRegistoRiscos(1, 1);
+
+    expect(_painelCellWrites.get("C5")).toMatchObject({ result: 0 });
+    expect(_painelCellWrites.get("C6")).toMatchObject({ result: 0 });
+    expect(_painelCellWrites.get("C7")).toMatchObject({ result: 0 });
+    expect(_painelCellWrites.get("C8")).toMatchObject({ result: 0 });
+    expect(_painelCellWrites.get("C9")).toMatchObject({ result: 0 });
+  });
+
+  it("preFillPainel unitário — valores directos sem generator", () => {
+    const mockWb = {
+      getWorksheet: (name: string) => {
+        if (name !== "📈 PAINEL DE CONTROLO") return null;
+        return {
+          getCell: (addr: string) => {
+            const cell = { value: undefined as any };
+            Object.defineProperty(cell, "value", {
+              get: () => _painelCellWrites.has(addr)
+                ? _painelCellWrites.get(addr)
+                : PAINEL_INITIAL[addr],
+              set: (v: any) => { _painelCellWrites.set(addr, v); },
+              enumerable: true, configurable: true,
+            });
+            return cell;
+          },
+        };
+      },
+    };
+    preFillPainel(mockWb as any, 7, 3, 2, 1, 1);
+    expect(_painelCellWrites.get("C5")).toMatchObject({ result: 7 });
+    expect(_painelCellWrites.get("C6")).toMatchObject({ result: 3 });
+    expect(_painelCellWrites.get("C7")).toMatchObject({ result: 2 });
+    expect(_painelCellWrites.get("C8")).toMatchObject({ result: 1 });
+    expect(_painelCellWrites.get("C9")).toMatchObject({ result: 1 });
   });
 });
 

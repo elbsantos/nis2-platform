@@ -101,6 +101,41 @@ function clearFormulaCache(wb: ExcelJS.Workbook): void {
   });
 }
 
+/**
+ * Pré-calcula e escreve o result das fórmulas COUNTIF/COUNTIFS do Painel de
+ * Controlo com base nos grupos de risco já escritos. Necessário porque essas
+ * fórmulas referenciam outro sheet e não são recalculadas em Modo Protegido.
+ * A fórmula original é preservada no XML para edição futura.
+ */
+export function preFillPainel(
+  wb: ExcelJS.Workbook,
+  total: number,
+  critico: number,
+  alto: number,
+  medio: number,
+  baixo: number,
+): void {
+  const painelSheet = wb.getWorksheet("📈 PAINEL DE CONTROLO");
+  if (!painelSheet) return;
+
+  const fill = (addr: string, result: number) => {
+    const c = painelSheet.getCell(addr);
+    const v = c.value as ExcelJS.CellValue;
+    if (v !== null && typeof v === "object" && "formula" in (v as object)) {
+      c.value = { formula: (v as ExcelJS.CellFormulaValue).formula, result } as ExcelJS.CellFormulaValue;
+    }
+  };
+
+  fill("C5",  total);    // Total de Riscos — COUNTA(C8:C40)
+  fill("C6",  critico);  // Crítico  — Nível >= 17
+  fill("C7",  alto);     // Alto     — 10 <= Nível < 17
+  fill("C8",  medio);    // Médio    — 5 <= Nível < 10
+  fill("C9",  baixo);    // Baixo    — 1 <= Nível < 5
+  fill("C12", 0);        // Em curso       — coluna L começa vazia
+  fill("C13", 0);        // Concluído      — coluna L começa vazia
+  fill("C14", 0);        // Transferir     — coluna L começa vazia
+}
+
 // ---------------------------------------------------------------------------
 // C15 — Registo de Riscos
 // ---------------------------------------------------------------------------
@@ -212,10 +247,20 @@ export async function generateRegistoRiscos(scanId: number, orgId: number): Prom
   sheet.getCell("G3").value =
     `Scan #${scanId} de ${formatDate(scan.createdAt)} — Gerado automaticamente`;
 
+  // Contadores para pré-preenchimento do Painel de Controlo
+  let cntCritico = 0, cntAlto = 0, cntMedio = 0, cntBaixo = 0;
+
   // Fill data rows
   for (let i = 0; i < dataRows.length; i++) {
     const rowNum = 8 + i;
     const group  = dataRows[i];
+
+    // Acumular contagens por Nível de Risco (= Prob × Impacto)
+    const nivel = group.prob * group.impact;
+    if      (nivel >= 17) cntCritico++;
+    else if (nivel >= 10) cntAlto++;
+    else if (nivel >= 5)  cntMedio++;
+    else if (nivel > 0)   cntBaixo++;
 
     const lib = group.bestCveId
       ? await lookupLibrary(group.bestCveId, "generic")
@@ -259,6 +304,7 @@ export async function generateRegistoRiscos(scanId: number, orgId: number): Prom
   }
 
   clearFormulaCache(wb);
+  preFillPainel(wb, dataRows.length, cntCritico, cntAlto, cntMedio, cntBaixo);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
