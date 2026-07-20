@@ -46,3 +46,14 @@ _*.ts
 registo-riscos-scan*.xlsx
 inventario-ativos-scan*.xlsx
 psi-cisplan*.docx
+
+# Backups de editor
+*.bak
+
+# Scripts de teste locais soltos
+test-*.ts
+
+# Notas e documentos de recon (gerados localmente, não fazem parte do repo)
+RECON-*.md
+ARQUITETURA-SCAN.md
+findings-catalog.md
