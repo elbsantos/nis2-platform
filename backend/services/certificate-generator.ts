@@ -12,10 +12,10 @@ const FONT_REGULAR = path.join(__dirname, "..", "assets", "fonts", "DejaVuSans.t
 const FONT_BOLD    = path.join(__dirname, "..", "assets", "fonts", "DejaVuSans-Bold.ttf");
 
 const C = {
-  brand:  "#1d4ed8",
-  gold:   "#b45309",
-  text:   "#111827",
-  muted:  "#6b7280",
+  navy:  "#12233b",
+  gold:  "#b45309",
+  text:  "#111827",
+  muted: "#6b7280",
 };
 
 export async function generateCertificateBuffer(opts: {
@@ -24,8 +24,8 @@ export async function generateCertificateBuffer(opts: {
   completedAt: Date;
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc    = new PDFDocument({ size: "A4", layout: "landscape", margin: 60,
-                                     info: { Title: "Certificado CISPLAN" } });
+    const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0,
+                                   info: { Title: "Certificado CISPLAN" } });
     doc.registerFont("Sans",      FONT_REGULAR);
     doc.registerFont("Sans-Bold", FONT_BOLD);
 
@@ -34,77 +34,102 @@ export async function generateCertificateBuffer(opts: {
     doc.on("end",   () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const W = 841.89; // A4 landscape width in points
+    const W = 841.89;
     const H = 595.28;
 
     // ── Background ──
-    doc.rect(0, 0, W, H).fillColor("#f0f4ff").fill();
+    doc.rect(0, 0, W, H).fillColor("#f8faff").fill();
 
-    // ── Gold border frame ──
-    doc.rect(20, 20, W - 40, H - 40).lineWidth(3).strokeColor(C.gold).stroke();
-    doc.rect(26, 26, W - 52, H - 52).lineWidth(1).strokeColor(C.gold).stroke();
+    // ── Double frame navy ──
+    doc.rect(15, 15, W - 30, H - 30).lineWidth(1.5).strokeColor(C.navy).stroke();
+    doc.rect(23, 23, W - 46, H - 46).lineWidth(0.5).strokeColor(C.navy).stroke();
 
-    // ── Blue top bar ──
-    doc.rect(20, 20, W - 40, 8).fillColor(C.brand).fill();
-    doc.rect(20, H - 28, W - 40, 8).fillColor(C.brand).fill();
+    // ── CISPLAN header ──
+    doc.fontSize(20).font("Sans-Bold").fillColor(C.navy)
+       .text("CISPLAN", 0, 42, { align: "center", width: W });
 
-    // ── Logo / Issuer ──
-    doc.fontSize(13).fillColor(C.brand).font("Sans-Bold")
-       .text("CISPLAN", 0, 52, { align: "center", width: W });
+    doc.fontSize(9).font("Sans").fillColor(C.muted)
+       .text("Conformidade NIS2 para PMEs Portuguesas", 0, 68, { align: "center", width: W });
 
-    doc.fontSize(9).fillColor(C.muted).font("Sans")
-       .text("Conformidade NIS2 para PMEs Portuguesas", 0, 70, { align: "center", width: W });
+    // ── Gold rule ──
+    doc.moveTo(W / 2 - 140, 86).lineTo(W / 2 + 140, 86)
+       .strokeColor(C.gold).lineWidth(0.8).stroke();
 
-    // ── Decorative rule ──
-    doc.moveTo(W / 2 - 120, 92).lineTo(W / 2 + 120, 92)
+    // ── CERTIFICADO DE CONCLUSÃO ──
+    doc.fontSize(15).font("Sans-Bold").fillColor(C.navy)
+       .text("CERTIFICADO DE CONCLUSÃO", 0, 98, {
+         align: "center", width: W, characterSpacing: 3,
+       });
+
+    // ── Thin navy separator ──
+    doc.moveTo(W / 2 - 100, 124).lineTo(W / 2 + 100, 124)
+       .strokeColor(C.navy).lineWidth(0.3).stroke();
+
+    // ── "Este certificado é atribuído a" ──
+    doc.fontSize(10).font("Sans").fillColor(C.muted)
+       .text("Este certificado é atribuído a", 0, 138, { align: "center", width: W });
+
+    // ── Recipient name — reduced if name exceeds useful width ──
+    const MAX_NAME_W = 560;
+    let namePt = 24;
+    doc.fontSize(namePt).font("Sans-Bold");
+    while (namePt > 13 && doc.widthOfString(opts.userName) > MAX_NAME_W) {
+      namePt -= 1;
+      doc.fontSize(namePt);
+    }
+    const nameLineH = doc.currentLineHeight();
+    const nameY     = 158;
+
+    doc.fillColor(C.text)
+       .text(opts.userName, 0, nameY, { align: "center", width: W });
+
+    // ── Gold underline under name ──
+    const nameStrW   = Math.min(doc.widthOfString(opts.userName) + 40, 440);
+    const underlineY = nameY + nameLineH + 4;
+    doc.moveTo(W / 2 - nameStrW / 2, underlineY)
+       .lineTo(W / 2 + nameStrW / 2, underlineY)
        .strokeColor(C.gold).lineWidth(1).stroke();
 
-    // ── Certificate of Completion title ──
-    doc.fontSize(32).fillColor(C.gold).font("Sans-Bold")
-       .text("Certificado de Conclusão", 0, 108, { align: "center", width: W });
+    // ── Course block ──
+    let y = underlineY + 22;
 
-    // ── Body text ──
-    doc.fontSize(12).fillColor(C.muted).font("Sans")
-       .text("Este certificado é atribuído a", 0, 165, { align: "center", width: W });
+    doc.fontSize(10).font("Sans").fillColor(C.muted)
+       .text("pela conclusão com sucesso do curso", 0, y, { align: "center", width: W });
+    y += doc.currentLineHeight() + 6;
 
-    // ── Recipient name ──
-    doc.fontSize(28).fillColor(C.text).font("Sans-Bold")
-       .text(opts.userName, 0, 187, { align: "center", width: W });
+    doc.fontSize(14).font("Sans-Bold").fillColor(C.navy)
+       .text("NIS2 para PMEs em Portugal", 0, y, { align: "center", width: W });
+    y += doc.currentLineHeight() + 7;
 
-    // ── Underline name ──
-    const nameWidth = Math.min(doc.widthOfString(opts.userName) + 40, 400);
-    doc.moveTo(W / 2 - nameWidth / 2, 223)
-       .lineTo(W / 2 + nameWidth / 2, 223)
-       .strokeColor(C.gold).lineWidth(1.5).stroke();
+    doc.fontSize(10).font("Sans").fillColor(C.muted)
+       .text(`em representação de ${opts.orgName}`, 0, y, { align: "center", width: W });
+    y += doc.currentLineHeight() + 16;
 
-    // ── Course and org ──
-    doc.fontSize(12).fillColor(C.muted).font("Sans")
-       .text("pela conclusão com sucesso do curso", 0, 237, { align: "center", width: W });
-
-    doc.fontSize(15).fillColor(C.brand).font("Sans-Bold")
-       .text("NIS2 para PMEs em Portugal", 0, 257, { align: "center", width: W });
-
-    doc.fontSize(11).fillColor(C.muted).font("Sans")
-       .text(`em representação de ${opts.orgName}`, 0, 281, { align: "center", width: W });
-
-    // ── Date ──
     const dateStr = opts.completedAt.toLocaleDateString("pt-PT", {
       day: "numeric", month: "long", year: "numeric",
     });
-    doc.fontSize(10).fillColor(C.muted).font("Sans")
-       .text(`Concluído em ${dateStr}`, 0, 320, { align: "center", width: W });
+    doc.fontSize(9).font("Sans").fillColor(C.muted)
+       .text(`Concluído em ${dateStr}`, 0, y, { align: "center", width: W });
 
-    // ── Signature line ──
-    doc.moveTo(W / 2 - 80, 365).lineTo(W / 2 + 80, 365)
-       .strokeColor(C.muted).lineWidth(0.5).stroke();
-    doc.fontSize(9).fillColor(C.muted).font("Sans")
-       .text("CISPLAN", 0, 370, { align: "center", width: W });
+    // ── Vectorial seal ──
+    const cx  = W / 2;
+    const cy  = 448;
+    const rOuter = 40;
+    const rInner = 33;
+
+    doc.circle(cx, cy, rOuter).lineWidth(1.5).strokeColor(C.navy).stroke();
+    doc.circle(cx, cy, rInner).lineWidth(0.5).strokeColor(C.navy).stroke();
+
+    doc.fontSize(8).font("Sans-Bold").fillColor(C.navy)
+       .text("CISPLAN", cx - 35, cy - 7, { width: 70, align: "center" });
+    doc.fontSize(6).font("Sans").fillColor(C.navy)
+       .text("NIS2 · 2026", cx - 35, cy + 5, { width: 70, align: "center" });
 
     // ── Footer ──
-    doc.fontSize(8).fillColor(C.muted).font("Sans")
+    doc.fontSize(8).font("Sans").fillColor(C.muted)
        .text(
          `Documento gerado automaticamente por CISPLAN · ${new Date().toLocaleDateString("pt-PT")}`,
-         0, H - 48, { align: "center", width: W }
+         0, H - 42, { align: "center", width: W }
        );
 
     doc.end();
