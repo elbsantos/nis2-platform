@@ -109,9 +109,10 @@ vi.mock("docxtemplater", () => ({
 }));
 
 vi.mock("../db", () => ({
-  getScanById:              vi.fn(),
-  getOrganizationById:      vi.fn(),
-  getVulnerabilitiesByScanId: vi.fn(),
+  getScanById:                  vi.fn(),
+  getOrganizationById:          vi.fn(),
+  getVulnerabilitiesByScanId:   vi.fn(),
+  getFrameworkAssessmentById:   vi.fn(),
 }));
 
 vi.mock("./ai-remediation", () => ({
@@ -126,6 +127,7 @@ import {
   generateRegistoRiscos,
   generateInventarioAtivos,
   generatePsi,
+  generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
   CONTENT_TYPES,
@@ -1040,5 +1042,181 @@ describe("generatePsi — PSI auto-preenchida (C17)", () => {
       expect(String(v), `"${k}" não deve ser 'None'`).not.toBe("None");
       expect(String(v), `"${k}" não deve ser 'null'`).not.toBe("null");
     }
+  });
+});
+
+// ===========================================================================
+// C-EQ4 — generateRelatorioEnquadramento
+// ===========================================================================
+
+// Fixture com output REAL do evaluateTree:
+//   evaluateTree(NIS2_PT_TREE, { "A.setor":"industria","C.estrutura":"autonoma","D.n":"80","D.vn":"12","D.b":"5" })
+//   → path: ["A","C","D","E"]
+//   → legalBasis: ["Art. 2.º DL 125/2025","Rec. 2003/361/CE","Anexo III DL 125/2025","Art. 6.º DL 125/2025"]
+//   → classification: "importante"
+//   → resultLabel: "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025)."
+const FAKE_ASSESSMENT = {
+  id:             99,
+  organizationId: 1,
+  userId:         1,
+  frameworkSlug:  "nis2-pt-dl125",
+  classification: "importante",
+  resultLabel:    "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025).",
+  engineVersion:  "1",
+  status:         "completed",
+  decisionPath:   ["A", "C", "D", "E"],
+  legalBasis:     ["Art. 2.º DL 125/2025", "Rec. 2003/361/CE", "Anexo III DL 125/2025", "Art. 6.º DL 125/2025"],
+  answers:        { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" },
+  completedAt:    new Date("2026-07-15"),
+  createdAt:      new Date("2026-07-15"),
+  updatedAt:      new Date("2026-07-15"),
+} as any;
+
+describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => {
+  const EQ_SETUP = (
+    assessmentOverride: object = {},
+    orgOverride: object = {},
+  ) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getFrameworkAssessmentById).mockResolvedValue({
+      ...FAKE_ASSESSMENT,
+      ...assessmentOverride,
+    });
+    vi.mocked(db.getOrganizationById).mockResolvedValue({
+      ...FAKE_ORG,
+      legalName: "TechCorp, Lda.",
+      ...orgOverride,
+    } as any);
+  };
+
+  it("lança erro claro quando template em falta", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateRelatorioEnquadramento(99, 1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: enquadramento-template.docx"
+    );
+  });
+
+  it("lança erro quando assessment não existe", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getFrameworkAssessmentById).mockResolvedValue(null as any);
+    await expect(generateRelatorioEnquadramento(99, 1)).rejects.toThrow(
+      "[Documentos] Assessment não encontrado"
+    );
+  });
+
+  it("lança erro quando assessment não pertence à org (isolamento multi-tenant)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getFrameworkAssessmentById).mockResolvedValue({
+      ...FAKE_ASSESSMENT,
+      organizationId: 999,
+    });
+    await expect(generateRelatorioEnquadramento(99, 1)).rejects.toThrow(
+      "[Documentos] Acesso não autorizado"
+    );
+  });
+
+  it("render chamado com empresa, data, classificacao, resultLabel, engineVersion", async () => {
+    EQ_SETUP();
+    await generateRelatorioEnquadramento(99, 1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    expect(_psiRenderArgs!.empresa).toBe("TechCorp, Lda.");
+    expect(_psiRenderArgs!.classificacao).toBe("importante");
+    expect(_psiRenderArgs!.resultLabel).toContain("importante");
+    expect(_psiRenderArgs!.engineVersion).toBe("1");
+    // data no formato DD/MM/AAAA
+    expect(typeof _psiRenderArgs!.data).toBe("string");
+    expect(_psiRenderArgs!.data).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+  });
+
+  it("org sem legalName → empresa = org.name", async () => {
+    EQ_SETUP({}, { legalName: null });
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Teste Lda");
+  });
+
+  it("steps é array derivado do motor (não de decisionPath BD) — labels legíveis, artigos correctos", async () => {
+    // O generator re-corre evaluateTree a partir de assessment.answers.
+    // FAKE_ASSESSMENT.answers = { A.setor:"industria", C.estrutura:"autonoma", D.n:"80", D.vn:"12", D.b:"5" }
+    // motor v2 → 4 steps (A + C + D + E), com labels legíveis em PT.
+    EQ_SETUP();
+    await generateRelatorioEnquadramento(99, 1);
+
+    const steps = _psiRenderArgs!.steps as Array<{ label: string; article: string }>;
+    expect(Array.isArray(steps)).toBe(true);
+    expect(steps).toHaveLength(4);
+
+    // Step A: setor
+    expect(steps[0]!.label).toContain("Indústria e manufatura");
+    expect(steps[0]!.article).toBe("Anexo II, ponto 5");
+
+    // Step C: grupo
+    expect(steps[1]!.label).toContain("empresa autónoma");
+    expect(steps[1]!.article).toContain("Rec. 2003/361/CE");
+
+    // Step D: dimensão com valores concretos
+    expect(steps[2]!.label).toContain("média");
+    expect(steps[2]!.label).toContain("trabalhadores: 80");
+    expect(steps[2]!.label).toContain("VN: 12 M€");
+    expect(steps[2]!.article).toContain("Anexo III DL 125/2025");
+
+    // Step E: resultado final
+    expect(steps[3]!.label).toContain("entidade importante");
+    expect(steps[3]!.article).toBe("Art. 6.º/2 DL 125/2025");
+
+    // Nenhum step tem label com '{' (nenhum placeholder por substituir)
+    for (const s of steps) {
+      expect(s.label).not.toContain("{");
+      expect(s.article).not.toContain("{");
+    }
+  });
+
+  it("answers null → steps derivado de respostas vazias (motor devolve resultado por omissão)", async () => {
+    // Com answers=null → {} → setor não identificado → B → nenhuma exceção → fora_condicional
+    EQ_SETUP({ answers: null });
+    await generateRelatorioEnquadramento(99, 1);
+
+    const steps = _psiRenderArgs!.steps as Array<{ label: string; article: string }>;
+    expect(Array.isArray(steps)).toBe(true);
+    expect(steps.length).toBeGreaterThan(0);
+    // Primeiro step é sempre o nó A
+    expect(steps[0]!.label).toContain("Setor");
+  });
+
+  it("classification null → classificacao = '—'", async () => {
+    EQ_SETUP({ classification: null });
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.classificacao).toBe("—");
+  });
+
+  it("resultLabel null → resultLabel = '—'", async () => {
+    EQ_SETUP({ resultLabel: null });
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.resultLabel).toBe("—");
+  });
+
+  it("nenhum valor nos render args contém '{' (nenhum placeholder por substituir)", async () => {
+    EQ_SETUP();
+    await generateRelatorioEnquadramento(99, 1);
+
+    const flat = [
+      _psiRenderArgs!.empresa,
+      _psiRenderArgs!.data,
+      _psiRenderArgs!.classificacao,
+      _psiRenderArgs!.resultLabel,
+      _psiRenderArgs!.engineVersion,
+    ];
+    for (const v of flat) {
+      expect(String(v)).not.toContain("{");
+    }
+  });
+
+  it("devolve Buffer não vazio com base64 válido", async () => {
+    EQ_SETUP();
+    const buf = await generateRelatorioEnquadramento(99, 1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
+    expect(buf.toString("base64")).toMatch(/^[A-Za-z0-9+/]+=*$/);
   });
 });

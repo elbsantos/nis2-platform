@@ -19,8 +19,10 @@ import {
   getScanById,
   getOrganizationById,
   getVulnerabilitiesByScanId,
+  getFrameworkAssessmentById,
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
+import { evaluateTree, NIS2_PT_TREE } from "../utils/decision-engine";
 
 // ---------------------------------------------------------------------------
 // Caminhos e constantes
@@ -32,6 +34,7 @@ export const TEMPLATE_PATHS = {
   registoRiscos:    path.join(TEMPLATE_DIR, "registo-riscos.xlsx"),
   inventarioAtivos: path.join(TEMPLATE_DIR, "inventario-ativos.xlsx"),
   psi:              path.join(TEMPLATE_DIR, "psi-template.docx"),
+  enquadramento:    path.join(TEMPLATE_DIR, "enquadramento-template.docx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -384,6 +387,48 @@ export async function generatePsi(orgId: number): Promise<Buffer> {
   };
 
   const content = fs.readFileSync(TEMPLATE_PATHS.psi);
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
+  return doc.getZip().generate({ type: "nodebuffer" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// C-EQ4 — Relatório de Enquadramento NIS2 (.docx)
+// ---------------------------------------------------------------------------
+
+export async function generateRelatorioEnquadramento(
+  assessmentId: number,
+  orgId: number,
+): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.enquadramento);
+
+  const assessment = await getFrameworkAssessmentById(assessmentId);
+  if (!assessment)
+    throw new Error("[Documentos] Assessment não encontrado");
+  if (assessment.organizationId !== orgId)
+    throw new Error("[Documentos] Acesso não autorizado a este assessment");
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  // Re-corre o motor a partir das respostas guardadas na BD.
+  // Motor é puro/determinístico: mesmas respostas → mesma classificação + steps.
+  // Funciona para assessments v1 (sem steps) e v2 — a trilha é sempre re-derivada.
+  const answers = (assessment.answers ?? {}) as Record<string, string>;
+  const result  = evaluateTree(NIS2_PT_TREE, answers);
+
+  const data = {
+    empresa:       cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    data:          formatDate(new Date()),
+    classificacao: assessment.classification ?? "—",
+    resultLabel:   assessment.resultLabel    ?? "—",
+    engineVersion: assessment.engineVersion,
+    // Loop {#steps}…{/steps}: um item por nó visitado, com label legível e base legal
+    steps: result.steps.map(s => ({ label: s.label, article: s.article })),
+  };
+
+  const content = fs.readFileSync(TEMPLATE_PATHS.enquadramento);
   const zip     = new PizZip(content);
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);

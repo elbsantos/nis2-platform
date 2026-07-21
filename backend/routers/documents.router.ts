@@ -14,7 +14,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { freeProcedure } from "../middlewares/planGuard";
-import { getScanById } from "../db";
+import { getScanById, getFrameworkAssessmentById } from "../db";
 import { CONTENT_TYPES } from "../services/document-generator";
 
 function slugify(name: string): string {
@@ -71,6 +71,21 @@ export const documentsRouter = router({
       const { generatePsi } = await import("../services/document-generator");
       const buffer   = await generatePsi(ctx.org.id);
       const filename = `Politica_Seguranca_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
+    }),
+
+  relatorioEnquadramento: freeProcedure
+    .input(z.object({ assessmentId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const assessment = await getFrameworkAssessmentById(input.assessmentId);
+      if (!assessment)
+        throw new TRPCError({ code: "NOT_FOUND" });
+      if (assessment.organizationId !== ctx.org.id)
+        throw new TRPCError({ code: "FORBIDDEN" });
+
+      const { generateRelatorioEnquadramento } = await import("../services/document-generator");
+      const buffer   = await generateRelatorioEnquadramento(input.assessmentId, ctx.org.id);
+      const filename = `Enquadramento_NIS2_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
     }),
 });
