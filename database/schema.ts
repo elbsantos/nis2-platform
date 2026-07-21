@@ -160,6 +160,34 @@ export const questionnaireSessions = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// Framework assessments (Enquadramento NIS2 — DL 125/2025)
+// ---------------------------------------------------------------------------
+
+export const frameworkAssessments = mysqlTable(
+  "framework_assessments",
+  {
+    id:             int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    userId:         int("userId").notNull(),
+    frameworkSlug:  varchar("frameworkSlug", { length: 50 }).notNull(),
+    answers:        json("answers").$type<Record<string, string>>(),
+    decisionPath:   json("decisionPath").$type<string[]>(),
+    legalBasis:     json("legalBasis").$type<string[]>(),
+    classification: varchar("classification", { length: 30 }),
+    resultLabel:    varchar("resultLabel", { length: 255 }),
+    engineVersion:  varchar("engineVersion", { length: 16 }).notNull(),
+    status:         mysqlEnum("status", ["in_progress", "completed"]).notNull().default("in_progress"),
+    completedAt:    timestamp("completedAt"),
+    createdAt:      timestamp("createdAt").notNull().defaultNow(),
+    updatedAt:      timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    index("idx_fa_org").on(t.organizationId),
+    index("idx_fa_user").on(t.userId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // Remediation items
 // ---------------------------------------------------------------------------
 
@@ -268,10 +296,11 @@ export const controlEvidence = mysqlTable(
 // Inferred types
 // ---------------------------------------------------------------------------
 
-export type User           = typeof users.$inferSelect;
-export type Organization   = typeof organizations.$inferSelect;
-export type Scan           = typeof scans.$inferSelect;
-export type Vulnerability  = typeof vulnerabilities.$inferSelect;
-export type Subscription   = typeof subscriptions.$inferSelect;
+export type User                  = typeof users.$inferSelect;
+export type Organization          = typeof organizations.$inferSelect;
+export type Scan                  = typeof scans.$inferSelect;
+export type Vulnerability         = typeof vulnerabilities.$inferSelect;
+export type Subscription          = typeof subscriptions.$inferSelect;
 export type ControlEvidence       = typeof controlEvidence.$inferSelect;
 export type RemediationLibraryEntry = typeof remediationLibrary.$inferSelect;
+export type FrameworkAssessment   = typeof frameworkAssessments.$inferSelect;

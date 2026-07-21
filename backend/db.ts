@@ -66,7 +66,7 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
 // Types
 // ---------------------------------------------------------------------------
 
-export type { User, Organization, Scan, Vulnerability, Subscription } from "../database/schema";
+export type { User, Organization, Scan, Vulnerability, Subscription, FrameworkAssessment } from "../database/schema";
 
 // ---------------------------------------------------------------------------
 // Users
@@ -433,7 +433,7 @@ export async function getRemediationItemByCvePrefix(orgId: number, cveId: string
 // Remediation library
 // ---------------------------------------------------------------------------
 
-import { questionnaireSessions, remediationItems, courseProgress, controlEvidence, remediationLibrary } from "../database/schema";
+import { questionnaireSessions, remediationItems, courseProgress, controlEvidence, remediationLibrary, frameworkAssessments } from "../database/schema";
 
 export async function getLibraryByCveIdAndOsKey(cveId: string, osKey: string) {
   const rows = await getDb()
@@ -777,4 +777,53 @@ export async function deleteAccount(userId: number): Promise<{ stripeSubId: stri
 
     return { stripeSubId };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Framework assessments (Enquadramento NIS2 — DL 125/2025)
+// ---------------------------------------------------------------------------
+
+export async function createFrameworkAssessment(data: {
+  organizationId: number;
+  userId:         number;
+  frameworkSlug:  string;
+  engineVersion:  string;
+}) {
+  const [row] = await getDb().insert(frameworkAssessments).values(data).$returningId();
+  return { id: row.id, ...data, status: "in_progress" as const };
+}
+
+export async function getFrameworkAssessmentById(id: number) {
+  const rows = await getDb()
+    .select()
+    .from(frameworkAssessments)
+    .where(eq(frameworkAssessments.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateFrameworkAssessment(
+  id: number,
+  data: {
+    answers?:        Record<string, string>;
+    decisionPath?:   string[];
+    legalBasis?:     string[];
+    classification?: string;
+    resultLabel?:    string;
+    status?:         "in_progress" | "completed";
+    completedAt?:    Date;
+  }
+) {
+  return getDb()
+    .update(frameworkAssessments)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(frameworkAssessments.id, id));
+}
+
+export async function getFrameworkAssessmentsByOrgId(orgId: number) {
+  return getDb()
+    .select()
+    .from(frameworkAssessments)
+    .where(eq(frameworkAssessments.organizationId, orgId))
+    .orderBy(desc(frameworkAssessments.createdAt));
 }
