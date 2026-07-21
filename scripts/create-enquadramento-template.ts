@@ -121,15 +121,15 @@ const sancoesTbl = [
   ),
   tr(
     tc("Muito grave"),
-    tc("até 10 000 000 € ou 2% do VN global"),
-    tc("até 7 000 000 € ou 1,4% do VN global"),
-    tc("Art. 61.º DL 125/2025"),
+    tc("até 10 000 000 € ou 2% do VN mundial, o que for mais elevado"),
+    tc("até 7 000 000 € ou 1,4% do VN mundial, o que for mais elevado"),
+    tc("Art. 61.º/2 DL 125/2025"),
   ),
   tr(
     tc("Grave"),
-    tc("até 5 000 000 € ou 1% do VN global"),
-    tc("até 3 500 000 € ou 0,7% do VN global"),
-    tc("Art. 62.º DL 125/2025"),
+    tc("até 5 000 000 € ou 1% do VN mundial, o que for mais elevado"),
+    tc("até 3 500 000 € ou 0,7% do VN mundial, o que for mais elevado"),
+    tc("Art. 62.º/2 DL 125/2025"),
   ),
   `</w:tbl>`,
 ].join("\n");
