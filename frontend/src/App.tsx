@@ -11,6 +11,9 @@ import ScanHistory     from "./pages/ScanHistory";
 import BulkScanResults from "./pages/BulkScanResults";
 import Questionnaire       from "./pages/Questionnaire";
 import QuestionnaireReport from "./pages/QuestionnaireReport";
+import Enquadramento        from "./pages/Enquadramento";
+import EnquadramentoWizard from "./pages/EnquadramentoWizard";
+import EnquadramentoResult from "./pages/EnquadramentoResult";
 import Remediation   from "./pages/Remediation";
 import Billing       from "./pages/Billing";
 import Course        from "./pages/Course";
@@ -50,8 +53,9 @@ function AppNav() {
         </NavLink>
         <NavLink to="/scan/start"    className={({ isActive }) => isActive ? active : inactive}>Novo scan</NavLink>
         <NavLink to="/scan/history"  className={({ isActive }) => isActive ? active : inactive}>Histórico</NavLink>
-        <NavLink to="/questionnaire" className={({ isActive }) => isActive ? active : inactive}>Questionário</NavLink>
-        <NavLink to="/remediation"   className={({ isActive }) => isActive ? active : inactive}>Remediação</NavLink>
+        <NavLink to="/questionnaire"   className={({ isActive }) => isActive ? active : inactive}>Questionário</NavLink>
+        <NavLink to="/enquadramento"   className={({ isActive }) => isActive ? active : inactive}>Enquadramento</NavLink>
+        <NavLink to="/remediation"     className={({ isActive }) => isActive ? active : inactive}>Remediação</NavLink>
         <NavLink to="/course"        className={({ isActive }) => isActive ? active : inactive}>Curso</NavLink>
         <NavLink to="/billing"       className={({ isActive }) => isActive ? active : inactive}>Planos</NavLink>
         <div className="ml-auto flex items-center gap-3">
@@ -99,7 +103,10 @@ export default function App() {
           <Route path="/questionnaire"                        element={<Questionnaire />} />
           <Route path="/questionnaire/:sessionId"           element={<Questionnaire />} />
           <Route path="/questionnaire/:sessionId/report"    element={<QuestionnaireReport />} />
-          <Route path="/remediation"              element={<Remediation />} />
+          <Route path="/enquadramento"                      element={<Enquadramento />} />
+          <Route path="/enquadramento/new"                  element={<EnquadramentoWizard />} />
+          <Route path="/enquadramento/:id"                  element={<EnquadramentoResult />} />
+          <Route path="/remediation"                        element={<Remediation />} />
           <Route path="/billing"                  element={<Billing />} />
           <Route path="/course"                   element={<Course />} />
           <Route path="/course/:lessonId"         element={<Lesson />} />
