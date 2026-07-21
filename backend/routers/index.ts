@@ -13,18 +13,20 @@ import { courseRouter }        from "./course.router";
 import { docsRouter }          from "./docs.router";
 import { reportRouter }        from "./report.router";
 import { adminRouter }         from "./admin.router";
-import { documentsRouter }     from "./documents.router";
+import { documentsRouter }       from "./documents.router";
+import { enquadramentoRouter }   from "./enquadramento.router";
 
 export const appRouter = router({
-  scan:          scanRouter,
-  questionnaire: questionnaireRouter,
-  remediation:   remediationRouter,
-  billing:       billingRouter,
-  course:        courseRouter,
-  docs:          docsRouter,
-  report:        reportRouter,
-  admin:         adminRouter,
-  documents:     documentsRouter,
+  scan:            scanRouter,
+  questionnaire:   questionnaireRouter,
+  remediation:     remediationRouter,
+  billing:         billingRouter,
+  course:          courseRouter,
+  docs:            docsRouter,
+  report:          reportRouter,
+  admin:           adminRouter,
+  documents:       documentsRouter,
+  enquadramento:   enquadramentoRouter,
 });
 
 export type AppRouter = typeof appRouter;
