@@ -3,9 +3,15 @@
  *
  * Motor determinístico de enquadramento NIS2-PT (DL 125/2025).
  * Lógica pura — zero I/O, zero BD. Reutilizável no frontend via tsconfig.web.json.
+ *
+ * ENGINE_VERSION "2" — adicionado campo `steps` (trilha legível nó a nó).
+ * Cada elemento de `steps` tem nodeId, label em linguagem de gestor e article (base legal).
+ * Os campos `path` e `legalBasis` são mantidos para retrocompatibilidade.
+ * Assessments v1 não têm `steps` na BD; o Relatório re-corre o motor com os answers
+ * guardados para os obter — motor é puro/determinístico, mesmas respostas = mesmo resultado.
  */
 
-export const ENGINE_VERSION = "1";
+export const ENGINE_VERSION = "2";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -38,17 +44,24 @@ export interface DecisionTree {
   rootId: string;
 }
 
+/** Um passo na trilha auditável — um por nó visitado, em linguagem de gestor. */
+export interface TrailStep {
+  nodeId:  string;  // id do nó ("A", "B", "C", "D", "E")
+  label:   string;  // frase legível do que aconteceu neste nó
+  article: string;  // base legal deste passo específico
+}
+
 export interface DecisionResult {
   classification: Classification;
-  resultLabel: string;
-  path: string[];
-  legalBasis: string[];
+  resultLabel:    string;
+  path:           string[];      // ids dos nós visitados — retrocompatível
+  legalBasis:     string[];      // artigos citados — retrocompatível
+  steps:          TrailStep[];   // trilha estruturada nó a nó (ENGINE_VERSION "2")
 }
 
 export type Answers = Record<string, string>;
 
 // ── Mapeamento setor → categoria de Anexo ─────────────────────────────────────
-// Usado internamente por evaluateTree para aplicar as regras do Art. 6.º
 
 type SectorAnexo = "tld_dns_confianca" | "telecom" | "anexo_i_outros" | "anexo_ii";
 
@@ -67,6 +80,15 @@ const SECTOR_ANEXO: Record<string, SectorAnexo> = {
   quimicos_alimentar:   "anexo_ii",
   industria:            "anexo_ii",
   digital_b2c:          "anexo_ii",
+};
+
+// ── Labels legíveis para C.estrutura ─────────────────────────────────────────
+
+const ESTRUTURA_PT: Record<string, string> = {
+  autonoma:        "empresa autónoma (sem controlo externo significativo)",
+  associada_total: "subsidiária/associada — controlo > 50 % (efetivos e contas somados na íntegra)",
+  parceira:        "empresa parceira — participação 25–50 % (cálculo proporcional, resultado condicional)",
+  nao_sei:         "estrutura de grupo não identificada (resultado condicional)",
 };
 
 // ── Árvore concreta NIS2-PT (DL 125/2025) ────────────────────────────────────
@@ -192,7 +214,7 @@ export const NIS2_PT_TREE: DecisionTree = {
     C: {
       id: "C",
       question: "Qual é a estrutura do grupo empresarial da sua organização?",
-      legalRef: "Rec. 2003/361/CE; Art. 6.º/2 DL 125/2025",
+      legalRef: "Rec. 2003/361/CE; Art. 3.º/1 DL 125/2025",
       options: [
         {
           id: "autonoma",
@@ -255,25 +277,44 @@ export const NIS2_PT_TREE: DecisionTree = {
 //   "D.grupo_b"   — balanço adicional do grupo em M€
 
 export function evaluateTree(
-  _tree: DecisionTree,
+  tree: DecisionTree,
   answers: Answers
 ): DecisionResult {
-  const path: string[] = [];
-  const legalBasis: string[] = [];
+  const path:      string[]     = [];
+  const legalBasis: string[]    = [];
+  const steps:     TrailStep[]  = [];
+
+  // Helper: encontra opção de um nó pelo id da resposta
+  const findOpt = (nodeId: string, optId: string): NodeOption | undefined =>
+    tree.nodes[nodeId]?.options.find(o => o.id === optId);
 
   // ── Nó A: Setor ──────────────────────────────────────────────────────────
   path.push("A");
   legalBasis.push("Art. 2.º DL 125/2025");
 
-  const setor = answers["A.setor"] ?? "";
+  const setor    = answers["A.setor"] ?? "";
+  const setorOpt = findOpt("A", setor);
+
+  steps.push({
+    nodeId:  "A",
+    label:   setorOpt ? `Setor: ${setorOpt.label}` : "Setor: não identificado",
+    article: setorOpt?.legalRef ?? tree.nodes["A"].legalRef,
+  });
 
   if (setor === "admin_publica") {
+    const art = "Art. 14.º DL 125/2025";
+    steps.push({
+      nodeId:  "E",
+      label:   "Resultado: Administração Pública — regime autónomo (fora do MVP; contacte o CNCS)",
+      article: art,
+    });
     return {
       classification: "fora_mvp",
       resultLabel:
         "Administração Pública — regime autónomo (Art. 14.º DL 125/2025). Consulte o CNCS diretamente.",
       path,
-      legalBasis: [...legalBasis, "Art. 14.º DL 125/2025"],
+      legalBasis: [...legalBasis, art],
+      steps,
     };
   }
 
@@ -282,32 +323,58 @@ export function evaluateTree(
     path.push("B");
     legalBasis.push("Art. 3.º/2 DL 125/2025");
 
-    const excecao = answers["B.excecao"] ?? "";
+    const excecao   = answers["B.excecao"] ?? "";
+    const excOpt    = findOpt("B", excecao);
+    const bArticle  = excOpt?.legalRef ?? "Art. 3.º/2 DL 125/2025";
+
+    steps.push({
+      nodeId:  "B",
+      label:   excOpt ? `Exceção: ${excOpt.label}` : "Exceção: nenhuma situação especial identificada",
+      article: bArticle,
+    });
 
     if (excecao === "qualitativo") {
+      steps.push({
+        nodeId:  "E",
+        label:   "Resultado: a confirmar — critério qualitativo (avaliação final pelo CNCS)",
+        article: bArticle,
+      });
       return {
         classification: "a_confirmar",
         resultLabel:
           "Possível abrangência por critério qualitativo — classificação a confirmar pelo CNCS (Art. 3.º/2 a) DL 125/2025).",
         path,
         legalBasis,
+        steps,
       };
     }
     if (excecao === "fornecedor") {
+      steps.push({
+        nodeId:  "E",
+        label:   "Resultado: a confirmar — abrangência via cadeia de abastecimento",
+        article: bArticle,
+      });
       return {
         classification: "a_confirmar_contratual",
         resultLabel:
           "Possível abrangência via cadeia de fornecimento de entidade abrangida — confirmar com o cliente ou autoridade competente.",
         path,
         legalBasis,
+        steps,
       };
     }
+    steps.push({
+      nodeId:  "E",
+      label:   "Resultado: provavelmente fora do âmbito (reavalie se setor, dimensão ou clientes mudarem)",
+      article: "Art. 3.º/2 DL 125/2025",
+    });
     return {
       classification: "fora_condicional",
       resultLabel:
         "Organização fora do âmbito da NIS2. Reavalie se o setor ou relações contratuais se alterarem.",
       path,
       legalBasis,
+      steps,
     };
   }
 
@@ -318,17 +385,22 @@ export function evaluateTree(
   legalBasis.push("Rec. 2003/361/CE");
 
   const estrutura = answers["C.estrutura"] ?? "autonoma";
-  // parceira (proporcional) e nao_sei sempre marcam resultado como condicional
   let condicional = estrutura === "parceira" || estrutura === "nao_sei";
+
+  steps.push({
+    nodeId:  "C",
+    label:   `Grupo: ${ESTRUTURA_PT[estrutura] ?? estrutura}`,
+    article: tree.nodes["C"].legalRef,
+  });
 
   // ── Nó D: Dimensão ───────────────────────────────────────────────────────
   path.push("D");
   legalBasis.push("Anexo III DL 125/2025");
 
-  const ownN  = parseInt(answers["D.n"]  ?? "0", 10) || 0;
-  const ownVn = parseFloat(answers["D.vn"] ?? "0")  || 0;
+  const ownN    = parseInt(answers["D.n"]  ?? "0", 10) || 0;
+  const ownVn   = parseFloat(answers["D.vn"] ?? "0")   || 0;
   const ownBStr = answers["D.b"];
-  let ownB = ownBStr !== undefined && ownBStr !== "" ? parseFloat(ownBStr) : -1;
+  let   ownB    = ownBStr !== undefined && ownBStr !== "" ? parseFloat(ownBStr) : -1;
 
   let totalN  = ownN;
   let totalVn = ownVn;
@@ -336,7 +408,7 @@ export function evaluateTree(
 
   if (estrutura === "associada_total") {
     totalN  += parseInt(answers["D.grupo_n"]  ?? "0", 10) || 0;
-    totalVn += parseFloat(answers["D.grupo_vn"] ?? "0")  || 0;
+    totalVn += parseFloat(answers["D.grupo_vn"] ?? "0")   || 0;
     const grupoBStr = answers["D.grupo_b"];
     if (grupoBStr !== undefined && grupoBStr !== "") {
       const grupoB = parseFloat(grupoBStr);
@@ -345,12 +417,16 @@ export function evaluateTree(
     // se grupo_b omitido e own_b também, totalB permanece -1
   }
 
+  let bLabelStr: string;
   if (totalB < 0) {
     // Balanço desconhecido — pior caso: assume que ultrapassa qualquer limiar,
     // para nunca gerar um falso "fora". Marca condicional para revisão.
     // (B=VN seria errado: com VN=8M, B=8 não satisfaz B>10 e a empresa sairia como fora.)
-    totalB = Number.POSITIVE_INFINITY;
+    totalB      = Number.POSITIVE_INFINITY;
     condicional = true;
+    bLabelStr   = "não informado";
+  } else {
+    bLabelStr = `${totalB} M€`;
   }
 
   // Thresholds do Anexo III DL 125/2025 / Rec. 2003/361/CE
@@ -363,95 +439,132 @@ export function evaluateTree(
     dimensao = "pequena";
   }
 
+  const dimensaoLabels: Record<string, string> = {
+    grande: "grande", media: "média", pequena: "pequena/micro",
+  };
+  const grupoSufixo = estrutura === "associada_total"
+    ? " (valores agregados do grupo)"
+    : "";
+
+  steps.push({
+    nodeId:  "D",
+    label:   `Dimensão: ${dimensaoLabels[dimensao]}${grupoSufixo} (trabalhadores: ${totalN}, VN: ${totalVn} M€, balanço: ${bLabelStr})`,
+    article: tree.nodes["D"].legalRef,
+  });
+
   // ── Nó E: Classificação ──────────────────────────────────────────────────
   path.push("E");
   legalBasis.push("Art. 6.º DL 125/2025");
 
-  return classifyE(categoriaSetor, dimensao, condicional, path, legalBasis);
+  return classifyE(categoriaSetor, dimensao, condicional, path, legalBasis, steps);
 }
 
 function classifyE(
-  cat: SectorAnexo,
-  dimensao: "grande" | "media" | "pequena",
+  cat:         SectorAnexo,
+  dimensao:    "grande" | "media" | "pequena",
   condicional: boolean,
-  path: string[],
-  legalBasis: string[]
+  path:        string[],
+  legalBasis:  string[],
+  steps:       TrailStep[],
 ): DecisionResult {
   const pfx = condicional ? "Provável " : "";
 
-  // Regra 1: TLD / DNS / Confiança Qualificada → ESSENCIAL independentemente da dimensão
+  // Helper: empurra o passo E e devolve o resultado
+  const finish = (
+    classification: Classification,
+    resultLabel:    string,
+    eLabel:         string,
+    eArticle:       string,
+  ): DecisionResult => {
+    steps.push({ nodeId: "E", label: eLabel, article: eArticle });
+    return { classification, resultLabel, path, legalBasis, steps };
+  };
+
+  // Regra 1: TLD / DNS / Confiança Qualificada → ESSENCIAL independentemente da dimensão.
+  // pfx não aplicável — dimensão é irrelevante para esta regra, nunca é "provável".
   if (cat === "tld_dns_confianca") {
-    return {
-      classification: "essencial",
-      resultLabel: `${pfx}Entidade essencial — TLD/DNS/Confiança Qualificada (Art. 6.º/1 DL 125/2025, independente da dimensão).`,
-      path,
-      legalBasis,
-    };
+    const art = "Art. 6.º/1 b) DL 125/2025";
+    return finish(
+      "essencial",
+      "Entidade essencial — TLD/DNS/Confiança Qualificada (Art. 6.º/1 DL 125/2025, independente da dimensão).",
+      "Resultado: entidade essencial — regra especial TLD/DNS/Confiança (independente da dimensão)",
+      art,
+    );
   }
 
   // Regra 2: Telecom — dimensão determina essencial vs importante
   if (cat === "telecom") {
     if (dimensao === "pequena") {
-      return {
-        classification: "importante",
-        resultLabel: `${pfx}Entidade importante — telecom de pequena/micro dimensão (Art. 3.º/2 a) i) DL 125/2025).`,
-        path,
-        legalBasis,
-      };
+      const art = "Art. 3.º/2 a) i) DL 125/2025";
+      return finish(
+        "importante",
+        `${pfx}Entidade importante — telecom de pequena/micro dimensão (Art. 3.º/2 a) i) DL 125/2025).`,
+        `${pfx}Resultado: entidade importante — telecom de pequena/micro dimensão`,
+        art,
+      );
     }
-    return {
-      classification: "essencial",
-      resultLabel: `${pfx}Entidade essencial — telecom de média ou grande dimensão (Art. 3.º/2 a) i) DL 125/2025).`,
-      path,
-      legalBasis,
-    };
+    const art = "Art. 6.º/1 c) DL 125/2025";
+    return finish(
+      "essencial",
+      `${pfx}Entidade essencial — telecom de média ou grande dimensão (Art. 3.º/2 a) i) DL 125/2025).`,
+      `${pfx}Resultado: entidade essencial — telecom de média/grande dimensão`,
+      art,
+    );
   }
 
   // Regra 3: Anexo I (outros setores)
   if (cat === "anexo_i_outros") {
     if (dimensao === "grande") {
-      return {
-        classification: "essencial",
-        resultLabel: `${pfx}Entidade essencial — Anexo I, grande dimensão (Art. 6.º/1 DL 125/2025).`,
-        path,
-        legalBasis,
-      };
+      const art = "Art. 6.º/1 a) DL 125/2025";
+      return finish(
+        "essencial",
+        `${pfx}Entidade essencial — Anexo I, grande dimensão (Art. 6.º/1 DL 125/2025).`,
+        `${pfx}Resultado: entidade essencial — Anexo I, grande dimensão`,
+        art,
+      );
     }
     if (dimensao === "media") {
-      return {
-        classification: "importante",
-        resultLabel: `${pfx}Entidade importante — Anexo I, média dimensão (Art. 6.º/2 DL 125/2025).`,
-        path,
-        legalBasis,
-      };
+      const art = "Art. 6.º/2 DL 125/2025";
+      return finish(
+        "importante",
+        `${pfx}Entidade importante — Anexo I, média dimensão (Art. 6.º/2 DL 125/2025).`,
+        `${pfx}Resultado: entidade importante — Anexo I, média dimensão`,
+        art,
+      );
     }
     // piccola + condicional: dimensão incerta → não afirmar "fora"; deixar para confirmação
-    return {
-      classification: condicional ? "a_confirmar" : "fora_condicional",
-      resultLabel: condicional
+    const art = "Art. 6.º DL 125/2025";
+    return finish(
+      condicional ? "a_confirmar" : "fora_condicional",
+      condicional
         ? "Dimensão a confirmar — balanço ou estrutura de grupo desconhecidos. Pode estar fora ou dentro do âmbito."
         : "Não abrangida — Anexo I, mas pequena/micro dimensão. Reavalie se a dimensão aumentar ou se existirem critérios qualitativos.",
-      path,
-      legalBasis,
-    };
+      condicional
+        ? "Resultado: dimensão a confirmar — balanço ou estrutura de grupo desconhecidos"
+        : "Resultado: provavelmente fora — Anexo I, pequena/micro dimensão",
+      art,
+    );
   }
 
   // Regra 4: Anexo II
   if (dimensao === "pequena") {
-    // piccola + condicional: dimensão incerta → não afirmar "fora"; deixar para confirmação
-    return {
-      classification: condicional ? "a_confirmar" : "fora_condicional",
-      resultLabel: condicional
+    const art = "Art. 6.º DL 125/2025";
+    return finish(
+      condicional ? "a_confirmar" : "fora_condicional",
+      condicional
         ? "Dimensão a confirmar — balanço ou estrutura de grupo desconhecidos. Pode estar fora ou dentro do âmbito."
         : "Não abrangida — Anexo II, pequena/micro dimensão. Reavalie se a dimensão aumentar.",
-      path,
-      legalBasis,
-    };
+      condicional
+        ? "Resultado: dimensão a confirmar — balanço ou estrutura de grupo desconhecidos"
+        : "Resultado: provavelmente fora — Anexo II, pequena/micro dimensão",
+      art,
+    );
   }
-  return {
-    classification: "importante",
-    resultLabel: `${pfx}Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025).`,
-    path,
-    legalBasis,
-  };
+  const art = "Art. 6.º/2 DL 125/2025";
+  return finish(
+    "importante",
+    `${pfx}Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025).`,
+    `${pfx}Resultado: entidade importante — Anexo II, média/grande dimensão`,
+    art,
+  );
 }

@@ -4,6 +4,7 @@ import {
   NIS2_PT_TREE,
   evaluateTree,
   type Answers,
+  type TrailStep,
 } from "./decision-engine";
 
 // Helpers
@@ -29,8 +30,8 @@ const BASE_ENERGIA_MEDIA: Answers = {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 describe("ENGINE_VERSION", () => {
-  it("versão inicial é '1'", () => {
-    expect(ENGINE_VERSION).toBe("1");
+  it("é '2' (v2 adiciona campo steps com trilha legível nó a nó)", () => {
+    expect(ENGINE_VERSION).toBe("2");
   });
 });
 
@@ -56,6 +57,18 @@ describe("Nó B — Exceções Art. 3.º/2 (entidade fora de setor)", () => {
     expect(r.classification).toBe("a_confirmar");
     expect(r.path).toEqual(["A", "B"]);
     expect(r.legalBasis).toContain("Art. 3.º/2 DL 125/2025");
+    // steps: A + B + E (nó virtual de resultado)
+    expect(r.steps).toHaveLength(3);
+    const [sA, sB, sE] = r.steps as [TrailStep, TrailStep, TrailStep];
+    expect(sA.nodeId).toBe("A");
+    expect(sA.label).toContain("Outro setor");
+    expect(sA.article).toBe("Art. 2.º DL 125/2025");
+    expect(sB.nodeId).toBe("B");
+    expect(sB.label).toContain("único fornecedor");
+    expect(sB.article).toBe("Art. 3.º/2 a) DL 125/2025");
+    expect(sE.nodeId).toBe("E");
+    expect(sE.label).toContain("a confirmar");
+    expect(sE.article).toBe("Art. 3.º/2 a) DL 125/2025");
   });
 
   it("fornecedor de entidade abrangida → a_confirmar_contratual", () => {
@@ -84,6 +97,13 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     expect(r.classification).toBe("essencial");
     expect(r.path).toEqual(["A", "C", "D", "E"]);
     expect(r.legalBasis).toContain("Art. 6.º DL 125/2025");
+    // steps: A + C + D + E
+    expect(r.steps).toHaveLength(4);
+    const [sA, sC, sD, sE] = r.steps as [TrailStep, TrailStep, TrailStep, TrailStep];
+    expect(sA).toEqual({ nodeId: "A", label: "Setor: Energia (eletricidade, gás, petróleo, hidrogénio, aquecimento/arrefecimento)", article: "Anexo I, ponto 1" });
+    expect(sC).toEqual({ nodeId: "C", label: "Grupo: empresa autónoma (sem controlo externo significativo)", article: "Rec. 2003/361/CE; Art. 3.º/1 DL 125/2025" });
+    expect(sD).toEqual({ nodeId: "D", label: "Dimensão: grande (trabalhadores: 300, VN: 60 M€, balanço: 50 M€)", article: "Anexo III DL 125/2025; Rec. 2003/361/CE" });
+    expect(sE).toEqual({ nodeId: "E", label: "Resultado: entidade essencial — Anexo I, grande dimensão", article: "Art. 6.º/1 a) DL 125/2025" });
   });
 
   it("[obrigatório] Anexo I média dimensão → importante", () => {
@@ -110,6 +130,15 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     expect(r.legalBasis).toContain("Art. 2.º DL 125/2025");
     expect(r.legalBasis).toContain("Anexo III DL 125/2025");
     expect(r.legalBasis).toContain("Art. 6.º DL 125/2025");
+    // steps: label de D mostra "pequena/micro"
+    expect(r.steps).toHaveLength(4);
+    const sD = r.steps[2]!;
+    expect(sD.nodeId).toBe("D");
+    expect(sD.label).toContain("pequena/micro");
+    expect(sD.label).toContain("trabalhadores: 30");
+    const sE = r.steps[3]!;
+    expect(sE.nodeId).toBe("E");
+    expect(sE.label).toContain("provavelmente fora");
   });
 
   it("[obrigatório] telecom pequena dimensão → importante", () => {
@@ -124,6 +153,10 @@ describe("Nó E — Classificação por setor e dimensão", () => {
       })
     );
     expect(r.classification).toBe("importante");
+    // step E deve citar o artigo de exceção para telecom pequena
+    const sE = r.steps.find(s => s.nodeId === "E")!;
+    expect(sE.label).toContain("telecom de pequena/micro dimensão");
+    expect(sE.article).toBe("Art. 3.º/2 a) i) DL 125/2025");
   });
 
   it("telecom média dimensão → essencial", () => {
@@ -174,6 +207,12 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     expect(r.legalBasis).toContain("Rec. 2003/361/CE");
     expect(r.legalBasis).toContain("Anexo III DL 125/2025");
     expect(r.legalBasis).toContain("Art. 6.º DL 125/2025");
+    // step C mostra "subsidiária/associada"; step D mostra valores agregados do grupo
+    const sC = r.steps.find(s => s.nodeId === "C")!;
+    expect(sC.label).toContain("subsidiária/associada");
+    const sD = r.steps.find(s => s.nodeId === "D")!;
+    expect(sD.label).toContain("valores agregados do grupo");
+    expect(sD.label).toContain("trabalhadores: 260");
 
     // Confirma que sem o grupo (240 < 250, VN=45≤50) seria apenas média → importante
     const semGrupo = evaluateTree(
@@ -226,8 +265,8 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     expect(r.classification).toBe("fora_condicional");
   });
 
-  it("balanço desconhecido → assume B=VN → pode elevar para média (resultado condicional)", () => {
-    // N=10, VN=12, B omitido → B assume 12 → (12>10 AND 12>10) → média → importante (saude = Anexo I)
+  it("balanço desconhecido → assume B=Infinity (pior caso) → pode elevar para média (resultado condicional)", () => {
+    // N=10, VN=12, B omitido → B=Infinity → (VN=12>10 AND Inf>10) → média → importante (saude = Anexo I)
     const r = evaluateTree(
       NIS2_PT_TREE,
       A({ "A.setor": "saude", "C.estrutura": "autonoma", "D.n": "10", "D.vn": "12" })
