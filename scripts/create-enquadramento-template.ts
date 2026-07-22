@@ -153,7 +153,7 @@ ${p("AVISO: Este documento é uma orientação preliminar, não um veredicto jur
 ${ep}
 
 ${p("1. Classificação", { bold: true, sz: 14 })}
-${pKVBold("Resultado: ", "{classificacao}")}
+${pKVBold("Resultado: ", "{classificacaoLabel}")}
 <w:p><w:r><w:t xml:space="preserve">{resultLabel}</w:t></w:r></w:p>
 ${ep}
 
@@ -164,16 +164,25 @@ ${pLoopStepItem()}
 ${pLoop("{/steps}")}
 ${ep}
 
-${p("3. O que a lei já exige de si hoje", { bold: true, sz: 14 })}
-${p("Estas obrigações estão em vigor desde a publicação do Regulamento n.º 756/2026 (22 de junho de 2026). São de baixo esforço mas de alto risco se esquecidas — o incumprimento é já uma infração:")}
-${p("  • Registo na plataforma MyCiber (myciber.gov.pt) — Art. 35.º do DL 125/2025.")}
-${p("  • Designação de responsável de cibersegurança — Art. 31.º do DL 125/2025.")}
-${p("  • Designação de ponto de contacto permanente com a CNCS — Art. 32.º do DL 125/2025.")}
+${pLoop("{#isFora}")}
+${p("As secções seguintes descrevem as obrigações aplicáveis às entidades abrangidas pelo Regime Jurídico da Cibersegurança. De acordo com este enquadramento preliminar, a sua organização não é abrangida, pelo que estas obrigações não lhe são exigíveis. São apresentadas a título informativo, para o caso de a situação da organização se alterar ou de se verificarem os critérios qualitativos do artigo 3.º, n.º 2, do RJC.")}
+${pLoop("{/isFora}")}
+${pLoop("{#isAConfirmar}")}
+${p("As secções seguintes descrevem as obrigações aplicáveis às entidades abrangidas pelo Regime Jurídico da Cibersegurança. De acordo com este enquadramento preliminar, o enquadramento da sua organização não está determinado, pelo que estas obrigações só lhe serão exigíveis caso se confirme que está abrangida. São apresentadas a título informativo, para o caso de a situação da organização se alterar ou de se verificarem os critérios qualitativos do artigo 3.º, n.º 2, do RJC.")}
+${pLoop("{/isAConfirmar}")}
+${ep}
+
+${p("{sec3Title}", { bold: true, sz: 14 })}
+${p("Estas obrigações estão em vigor desde a entrada em vigor do Regime Jurídico da Cibersegurança, em 3 de abril de 2026 (artigo 11.º do Decreto-Lei n.º 125/2025). O Regulamento n.º 756/2026, em vigor desde 23 de junho de 2026, não as criou: operacionalizou-as, definindo o funcionamento da plataforma eletrónica MyCiber e os procedimentos de autoidentificação, qualificação, comunicação e notificação.")}
+${p("  • Registo e autoidentificação na plataforma MyCiber (myciber.gov.pt) — artigo 35.º do DL 125/2025. Prazo: 60 dias úteis a contar da disponibilização da plataforma, ocorrida a 23 de junho de 2026, para as entidades que já se encontravam em atividade; 30 dias úteis para as que iniciem atividade após a entrada em vigor do RJC. O prazo termina por volta de 15 de setembro de 2026. Confirme a data exata junto do CNCS.")}
+${p("  • Designação de responsável de cibersegurança — artigo 31.º do DL 125/2025.")}
+${p("  • Designação de ponto de contacto permanente — artigo 32.º do DL 125/2025.")}
+${p("A comunicação de ambos é feita na área reservada da plataforma, nos termos dos artigos 14.º e 15.º do Regulamento n.º 756/2026. Nos casos previstos no n.º 4 dos artigos 31.º e 32.º do RJC, o prazo conta-se a partir da notificação da qualificação da entidade (artigo 8.º, n.º 5, do RJC).")}
 ${p("  • Ativação do canal de notificação de incidentes significativos — Art. 40.º do DL 125/2025.")}
 ${ep}
 
-${p("4. O que terá de estar pronto até ~junho de 2028", { bold: true, sz: 14 })}
-${p("As medidas de gestão de risco de cibersegurança (Art. 27.º a 30.º do DL 125/2025) têm um período de adaptação de 24 meses (Art. 10.º/2). O prazo previsto é até cerca de junho de 2028. Incluem, entre outras:")}
+${p("{sec4Title}", { bold: true, sz: 14 })}
+${p("O disposto nos n.os 1 e 2 do artigo 27.º, nos artigos 28.º a 30.º e no artigo 33.º do RJC produz efeitos 24 meses após a publicação do Regulamento n.º 756/2026, ou seja, a partir de 22 de junho de 2028 (artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025).")}
 ${p("  • Análise de riscos e adoção de uma política de segurança da informação.")}
 ${p("  • Gestão de incidentes e continuidade de negócio.")}
 ${p("  • Segurança da cadeia de abastecimento (Art. 28.º) e dos sistemas de informação.")}
@@ -184,16 +193,17 @@ ${ep}
 ${p("Nota: até cerca de abril de 2027 é possível pedir dispensa de coimas por ainda não estar adaptado (Art. 65.º do DL 125/2025). Não confunda dispensa de coimas com dispensa de cumprimento — as obrigações existem desde já.", { italic: true })}
 ${ep}
 
-${p("5. Exposição sancionatória", { bold: true, sz: 14 })}
+${p("{sec5Title}", { bold: true, sz: 14 })}
 ${p("Escalões aplicáveis à sua categoria (Art. 61.º e 62.º do DL 125/2025). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela CNCS. Há um caminho de conformidade e ainda há tempo.")}
 ${sancoesTbl}
+${p("Nota: as contraordenações muito graves previstas nas alíneas b), c) e f) do n.º 1 do artigo 61.º do RJC só produzem efeitos a partir de 22 de junho de 2028, nos termos do artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
 ${ep}
 
 ${p("6. Dossier de Registo na CNCS (Art. 35.º)", { bold: true, sz: 14 })}
 ${p("O registo na plataforma MyCiber (myciber.gov.pt) requer que a entidade disponibilize, entre outros dados:")}
 ${p("  • Nome e contactos da organização e do ponto de contacto designado.")}
 ${p("  • Setor(es) e subsetor(es) em que opera (conforme os Anexos I e II do DL 125/2025).")}
-${p("  • Lista de endereços IP e gamas de rede da organização — o CISPLAN já dispõe desta informação do scan.")}
+${p("  • Lista de ativos publicamente acessíveis — artigo 32.º do Regulamento n.º 756/2026. Abrange todos os ativos diretamente acessíveis pela Internet, com indicação do serviço suportado, nome do equipamento ou software, modelo e versão, sistema operativo, software do servidor aplicacional, endereço IP, FQDN, fabricante e dependências entre ativos. Constitui informação classificada de grau reservado e é atualizada anualmente. A versão inicial é comunicada até 31 de janeiro do ano seguinte ao da notificação de qualificação, ou no prazo de seis meses após essa notificação, consoante o que ocorrer primeiro. O scan externo do CISPLAN recolhe já a maior parte destes elementos.")}
 ${p("  • Identificação dos sistemas de informação e redes críticos para a prestação do serviço.")}
 ${ep}
 ${p("A submissão é feita diretamente na plataforma MyCiber. A equipa CISPLAN pode preparar o dossier consigo.", { italic: true })}

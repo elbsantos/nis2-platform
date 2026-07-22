@@ -418,12 +418,36 @@ export async function generateRelatorioEnquadramento(
   const answers = (assessment.answers ?? {}) as Record<string, string>;
   const result  = evaluateTree(NIS2_PT_TREE, answers);
 
+  const classification = assessment.classification ?? "";
+  const isForaOuConfirmar =
+    classification === "fora_condicional" || classification === "a_confirmar";
+
+  const CLASSIFICACAO_LABELS: Record<string, string> = {
+    essencial:              "Entidade essencial",
+    importante:             "Entidade importante",
+    a_confirmar:            "A confirmar",
+    a_confirmar_contratual: "A confirmar (via cadeia de fornecimento)",
+    fora_condicional:       "Provavelmente fora do âmbito",
+    fora_mvp:               "Fora do âmbito do CISPLAN (regime autónomo)",
+  };
+
   const data = {
-    empresa:       cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
-    data:          formatDate(new Date()),
-    classificacao: assessment.classification ?? "—",
-    resultLabel:   assessment.resultLabel    ?? "—",
-    engineVersion: assessment.engineVersion,
+    empresa:            cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    data:               formatDate(new Date()),
+    classificacaoLabel: (CLASSIFICACAO_LABELS[classification] ?? classification) || "—",
+    resultLabel:        assessment.resultLabel ?? "—",
+    engineVersion:      assessment.engineVersion,
+    isFora:             classification === "fora_condicional",
+    isAConfirmar:       classification === "a_confirmar",
+    sec3Title: isForaOuConfirmar
+      ? "3. O que a lei exige das entidades abrangidas"
+      : "3. O que a lei já exige de si hoje",
+    sec4Title: isForaOuConfirmar
+      ? "4. O que terá de estar pronto até junho de 2028, se abrangida"
+      : "4. O que terá de estar pronto até junho de 2028",
+    sec5Title: isForaOuConfirmar
+      ? "5. Exposição sancionatória das entidades abrangidas"
+      : "5. Exposição sancionatória",
     // Loop {#steps}…{/steps}: um item por nó visitado, com label legível e base legal
     steps: result.steps.map(s => ({ label: s.label, article: s.article })),
   };
