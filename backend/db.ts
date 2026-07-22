@@ -783,14 +783,22 @@ export async function deleteAccount(userId: number): Promise<{ stripeSubId: stri
 // Framework assessments (Enquadramento NIS2 — DL 125/2025)
 // ---------------------------------------------------------------------------
 
-export async function createFrameworkAssessment(data: {
+export async function createCompletedFrameworkAssessment(data: {
   organizationId: number;
   userId:         number;
   frameworkSlug:  string;
   engineVersion:  string;
+  answers:        Record<string, string>;
+  decisionPath:   string[];
+  legalBasis:     string[];
+  classification: string;
+  resultLabel:    string;
 }) {
-  const [row] = await getDb().insert(frameworkAssessments).values(data).$returningId();
-  return { id: row.id, ...data, status: "in_progress" as const };
+  const [row] = await getDb()
+    .insert(frameworkAssessments)
+    .values({ ...data, status: "completed", completedAt: new Date() })
+    .$returningId();
+  return { id: row.id };
 }
 
 export async function getFrameworkAssessmentById(id: number) {
@@ -800,24 +808,6 @@ export async function getFrameworkAssessmentById(id: number) {
     .where(eq(frameworkAssessments.id, id))
     .limit(1);
   return rows[0] ?? null;
-}
-
-export async function updateFrameworkAssessment(
-  id: number,
-  data: {
-    answers?:        Record<string, string>;
-    decisionPath?:   string[];
-    legalBasis?:     string[];
-    classification?: string;
-    resultLabel?:    string;
-    status?:         "in_progress" | "completed";
-    completedAt?:    Date;
-  }
-) {
-  return getDb()
-    .update(frameworkAssessments)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(frameworkAssessments.id, id));
 }
 
 export async function getFrameworkAssessmentsByOrgId(orgId: number) {

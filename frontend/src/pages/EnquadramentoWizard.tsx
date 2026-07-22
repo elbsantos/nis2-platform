@@ -1,11 +1,12 @@
 /**
  * frontend/src/pages/EnquadramentoWizard.tsx
  *
- * Fluxo completo: inicia assessment → wizard → complete → navega para resultado.
+ * Fluxo completo: wizard em React state → complete (cria linha already completed).
+ * Nenhuma linha in_progress é criada enquanto o utilizador preenche (C-EQ7).
  * Rota: /enquadramento/new
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { NIS2_PT_TREE } from "../../../backend/utils/decision-engine";
@@ -15,47 +16,30 @@ import DecisionWizard from "../components/DecisionWizard";
 export default function EnquadramentoWizard() {
   const navigate = useNavigate();
 
-  const [assessmentId, setAssessmentId]   = useState<number | null>(null);
-  const [startError,   setStartError]     = useState<string | null>(null);
-  const [completing,   setCompleting]     = useState(false);
-
-  const startMut = trpc.enquadramento.start.useMutation({
-    onSuccess: (data) => setAssessmentId(data.id),
-    onError:   (e)    => setStartError(e.message),
-  });
+  const [error,      setError]     = useState<string | null>(null);
+  const [completing, setCompleting] = useState(false);
 
   const completeMut = trpc.enquadramento.complete.useMutation({
-    onSuccess: (_, vars) => navigate(`/enquadramento/${vars.id}`, { replace: true }),
-    onError:   (e)       => { setStartError(e.message); setCompleting(false); },
+    onSuccess: (data) => navigate(`/enquadramento/${data.id}`, { replace: true }),
+    onError:   (e)    => { setError(e.message); setCompleting(false); },
   });
 
-  // Inicia assessment ao montar — apenas uma vez
-  useEffect(() => { startMut.mutate({}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleWizardComplete(answers: Answers) {
-    if (!assessmentId || completing) return;
+  function handleWizardComplete(answers: Answers) {
+    if (completing) return;
     setCompleting(true);
-    completeMut.mutate({ id: assessmentId, answers });
+    completeMut.mutate({ answers });
   }
 
-  if (startError) {
+  if (error) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-4">
-        <p className="text-red-400 text-sm">{startError}</p>
+        <p className="text-red-400 text-sm">{error}</p>
         <button
           onClick={() => navigate("/enquadramento")}
           className="text-slate-400 hover:text-white text-sm transition-colors"
         >
           ← Voltar
         </button>
-      </div>
-    );
-  }
-
-  if (!assessmentId || startMut.isPending) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center text-slate-400 text-sm">
-        A iniciar…
       </div>
     );
   }
