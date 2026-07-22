@@ -9,9 +9,11 @@
  * Os campos `path` e `legalBasis` são mantidos para retrocompatibilidade.
  * Assessments v1 não têm `steps` na BD; o Relatório re-corre o motor com os answers
  * guardados para os obter — motor é puro/determinístico, mesmas respostas = mesmo resultado.
+ * ENGINE_VERSION "3" — cálculo em gémeo de dimensão: a_confirmar só quando o balanço
+ * é o factor decisivo (dim(B=0) ≠ dim(B=∞)); VN≤10 com B omitido → fora_condicional.
  */
 
-export const ENGINE_VERSION = "2";
+export const ENGINE_VERSION = "3";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -385,7 +387,7 @@ export function evaluateTree(
   legalBasis.push("Rec. 2003/361/CE");
 
   const estrutura = answers["C.estrutura"] ?? "autonoma";
-  let condicional = estrutura === "parceira" || estrutura === "nao_sei";
+  const condicionalGrupo = estrutura === "parceira" || estrutura === "nao_sei";
 
   steps.push({
     nodeId:  "C",
@@ -417,27 +419,25 @@ export function evaluateTree(
     // se grupo_b omitido e own_b também, totalB permanece -1
   }
 
-  let bLabelStr: string;
-  if (totalB < 0) {
-    // Balanço desconhecido — pior caso: assume que ultrapassa qualquer limiar,
-    // para nunca gerar um falso "fora". Marca condicional para revisão.
-    // (B=VN seria errado: com VN=8M, B=8 não satisfaz B>10 e a empresa sairia como fora.)
-    totalB      = Number.POSITIVE_INFINITY;
-    condicional = true;
-    bLabelStr   = "não informado";
-  } else {
-    bLabelStr = `${totalB} M€`;
-  }
+  const bDesconhecido = totalB < 0;
+  const bLabelStr     = bDesconhecido ? "não informado" : `${totalB} M€`;
 
   // Thresholds do Anexo III DL 125/2025 / Rec. 2003/361/CE
-  let dimensao: "grande" | "media" | "pequena";
-  if (totalN >= 250 || (totalVn > 50 && totalB > 43)) {
-    dimensao = "grande";
-  } else if (totalN >= 50 || (totalVn > 10 && totalB > 10)) {
-    dimensao = "media";
-  } else {
-    dimensao = "pequena";
-  }
+  const calcDim = (b: number): "grande" | "media" | "pequena" => {
+    if (totalN >= 250 || (totalVn > 50 && b > 43)) return "grande";
+    if (totalN >= 50  || (totalVn > 10 && b > 10)) return "media";
+    return "pequena";
+  };
+
+  // Cálculo em gémeo: pior caso financeiro (B=0) vs melhor caso (B=∞).
+  // Se dim(B=0) ≠ dim(B=∞), o balanço é o factor decisivo → a_confirmar.
+  // Se coincidem, a incerteza do balanço é irrelevante para a decisão de dimensão.
+  const dimB0   = calcDim(bDesconhecido ? 0                       : totalB);
+  const dimBInf = calcDim(bDesconhecido ? Number.POSITIVE_INFINITY : totalB);
+
+  const condicionalBalanco = bDesconhecido && dimB0 !== dimBInf;
+  const dimensao           = dimBInf;  // pior caso: maior dimensão possível
+  const condicional        = condicionalGrupo || condicionalBalanco;
 
   const dimensaoLabels: Record<string, string> = {
     grande: "grande", media: "média", pequena: "pequena/micro",
@@ -445,14 +445,38 @@ export function evaluateTree(
   const grupoSufixo = estrutura === "associada_total"
     ? " (valores agregados do grupo)"
     : "";
+  const dimensaoLabel = condicionalBalanco
+    ? `a confirmar (entre ${dimensaoLabels[dimB0]} e ${dimensaoLabels[dimBInf]}, balanço decisivo)`
+    : dimensaoLabels[dimensao];
 
   steps.push({
     nodeId:  "D",
-    label:   `Dimensão: ${dimensaoLabels[dimensao]}${grupoSufixo} (trabalhadores: ${totalN}, VN: ${totalVn} M€, balanço: ${bLabelStr})`,
+    label:   `Dimensão: ${dimensaoLabel}${grupoSufixo} (trabalhadores: ${totalN}, VN: ${totalVn} M€, balanço: ${bLabelStr})`,
     article: tree.nodes["D"].legalRef,
   });
 
   // ── Nó E: Classificação ──────────────────────────────────────────────────
+  // Se o balanço foi o factor decisivo entre dimensões distintas, não é possível
+  // determinar o enquadramento sem ele — independentemente do setor.
+  if (condicionalBalanco) {
+    const art = "Art. 6.º DL 125/2025";
+    path.push("E");
+    legalBasis.push(art);
+    steps.push({
+      nodeId:  "E",
+      label:   "Resultado: dimensão a confirmar — balanço desconhecido é o factor decisivo",
+      article: art,
+    });
+    return {
+      classification: "a_confirmar",
+      resultLabel:
+        "Dimensão a confirmar — o balanço desconhecido determina se a organização é abrangida e em que categoria. Forneça o balanço para obter uma classificação definitiva.",
+      path,
+      legalBasis,
+      steps,
+    };
+  }
+
   path.push("E");
   legalBasis.push("Art. 6.º DL 125/2025");
 

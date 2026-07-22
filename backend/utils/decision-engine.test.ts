@@ -30,8 +30,8 @@ const BASE_ENERGIA_MEDIA: Answers = {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 describe("ENGINE_VERSION", () => {
-  it("é '2' (v2 adiciona campo steps com trilha legível nó a nó)", () => {
-    expect(ENGINE_VERSION).toBe("2");
+  it("é '3' (v3 — cálculo em gémeo: a_confirmar só quando balanço é decisivo)", () => {
+    expect(ENGINE_VERSION).toBe("3");
   });
 });
 
@@ -265,27 +265,26 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     expect(r.classification).toBe("fora_condicional");
   });
 
-  it("balanço desconhecido → assume B=Infinity (pior caso) → pode elevar para média (resultado condicional)", () => {
-    // N=10, VN=12, B omitido → B=Infinity → (VN=12>10 AND Inf>10) → média → importante (saude = Anexo I)
+  it("balanço desconhecido com VN>10 → a_confirmar (o balanço decide entre pequena e média)", () => {
+    // CORRIGIDO: N=10, VN=12, B omitido → dim(B=0)=pequena, dim(B=∞)=média → dims diferem → a_confirmar.
+    // Antes codificava comportamento errado: assumia B=∞ → média → "Provável importante".
     const r = evaluateTree(
       NIS2_PT_TREE,
       A({ "A.setor": "saude", "C.estrutura": "autonoma", "D.n": "10", "D.vn": "12" })
     );
-    expect(r.classification).toBe("importante");
-    expect(r.resultLabel).toMatch(/Provável/);
+    expect(r.classification).toBe("a_confirmar");
   });
 
-  it("balanço desconhecido não gera falso 'fora' — N=30, VN=8, B omitido → a_confirmar", () => {
-    // Fix 1: B=VN=8 era errado — (8>10 && 8>10)=false → piccola → fora (falso negativo)
-    // Fix 1 (B=Infinity) sozinho não resolve: (8>10 && Infinity>10)=false, VN é o fator restritivo
-    // Fix 2 (piccola+condicional→a_confirmar) é o que evita o falso "fora"
+  it("balanço desconhecido com VN≤10 → fora_condicional (VN decide sozinho, balanço irrelevante)", () => {
+    // CORRIGIDO: N=30, VN=8, B omitido → dim(B=0)=pequena, dim(B=∞)=pequena → dims iguais → fora_condicional.
+    // VN=8≤10 faz (VN>10 AND B>10) falhar para qualquer B — o balanço não muda a decisão.
+    // Antes codificava comportamento errado: piccola+condicional→a_confirmar (incerteza falsa).
     const r = evaluateTree(
       NIS2_PT_TREE,
       A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8" })
     );
-    expect(r.classification).not.toBe("fora_condicional");
-    expect(r.classification).toBe("a_confirmar");
-    expect(r.resultLabel).toMatch(/confirmar/);
+    expect(r.classification).toBe("fora_condicional");
+    expect(r.classification).not.toBe("a_confirmar");
   });
 
   it("estrutura parceira → resultado sempre condicional", () => {
@@ -301,5 +300,55 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     );
     expect(r.classification).toBe("importante"); // Anexo I média
     expect(r.resultLabel).toMatch(/Provável/);
+  });
+
+  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "3" ────────────
+
+  it("[EQ8-T1] N=30, VN=8, B=desconhecido → fora_condicional (VN≤10, balanço irrelevante)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8" })
+    );
+    expect(r.classification).toBe("fora_condicional");
+  });
+
+  it("[EQ8-T2] N=30, VN=8, B=5 → fora_condicional (B conhecido, pequena determinística)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8", "D.b": "5" })
+    );
+    expect(r.classification).toBe("fora_condicional");
+  });
+
+  it("[EQ8-T3] N=30, VN=12, B=desconhecido → a_confirmar (balanço decide entre pequena e média)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12" })
+    );
+    expect(r.classification).toBe("a_confirmar");
+  });
+
+  it("[EQ8-T4] N=30, VN=12, B=8 → fora_condicional (B≤10 torna pequena determinística)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12", "D.b": "8" })
+    );
+    expect(r.classification).toBe("fora_condicional");
+  });
+
+  it("[EQ8-T5] N=30, VN=12, B=15 → dentro do âmbito (B>10 → média → importante)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12", "D.b": "15" })
+    );
+    expect(r.classification).toBe("importante");
+  });
+
+  it("[EQ8-T6] N=60, VN=2, B=desconhecido → dentro do âmbito (N≥50 basta, balanço irrelevante)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "60", "D.vn": "2" })
+    );
+    expect(r.classification).toBe("importante"); // Anexo II, média (N≥50)
   });
 });
