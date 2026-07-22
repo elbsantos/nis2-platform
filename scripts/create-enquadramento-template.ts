@@ -123,13 +123,13 @@ const sancoesTbl = [
     tc("Muito grave"),
     tc("até 10 000 000 € ou 2% do VN mundial, o que for mais elevado"),
     tc("até 7 000 000 € ou 1,4% do VN mundial, o que for mais elevado"),
-    tc("Art. 61.º/2 DL 125/2025"),
+    tc("Art. 61.º/2 do RJC"),
   ),
   tr(
     tc("Grave"),
     tc("até 5 000 000 € ou 1% do VN mundial, o que for mais elevado"),
     tc("até 3 500 000 € ou 0,7% do VN mundial, o que for mais elevado"),
-    tc("Art. 62.º/2 DL 125/2025"),
+    tc("Art. 62.º/2 do RJC"),
   ),
   `</w:tbl>`,
 ].join("\n");
@@ -149,7 +149,7 @@ ${pKV("Empresa: ", "{empresa}")}
 ${pKV("Data: ", "{data}")}
 ${pKV("Versão do motor: ", "{engineVersion}")}
 ${ep}
-${p("AVISO: Este documento é uma orientação preliminar, não um veredicto jurídico nem uma qualificação oficial. A qualificação formal cabe ao CNCS (Art. 8.º do DL 125/2025). A emissão deste relatório não substitui o registo na plataforma MyCiber nem o aconselhamento jurídico.", { italic: true })}
+${p("AVISO: Este documento é uma orientação preliminar, não um veredicto jurídico nem uma qualificação oficial. A qualificação formal cabe ao CNCS (artigo 8.º do RJC). A emissão deste relatório não substitui o registo na plataforma MyCiber nem o aconselhamento jurídico.", { italic: true })}
 ${ep}
 
 ${p("1. Classificação", { bold: true, sz: 14 })}
@@ -174,11 +174,9 @@ ${ep}
 
 ${p("{sec3Title}", { bold: true, sz: 14 })}
 ${p("Estas obrigações estão em vigor desde a entrada em vigor do Regime Jurídico da Cibersegurança, em 3 de abril de 2026 (artigo 11.º do Decreto-Lei n.º 125/2025). O Regulamento n.º 756/2026, em vigor desde 23 de junho de 2026, não as criou: operacionalizou-as, definindo o funcionamento da plataforma eletrónica MyCiber e os procedimentos de autoidentificação, qualificação, comunicação e notificação.")}
-${p("  • Registo e autoidentificação na plataforma MyCiber (myciber.gov.pt) — artigo 35.º do DL 125/2025. Prazo: 60 dias úteis a contar da disponibilização da plataforma, ocorrida a 23 de junho de 2026, para as entidades que já se encontravam em atividade; 30 dias úteis para as que iniciem atividade após a entrada em vigor do RJC. O prazo termina por volta de 15 de setembro de 2026. Confirme a data exata junto do CNCS.")}
-${p("  • Designação de responsável de cibersegurança — artigo 31.º do DL 125/2025.")}
-${p("  • Designação de ponto de contacto permanente — artigo 32.º do DL 125/2025.")}
-${p("A comunicação de ambos é feita na área reservada da plataforma, nos termos dos artigos 14.º e 15.º do Regulamento n.º 756/2026. Nos casos previstos no n.º 4 dos artigos 31.º e 32.º do RJC, o prazo conta-se a partir da notificação da qualificação da entidade (artigo 8.º, n.º 5, do RJC).")}
-${p("  • Ativação do canal de notificação de incidentes significativos — Art. 40.º do DL 125/2025.")}
+${p("  • Autoidentificação (artigo 8.º, n.º 1, do RJC): 60 dias após a disponibilização da plataforma eletrónica, para entidades já em atividade à data de entrada em vigor do RJC; 30 dias após o início de atividade, para as restantes. O CNCS refere na sua página estes prazos em dias úteis e a lei não fixa a data de disponibilização da plataforma — confirme o prazo aplicável junto do CNCS.")}
+${p("  • Designação obrigatória de responsável de cibersegurança (artigo 31.º) e de ponto de contacto permanente (artigo 32.º). A comunicação faz-se no prazo de 20 dias úteis a contar do início de funções. Para as entidades que já exerciam atividade à data de entrada em vigor do RJC, os artigos 14.º, n.º 2, e 15.º, n.º 2, do Regulamento n.º 756/2026 determinam que o prazo se conta a partir da notificação da qualificação da entidade (artigo 8.º, n.º 5, do RJC).")}
+${p("  • Ativação do canal de notificação de incidentes significativos — artigo 40.º do RJC.")}
 ${ep}
 
 ${p("{sec4Title}", { bold: true, sz: 14 })}
@@ -190,13 +188,20 @@ ${p("  • Boas práticas de ciberhigiene, formação, criptografia e controlo d
 ${p("  • Segurança física, ambiental e dos recursos humanos.")}
 ${p("  • Relatório anual de conformidade (Art. 30.º).")}
 ${ep}
-${p("Nota: até cerca de abril de 2027 é possível pedir dispensa de coimas por ainda não estar adaptado (Art. 65.º do DL 125/2025). Não confunda dispensa de coimas com dispensa de cumprimento — as obrigações existem desde já.", { italic: true })}
+${p("Dispensa de coimas (artigo 65.º do RJC): até 3 de abril de 2027 — 12 meses a contar da entrada em vigor do RJC — as entidades podem solicitar à autoridade competente, mediante pedido devidamente fundamentado, a dispensa da aplicação das coimas previstas no n.º 2 do artigo 61.º e no n.º 2 do artigo 62.º, com fundamento na inexistência de um procedimento interno de adaptação ao novo regime. A dispensa não é automática, depende de decisão da autoridade, e não abrange as contraordenações leves nem as sanções acessórias.", { italic: true })}
 ${ep}
 
 ${p("{sec5Title}", { bold: true, sz: 14 })}
 ${p("{sec5Intro}")}
 ${sancoesTbl}
 ${p("Nota: as contraordenações muito graves previstas nas alíneas b), c) e f) do n.º 1 do artigo 61.º do RJC só produzem efeitos a partir de 22 de junho de 2028, nos termos do artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
+${pLoop("{#isAbrangida}")}
+${p("O incumprimento dos deveres de designação do responsável de cibersegurança (artigo 31.º) e de ponto de contacto permanente (artigo 32.º) constitui contraordenação muito grave, nos termos das alíneas d) e e) do n.º 1 do artigo 61.º do RJC. Estas alíneas não constam do diferimento previsto no artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
+${pLoop("{/isAbrangida}")}
+${pLoop("{#isAConfirmar}")}
+${p("O incumprimento dos deveres de designação do responsável de cibersegurança (artigo 31.º) e de ponto de contacto permanente (artigo 32.º) constitui contraordenação muito grave, nos termos das alíneas d) e e) do n.º 1 do artigo 61.º do RJC. Estas alíneas não constam do diferimento previsto no artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
+${pLoop("{/isAConfirmar}")}
+${p("Salvo em caso de dolo, a instauração de processo de contraordenação depende de prévia advertência da autoridade competente para cumprimento da obrigação omitida em prazo razoável (artigo 66.º, n.º 5, do RJC).", { italic: true })}
 ${ep}
 
 ${p("6. Dossier de Registo na CNCS (Art. 35.º)", { bold: true, sz: 14 })}
@@ -210,7 +215,7 @@ ${p("A submissão é feita diretamente na plataforma MyCiber. A equipa CISPLAN p
 ${ep}
 
 ${p("7. Nível de conformidade exigido", { bold: true, sz: 14 })}
-${p("O nível de conformidade exato (básico, substancial ou elevado) é atribuído pelo CNCS com base no setor e na dimensão da entidade (Art. 26.º/5 do DL 125/2025; Anexo II do Regulamento n.º 756/2026). Este relatório não estima o nível — fazê-lo aqui seria prematuro e potencialmente contestável.", { italic: true })}
+${p("O nível de conformidade exato (básico, substancial ou elevado) é atribuído pelo CNCS com base no setor e na dimensão da entidade (artigo 26.º, n.º 5, do RJC; Anexo II do Regulamento n.º 756/2026). Este relatório não estima o nível — fazê-lo aqui seria prematuro e potencialmente contestável.", { italic: true })}
 ${ep}
 ${p("Numa próxima fase, o CISPLAN dar-lhe-á uma estimativa preliminar do nível esperado.")}
 ${ep}
