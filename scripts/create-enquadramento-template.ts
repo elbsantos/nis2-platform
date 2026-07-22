@@ -194,7 +194,7 @@ ${p("Nota: até cerca de abril de 2027 é possível pedir dispensa de coimas por
 ${ep}
 
 ${p("{sec5Title}", { bold: true, sz: 14 })}
-${p("Escalões aplicáveis à sua categoria (Art. 61.º e 62.º do DL 125/2025). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela CNCS. Há um caminho de conformidade e ainda há tempo.")}
+${p("{sec5Intro}")}
 ${sancoesTbl}
 ${p("Nota: as contraordenações muito graves previstas nas alíneas b), c) e f) do n.º 1 do artigo 61.º do RJC só produzem efeitos a partir de 22 de junho de 2028, nos termos do artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
 ${ep}
@@ -220,11 +220,25 @@ ${p("Nível de confidencialidade: RESERVADO — Distribuição restrita à admin
 ${ep}
 ${p("A nossa equipa está disponível para confirmar o enquadramento, preparar o dossier de registo e acompanhar a implementação das medidas ao ritmo da sua empresa. Sem preços e sem compromisso nesta fase.")}
 ${ep}
+${pLoop("{#isAbrangida}")}
 ${p("  1. Confirme este enquadramento com assessor jurídico ou com a CNCS, se tiver dúvidas.")}
 ${p("  2. Registe-se na MyCiber (myciber.gov.pt) — Art. 35.º. A equipa CISPLAN pode ajudar.")}
 ${p("  3. Designe o responsável de cibersegurança (Art. 31.º) e o ponto de contacto (Art. 32.º).")}
 ${p("  4. Prepare o canal de notificação de incidentes (Art. 40.º).")}
 ${p("  5. Planeie a implementação das medidas de gestão de risco (Art. 27.º-30.º) dentro do prazo.")}
+${pLoop("{/isAbrangida}")}
+${pLoop("{#isFora}")}
+${p("  1. Confirme este enquadramento com assessor jurídico ou junto do CNCS. Este relatório é uma orientação preliminar e não substitui a qualificação oficial.")}
+${p("  2. Verifique se lhe são aplicáveis os critérios qualitativos do artigo 3.º, n.º 2, do RJC — nomeadamente ser o único prestador de um serviço essencial, ou a organização prestar serviços de comunicações eletrónicas, serviços de confiança ou serviços de DNS e registo de domínios, casos em que a dimensão é irrelevante.")}
+${p("  3. Reavalie o enquadramento se a dimensão da organização aumentar ou se a estrutura de grupo se alterar.")}
+${p("  4. Ainda que não abrangida, pode adotar voluntariamente o Quadro Nacional de Referência para a Cibersegurança. O CNCS pode recomendá-lo a entidades fora do âmbito de aplicação (artigo 24.º, n.º 2, e artigo 30.º, n.º 8, do Regulamento n.º 756/2026).")}
+${pLoop("{/isFora}")}
+${pLoop("{#isAConfirmar}")}
+${p("  1. Confirme este enquadramento com assessor jurídico ou junto do CNCS. Este relatório é uma orientação preliminar e não substitui a qualificação oficial.")}
+${p("  2. Reúna os dados em falta que determinam o enquadramento — nomeadamente o balanço total anual e a estrutura de grupo — e repita a avaliação. São esses dados que decidem se a organização está abrangida e em que categoria.")}
+${p("  3. Verifique se lhe são aplicáveis os critérios qualitativos do artigo 3.º, n.º 2, do RJC, que abrangem determinadas entidades independentemente da dimensão.")}
+${p("  4. Caso se confirme que está abrangida, os passos aplicáveis são os descritos nas secções 3 e 4 deste relatório.")}
+${pLoop("{/isAConfirmar}")}
 ${ep}
 ${p("Gerado automaticamente pelo CISPLAN — cisplan.com", { bold: true })}
 

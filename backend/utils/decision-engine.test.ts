@@ -351,4 +351,15 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     );
     expect(r.classification).toBe("importante"); // Anexo II, média (N≥50)
   });
+
+  it("[EQ8-T7] N=200, VN=60, B=desconhecido → a_confirmar (balanço decide entre média e grande)", () => {
+    // calcDim(B=0)=média (N<250, VN>50 mas B=0 não passa >43)
+    // calcDim(B=∞)=grande (VN=60>50 E ∞>43)
+    // dims diferem → o balanço é decisivo → a_confirmar
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "200", "D.vn": "60" })
+    );
+    expect(r.classification).toBe("a_confirmar");
+  });
 });

@@ -448,6 +448,10 @@ export async function generateRelatorioEnquadramento(
     sec5Title: isForaOuConfirmar
       ? "5. Exposição sancionatória das entidades abrangidas"
       : "5. Exposição sancionatória",
+    sec5Intro: isForaOuConfirmar
+      ? "Escalões aplicáveis às entidades abrangidas (artigos 61.º e 62.º do DL 125/2025). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente."
+      : "Escalões aplicáveis à sua categoria (artigos 61.º e 62.º do DL 125/2025). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente. Há um caminho de conformidade e ainda há tempo.",
+    isAbrangida: classification === "essencial" || classification === "importante",
     // Loop {#steps}…{/steps}: um item por nó visitado, com label legível e base legal
     steps: result.steps.map(s => ({ label: s.label, article: s.article })),
   };
