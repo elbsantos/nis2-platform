@@ -104,7 +104,7 @@ export const NIS2_PT_TREE: DecisionTree = {
     A: {
       id: "A",
       question: "Em que setor opera a sua organização?",
-      legalRef: "Art. 2.º DL 125/2025",
+      legalRef: "Art. 3.º do RJC",
       options: [
         {
           id: "tld_dns_confianca",
@@ -179,7 +179,7 @@ export const NIS2_PT_TREE: DecisionTree = {
         {
           id: "admin_publica",
           label: "Administração Pública",
-          legalRef: "Art. 14.º DL 125/2025",
+          legalRef: "Art. 3.º/3 e Art. 7.º do RJC",
         },
         {
           id: "outro",
@@ -192,19 +192,19 @@ export const NIS2_PT_TREE: DecisionTree = {
       id: "B",
       question:
         "Embora fora dos setores listados, existe alguma situação que possa tornar a sua organização relevante para a NIS2?",
-      legalRef: "Art. 3.º/2 DL 125/2025",
+      legalRef: "Art. 3.º/2 do RJC",
       options: [
         {
           id: "qualitativo",
           label:
             "Sim — somos o único fornecedor de um serviço essencial, ou uma perturbação teria impacto transfronteiriço significativo",
-          legalRef: "Art. 3.º/2 a) DL 125/2025",
+          legalRef: "Art. 3.º/2 b) e d) do RJC",
         },
         {
           id: "fornecedor",
           label:
             "Sim — somos fornecedor crítico de uma entidade já abrangida pela NIS2 (via contrato ou dependência operacional)",
-          legalRef: "Art. 3.º/2 b) DL 125/2025",
+          legalRef: "Art. 28.º do RJC (obrigação da entidade abrangida quanto aos seus fornecedores)",
         },
         {
           id: "nenhum",
@@ -216,7 +216,7 @@ export const NIS2_PT_TREE: DecisionTree = {
     C: {
       id: "C",
       question: "Qual é a estrutura do grupo empresarial da sua organização?",
-      legalRef: "Rec. 2003/361/CE; Art. 3.º/1 DL 125/2025",
+      legalRef: "Rec. 2003/361/CE; Art. 3.º/1 do RJC",
       options: [
         {
           id: "autonoma",
@@ -259,7 +259,7 @@ export const NIS2_PT_TREE: DecisionTree = {
     E: {
       id: "E",
       question: "Classificação final (calculada automaticamente com base no setor e dimensão)",
-      legalRef: "Art. 6.º DL 125/2025",
+      legalRef: "Art. 6.º do RJC",
       options: [],
     },
   },
@@ -292,7 +292,7 @@ export function evaluateTree(
 
   // ── Nó A: Setor ──────────────────────────────────────────────────────────
   path.push("A");
-  legalBasis.push("Art. 2.º DL 125/2025");
+  legalBasis.push("Art. 3.º do RJC");
 
   const setor    = answers["A.setor"] ?? "";
   const setorOpt = findOpt("A", setor);
@@ -304,7 +304,7 @@ export function evaluateTree(
   });
 
   if (setor === "admin_publica") {
-    const art = "Art. 14.º DL 125/2025";
+    const art = "Art. 3.º/3 e Art. 7.º do RJC";
     steps.push({
       nodeId:  "E",
       label:   "Resultado: Administração Pública — regime autónomo (fora do MVP; contacte o CNCS)",
@@ -313,7 +313,7 @@ export function evaluateTree(
     return {
       classification: "fora_mvp",
       resultLabel:
-        "Administração Pública — regime autónomo (Art. 14.º DL 125/2025). Consulte o CNCS diretamente.",
+        "Administração Pública — regime autónomo (Art. 3.º/3 e Art. 7.º do RJC). Consulte o CNCS diretamente.",
       path,
       legalBasis: [...legalBasis, art],
       steps,
@@ -323,11 +323,11 @@ export function evaluateTree(
   if (setor === "outro" || !SECTOR_ANEXO[setor]) {
     // ── Nó B: Exceções Art. 3.º/2 ────────────────────────────────────────
     path.push("B");
-    legalBasis.push("Art. 3.º/2 DL 125/2025");
+    legalBasis.push("Art. 3.º/2 do RJC");
 
     const excecao   = answers["B.excecao"] ?? "";
     const excOpt    = findOpt("B", excecao);
-    const bArticle  = excOpt?.legalRef ?? "Art. 3.º/2 DL 125/2025";
+    const bArticle  = excOpt?.legalRef ?? "Art. 3.º/2 do RJC";
 
     steps.push({
       nodeId:  "B",
@@ -344,7 +344,7 @@ export function evaluateTree(
       return {
         classification: "a_confirmar",
         resultLabel:
-          "Possível abrangência por critério qualitativo — classificação a confirmar pelo CNCS (Art. 3.º/2 a) DL 125/2025).",
+          "Não foi possível enquadrar a sua atividade nas opções apresentadas. Os critérios qualitativos do Art. 3.º/2 do RJC aplicam-se a entidades que constam dos Anexos I ou II, independentemente da dimensão — verifique se a sua atividade consta desses anexos e confirme junto do CNCS.",
         path,
         legalBasis,
         steps,
@@ -368,7 +368,7 @@ export function evaluateTree(
     steps.push({
       nodeId:  "E",
       label:   "Resultado: provavelmente fora do âmbito (reavalie se setor, dimensão ou clientes mudarem)",
-      article: "Art. 3.º/2 DL 125/2025",
+      article: "Art. 3.º/2 do RJC",
     });
     return {
       classification: "fora_condicional",
@@ -459,7 +459,7 @@ export function evaluateTree(
   // Se o balanço foi o factor decisivo entre dimensões distintas, não é possível
   // determinar o enquadramento sem ele — independentemente do setor.
   if (condicionalBalanco) {
-    const art = "Art. 6.º DL 125/2025";
+    const art = "Art. 6.º do RJC";
     path.push("E");
     legalBasis.push(art);
     steps.push({
@@ -478,7 +478,7 @@ export function evaluateTree(
   }
 
   path.push("E");
-  legalBasis.push("Art. 6.º DL 125/2025");
+  legalBasis.push("Art. 6.º do RJC");
 
   return classifyE(categoriaSetor, dimensao, condicional, path, legalBasis, steps);
 }
@@ -507,10 +507,10 @@ function classifyE(
   // Regra 1: TLD / DNS / Confiança Qualificada → ESSENCIAL independentemente da dimensão.
   // pfx não aplicável — dimensão é irrelevante para esta regra, nunca é "provável".
   if (cat === "tld_dns_confianca") {
-    const art = "Art. 6.º/1 b) DL 125/2025";
+    const art = "Art. 6.º/1 b) do RJC";
     return finish(
       "essencial",
-      "Entidade essencial — TLD/DNS/Confiança Qualificada (Art. 6.º/1 DL 125/2025, independente da dimensão).",
+      "Entidade essencial — TLD/DNS/Confiança Qualificada (Art. 6.º/1 b) do RJC, independente da dimensão).",
       "Resultado: entidade essencial — regra especial TLD/DNS/Confiança (independente da dimensão)",
       art,
     );
@@ -519,18 +519,18 @@ function classifyE(
   // Regra 2: Telecom — dimensão determina essencial vs importante
   if (cat === "telecom") {
     if (dimensao === "pequena") {
-      const art = "Art. 3.º/2 a) i) DL 125/2025";
+      const art = "Art. 3.º/2 a) i) do RJC; Art. 6.º/2 do RJC";
       return finish(
         "importante",
-        `${pfx}Entidade importante — telecom de pequena/micro dimensão (Art. 3.º/2 a) i) DL 125/2025).`,
+        `${pfx}Entidade importante — telecom de pequena/micro dimensão (abrangida nos termos do Art. 3.º/2 a) i) do RJC; qualificada nos termos do Art. 6.º/2 do RJC).`,
         `${pfx}Resultado: entidade importante — telecom de pequena/micro dimensão`,
         art,
       );
     }
-    const art = "Art. 6.º/1 c) DL 125/2025";
+    const art = "Art. 6.º/1 a) e c) do RJC";
     return finish(
       "essencial",
-      `${pfx}Entidade essencial — telecom de média ou grande dimensão (Art. 3.º/2 a) i) DL 125/2025).`,
+      `${pfx}Entidade essencial — telecom de média ou grande dimensão (Art. 6.º/1 a) e c) do RJC).`,
       `${pfx}Resultado: entidade essencial — telecom de média/grande dimensão`,
       art,
     );
@@ -539,25 +539,25 @@ function classifyE(
   // Regra 3: Anexo I (outros setores)
   if (cat === "anexo_i_outros") {
     if (dimensao === "grande") {
-      const art = "Art. 6.º/1 a) DL 125/2025";
+      const art = "Art. 6.º/1 a) do RJC";
       return finish(
         "essencial",
-        `${pfx}Entidade essencial — Anexo I, grande dimensão (Art. 6.º/1 DL 125/2025).`,
+        `${pfx}Entidade essencial — Anexo I, grande dimensão (Art. 6.º/1 a) do RJC).`,
         `${pfx}Resultado: entidade essencial — Anexo I, grande dimensão`,
         art,
       );
     }
     if (dimensao === "media") {
-      const art = "Art. 6.º/2 DL 125/2025";
+      const art = "Art. 6.º/2 do RJC";
       return finish(
         "importante",
-        `${pfx}Entidade importante — Anexo I, média dimensão (Art. 6.º/2 DL 125/2025).`,
+        `${pfx}Entidade importante — Anexo I, média dimensão (Art. 6.º/2 do RJC).`,
         `${pfx}Resultado: entidade importante — Anexo I, média dimensão`,
         art,
       );
     }
     // piccola + condicional: dimensão incerta → não afirmar "fora"; deixar para confirmação
-    const art = "Art. 6.º DL 125/2025";
+    const art = "Art. 6.º do RJC";
     return finish(
       condicional ? "a_confirmar" : "fora_condicional",
       condicional
@@ -572,7 +572,7 @@ function classifyE(
 
   // Regra 4: Anexo II
   if (dimensao === "pequena") {
-    const art = "Art. 6.º DL 125/2025";
+    const art = "Art. 6.º do RJC";
     return finish(
       condicional ? "a_confirmar" : "fora_condicional",
       condicional
@@ -584,10 +584,10 @@ function classifyE(
       art,
     );
   }
-  const art = "Art. 6.º/2 DL 125/2025";
+  const art = "Art. 6.º/2 do RJC";
   return finish(
     "importante",
-    `${pfx}Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025).`,
+    `${pfx}Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 do RJC).`,
     `${pfx}Resultado: entidade importante — Anexo II, média/grande dimensão`,
     art,
   );

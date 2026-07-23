@@ -42,7 +42,7 @@ describe("Nó A — Setor", () => {
     const r = evaluateTree(NIS2_PT_TREE, A({ "A.setor": "admin_publica" }));
     expect(r.classification).toBe("fora_mvp");
     expect(r.path).toEqual(["A"]);
-    expect(r.legalBasis).toContain("Art. 14.º DL 125/2025");
+    expect(r.legalBasis).toContain("Art. 3.º/3 e Art. 7.º do RJC"); // antes: "Art. 14.º DL 125/2025"
   });
 });
 
@@ -56,19 +56,19 @@ describe("Nó B — Exceções Art. 3.º/2 (entidade fora de setor)", () => {
     );
     expect(r.classification).toBe("a_confirmar");
     expect(r.path).toEqual(["A", "B"]);
-    expect(r.legalBasis).toContain("Art. 3.º/2 DL 125/2025");
+    expect(r.legalBasis).toContain("Art. 3.º/2 do RJC"); // antes: "Art. 3.º/2 DL 125/2025"
     // steps: A + B + E (nó virtual de resultado)
     expect(r.steps).toHaveLength(3);
     const [sA, sB, sE] = r.steps as [TrailStep, TrailStep, TrailStep];
     expect(sA.nodeId).toBe("A");
     expect(sA.label).toContain("Outro setor");
-    expect(sA.article).toBe("Art. 2.º DL 125/2025");
+    expect(sA.article).toBe("Art. 3.º do RJC"); // antes: "Art. 2.º DL 125/2025"
     expect(sB.nodeId).toBe("B");
     expect(sB.label).toContain("único fornecedor");
-    expect(sB.article).toBe("Art. 3.º/2 a) DL 125/2025");
+    expect(sB.article).toBe("Art. 3.º/2 b) e d) do RJC"); // antes: "Art. 3.º/2 a) DL 125/2025" — diploma e alíneas corrigidos
     expect(sE.nodeId).toBe("E");
     expect(sE.label).toContain("a confirmar");
-    expect(sE.article).toBe("Art. 3.º/2 a) DL 125/2025");
+    expect(sE.article).toBe("Art. 3.º/2 b) e d) do RJC"); // antes: "Art. 3.º/2 a) DL 125/2025"
   });
 
   it("fornecedor de entidade abrangida → a_confirmar_contratual", () => {
@@ -96,14 +96,14 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     const r = evaluateTree(NIS2_PT_TREE, BASE_ENERGIA_GRANDE);
     expect(r.classification).toBe("essencial");
     expect(r.path).toEqual(["A", "C", "D", "E"]);
-    expect(r.legalBasis).toContain("Art. 6.º DL 125/2025");
+    expect(r.legalBasis).toContain("Art. 6.º do RJC"); // antes: "Art. 6.º DL 125/2025"
     // steps: A + C + D + E
     expect(r.steps).toHaveLength(4);
     const [sA, sC, sD, sE] = r.steps as [TrailStep, TrailStep, TrailStep, TrailStep];
     expect(sA).toEqual({ nodeId: "A", label: "Setor: Energia (eletricidade, gás, petróleo, hidrogénio, aquecimento/arrefecimento)", article: "Anexo I, ponto 1" });
-    expect(sC).toEqual({ nodeId: "C", label: "Grupo: empresa autónoma (sem controlo externo significativo)", article: "Rec. 2003/361/CE; Art. 3.º/1 DL 125/2025" });
+    expect(sC).toEqual({ nodeId: "C", label: "Grupo: empresa autónoma (sem controlo externo significativo)", article: "Rec. 2003/361/CE; Art. 3.º/1 do RJC" }); // antes: "...Art. 3.º/1 DL 125/2025"
     expect(sD).toEqual({ nodeId: "D", label: "Dimensão: grande (trabalhadores: 300, VN: 60 M€, balanço: 50 M€)", article: "Anexo III DL 125/2025; Rec. 2003/361/CE" });
-    expect(sE).toEqual({ nodeId: "E", label: "Resultado: entidade essencial — Anexo I, grande dimensão", article: "Art. 6.º/1 a) DL 125/2025" });
+    expect(sE).toEqual({ nodeId: "E", label: "Resultado: entidade essencial — Anexo I, grande dimensão", article: "Art. 6.º/1 a) do RJC" }); // antes: "Art. 6.º/1 a) DL 125/2025"
   });
 
   it("[obrigatório] Anexo I média dimensão → importante", () => {
@@ -127,9 +127,9 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     );
     expect(r.classification).toBe("fora_condicional");
     expect(r.path).toEqual(["A", "C", "D", "E"]);
-    expect(r.legalBasis).toContain("Art. 2.º DL 125/2025");
+    expect(r.legalBasis).toContain("Art. 3.º do RJC"); // antes: "Art. 2.º DL 125/2025"
     expect(r.legalBasis).toContain("Anexo III DL 125/2025");
-    expect(r.legalBasis).toContain("Art. 6.º DL 125/2025");
+    expect(r.legalBasis).toContain("Art. 6.º do RJC"); // antes: "Art. 6.º DL 125/2025"
     // steps: label de D mostra "pequena/micro"
     expect(r.steps).toHaveLength(4);
     const sD = r.steps[2]!;
@@ -156,7 +156,7 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     // step E deve citar o artigo de exceção para telecom pequena
     const sE = r.steps.find(s => s.nodeId === "E")!;
     expect(sE.label).toContain("telecom de pequena/micro dimensão");
-    expect(sE.article).toBe("Art. 3.º/2 a) i) DL 125/2025");
+    expect(sE.article).toBe("Art. 3.º/2 a) i) do RJC; Art. 6.º/2 do RJC"); // antes: "Art. 3.º/2 a) i) DL 125/2025" — base de categoria (6.º/2) acrescentada
   });
 
   it("telecom média dimensão → essencial", () => {
@@ -206,7 +206,7 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     expect(r.path).toEqual(["A", "C", "D", "E"]);
     expect(r.legalBasis).toContain("Rec. 2003/361/CE");
     expect(r.legalBasis).toContain("Anexo III DL 125/2025");
-    expect(r.legalBasis).toContain("Art. 6.º DL 125/2025");
+    expect(r.legalBasis).toContain("Art. 6.º do RJC"); // antes: "Art. 6.º DL 125/2025"
     // step C mostra "subsidiária/associada"; step D mostra valores agregados do grupo
     const sC = r.steps.find(s => s.nodeId === "C")!;
     expect(sC.label).toContain("subsidiária/associada");
@@ -227,7 +227,7 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     );
     expect(semGrupo.classification).toBe("importante");
     expect(semGrupo.path).toEqual(["A", "C", "D", "E"]);
-    expect(semGrupo.legalBasis).toContain("Art. 6.º DL 125/2025");
+    expect(semGrupo.legalBasis).toContain("Art. 6.º do RJC"); // antes: "Art. 6.º DL 125/2025"
   });
 
   it("Anexo II média dimensão → importante", () => {

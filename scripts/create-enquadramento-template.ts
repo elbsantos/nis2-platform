@@ -188,7 +188,7 @@ ${p("  • Boas práticas de ciberhigiene, formação, criptografia e controlo d
 ${p("  • Segurança física, ambiental e dos recursos humanos.")}
 ${p("  • Relatório anual de conformidade (Art. 30.º).")}
 ${ep}
-${p("Dispensa de coimas (artigo 65.º do RJC): até 3 de abril de 2027 — 12 meses a contar da entrada em vigor do RJC — as entidades podem solicitar à autoridade competente, mediante pedido devidamente fundamentado, a dispensa da aplicação das coimas previstas no n.º 2 do artigo 61.º e no n.º 2 do artigo 62.º, com fundamento na inexistência de um procedimento interno de adaptação ao novo regime. A dispensa não é automática, depende de decisão da autoridade, e não abrange as contraordenações leves nem as sanções acessórias.", { italic: true })}
+${p("Dispensa de coimas (artigo 65.º do RJC): até 3 de abril de 2027 — 12 meses a contar da entrada em vigor do RJC — as entidades podem solicitar à autoridade competente, mediante pedido devidamente fundamentado, a dispensa da aplicação das coimas previstas no n.º 2 do artigo 61.º e no n.º 2 do artigo 62.º, com fundamento na inexistência de um procedimento interno de adaptação ao novo regime. A dispensa não é automática, depende de decisão da autoridade, e não abrange as contraordenações leves nem as sanções acessórias. A dispensa respeita apenas à aplicação de coimas e não dispensa o cumprimento das obrigações, que se mantêm exigíveis.", { italic: true })}
 ${ep}
 
 ${p("{sec5Title}", { bold: true, sz: 14 })}
