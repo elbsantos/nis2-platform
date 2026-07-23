@@ -22,7 +22,7 @@ import {
   getFrameworkAssessmentById,
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
-import { evaluateTree, NIS2_PT_TREE } from "../utils/decision-engine";
+import { evaluateTree, NIS2_PT_TREE, ENGINE_VERSION } from "../utils/decision-engine";
 
 // ---------------------------------------------------------------------------
 // Caminhos e constantes
@@ -411,6 +411,11 @@ export async function generateRelatorioEnquadramento(
 
   const org = await getOrganizationById(orgId);
   if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  if (String(assessment.engineVersion) !== String(ENGINE_VERSION))
+    throw new Error(
+      `Este enquadramento foi calculado com a versão ${assessment.engineVersion} do motor de decisão; a versão actual é ${ENGINE_VERSION}. Para garantir a coerência do relatório, é necessário repetir o enquadramento.`
+    );
 
   // Re-corre o motor a partir das respostas guardadas na BD.
   // Motor é puro/determinístico: mesmas respostas → mesma classificação + steps.

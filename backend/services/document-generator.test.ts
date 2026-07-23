@@ -8,6 +8,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import fs from "fs";
+import { ENGINE_VERSION } from "../utils/decision-engine";
 
 // ---------------------------------------------------------------------------
 // Mocks de módulo (hoisted antes de qualquer import)
@@ -1049,23 +1050,23 @@ describe("generatePsi — PSI auto-preenchida (C17)", () => {
 // C-EQ4 — generateRelatorioEnquadramento
 // ===========================================================================
 
-// Fixture com output REAL do evaluateTree:
+// Fixture com output REAL do evaluateTree (motor v3):
 //   evaluateTree(NIS2_PT_TREE, { "A.setor":"industria","C.estrutura":"autonoma","D.n":"80","D.vn":"12","D.b":"5" })
 //   → path: ["A","C","D","E"]
-//   → legalBasis: ["Art. 2.º DL 125/2025","Rec. 2003/361/CE","Anexo III DL 125/2025","Art. 6.º DL 125/2025"]
+//   → legalBasis: ["Art. 3.º do RJC","Rec. 2003/361/CE","Anexo III DL 125/2025","Art. 6.º do RJC"]
 //   → classification: "importante"
-//   → resultLabel: "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025)."
+//   → resultLabel: "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 do RJC)."
 const FAKE_ASSESSMENT = {
   id:             99,
   organizationId: 1,
   userId:         1,
   frameworkSlug:  "nis2-pt-dl125",
   classification: "importante",
-  resultLabel:    "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 DL 125/2025).",
-  engineVersion:  "1",
+  resultLabel:    "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 do RJC).",
+  engineVersion:  ENGINE_VERSION, // antes: "1" (motor está em v3; guard exige versão actual)
   status:         "completed",
   decisionPath:   ["A", "C", "D", "E"],
-  legalBasis:     ["Art. 2.º DL 125/2025", "Rec. 2003/361/CE", "Anexo III DL 125/2025", "Art. 6.º DL 125/2025"],
+  legalBasis:     ["Art. 3.º do RJC", "Rec. 2003/361/CE", "Anexo III DL 125/2025", "Art. 6.º do RJC"],
   answers:        { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" },
   completedAt:    new Date("2026-07-15"),
   createdAt:      new Date("2026-07-15"),
@@ -1122,9 +1123,9 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
 
     expect(_psiRenderArgs).not.toBeNull();
     expect(_psiRenderArgs!.empresa).toBe("TechCorp, Lda.");
-    expect(_psiRenderArgs!.classificacao).toBe("importante");
+    expect(_psiRenderArgs!.classificacaoLabel).toBe("Entidade importante"); // antes: .classificacao — campo renomeado
     expect(_psiRenderArgs!.resultLabel).toContain("importante");
-    expect(_psiRenderArgs!.engineVersion).toBe("1");
+    expect(_psiRenderArgs!.engineVersion).toBe(ENGINE_VERSION); // antes: toBe("1") — motor está em v3
     // data no formato DD/MM/AAAA
     expect(typeof _psiRenderArgs!.data).toBe("string");
     expect(_psiRenderArgs!.data).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
@@ -1139,7 +1140,7 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
   it("steps é array derivado do motor (não de decisionPath BD) — labels legíveis, artigos correctos", async () => {
     // O generator re-corre evaluateTree a partir de assessment.answers.
     // FAKE_ASSESSMENT.answers = { A.setor:"industria", C.estrutura:"autonoma", D.n:"80", D.vn:"12", D.b:"5" }
-    // motor v2 → 4 steps (A + C + D + E), com labels legíveis em PT.
+    // motor v3 → 4 steps (A + C + D + E), com labels legíveis em PT.
     EQ_SETUP();
     await generateRelatorioEnquadramento(99, 1);
 
@@ -1163,7 +1164,7 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
 
     // Step E: resultado final
     expect(steps[3]!.label).toContain("entidade importante");
-    expect(steps[3]!.article).toBe("Art. 6.º/2 DL 125/2025");
+    expect(steps[3]!.article).toBe("Art. 6.º/2 do RJC"); // antes: "Art. 6.º/2 DL 125/2025" — citação corrigida no C-EQ12a
 
     // Nenhum step tem label com '{' (nenhum placeholder por substituir)
     for (const s of steps) {
@@ -1184,10 +1185,10 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
     expect(steps[0]!.label).toContain("Setor");
   });
 
-  it("classification null → classificacao = '—'", async () => {
+  it("classification null → classificacaoLabel = '—'", async () => {
     EQ_SETUP({ classification: null });
     await generateRelatorioEnquadramento(99, 1);
-    expect(_psiRenderArgs!.classificacao).toBe("—");
+    expect(_psiRenderArgs!.classificacaoLabel).toBe("—"); // antes: .classificacao — campo renomeado
   });
 
   it("resultLabel null → resultLabel = '—'", async () => {
@@ -1203,7 +1204,7 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
     const flat = [
       _psiRenderArgs!.empresa,
       _psiRenderArgs!.data,
-      _psiRenderArgs!.classificacao,
+      _psiRenderArgs!.classificacaoLabel, // antes: .classificacao — campo renomeado
       _psiRenderArgs!.resultLabel,
       _psiRenderArgs!.engineVersion,
     ];
@@ -1218,5 +1219,30 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
     expect(buf.toString("base64")).toMatch(/^[A-Za-z0-9+/]+=*$/);
+  });
+
+  it("guard dispara: assessment com engineVersion diferente → rejeita antes de gerar ficheiro", async () => {
+    const VERSAO_ANTIGA = `${ENGINE_VERSION}-antiga`;
+    EQ_SETUP({ engineVersion: VERSAO_ANTIGA });
+    await expect(generateRelatorioEnquadramento(99, 1)).rejects.toThrow(
+      `versão ${VERSAO_ANTIGA} do motor de decisão`
+    );
+    await expect(generateRelatorioEnquadramento(99, 1)).rejects.toThrow(
+      `versão actual é ${ENGINE_VERSION}`
+    );
+  });
+
+  it("caminho feliz: assessment com ENGINE_VERSION actual → gera Buffer normalmente", async () => {
+    EQ_SETUP({ engineVersion: ENGINE_VERSION });
+    const buf = await generateRelatorioEnquadramento(99, 1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("guard aceita engineVersion numérico (VARCHAR pode chegar como number)", async () => {
+    EQ_SETUP({ engineVersion: Number(ENGINE_VERSION) as unknown as string });
+    const buf = await generateRelatorioEnquadramento(99, 1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
   });
 });
