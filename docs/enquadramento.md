@@ -178,6 +178,8 @@ referência legal que imprime. Verificar sempre na fonte primária antes de
 escrever. Em julho de 2026 foram encontradas cerca de 30 citações atribuídas
 ao diploma errado já em produção.
 
+Para prazos (autoidentificação, responsável de cibersegurança, ponto de contacto, notificação de incidentes) ver [`docs/PRAZOS-RJC-fechado.md`](PRAZOS-RJC-fechado.md).
+
 ## Como regenerar o template
 
 O ficheiro `backend/assets/templates/enquadramento-template.docx` **não deve
