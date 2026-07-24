@@ -89,6 +89,22 @@ describe("Nó B — Exceções Art. 3.º/2 (entidade fora de setor)", () => {
   });
 });
 
+// ── Nó C — legalRef das opções de estrutura de grupo ─────────────────────────
+
+describe("Nó C — legalRef das opções de estrutura de grupo", () => {
+  it("opção associada_total cita Art. 3.º/4 do anexo à Rec. 2003/361/CE", () => {
+    // O artigo 3.º do CORPO da Recomendação não tem números; os tipos de empresa
+    // (autónoma, parceiras, associadas) estão no Art. 3.º DO ANEXO.
+    const opt = NIS2_PT_TREE.nodes["C"].options.find(o => o.id === "associada_total")!;
+    expect(opt.legalRef).toBe("Art. 3.º/4 do anexo à Rec. 2003/361/CE");
+  });
+
+  it("opção parceira cita Art. 3.º/2 do anexo à Rec. 2003/361/CE", () => {
+    const opt = NIS2_PT_TREE.nodes["C"].options.find(o => o.id === "parceira")!;
+    expect(opt.legalRef).toBe("Art. 3.º/2 do anexo à Rec. 2003/361/CE");
+  });
+});
+
 // ── Nó E — Classificação ─────────────────────────────────────────────────────
 
 describe("Nó E — Classificação por setor e dimensão", () => {

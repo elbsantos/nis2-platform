@@ -226,13 +226,13 @@ export const NIS2_PT_TREE: DecisionTree = {
           id: "associada_total",
           label:
             "Associada / subsidiária — outra empresa detém mais de 50 % do capital ou direitos de voto (soma-se 100 % dos efetivos do grupo)",
-          legalRef: "Art. 3.º/4 Rec. 2003/361/CE",
+          legalRef: "Art. 3.º/4 do anexo à Rec. 2003/361/CE",
         },
         {
           id: "parceira",
           label:
             "Parceira — outra empresa detém entre 25 % e 50 % (cálculo proporcional; resultado a confirmar)",
-          legalRef: "Art. 3.º/2 Rec. 2003/361/CE",
+          legalRef: "Art. 3.º/2 do anexo à Rec. 2003/361/CE",
         },
         {
           id: "nao_sei",
