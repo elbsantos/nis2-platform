@@ -73,10 +73,19 @@ O RJC designa-se a si próprio «o presente decreto-lei» e chama aos seus anexo
 | `diploma` | `diplomaLiteral` |
 |---|---|
 | `DL125` | `Decreto-Lei n.º 125/2025, de 4 de dezembro` |
-| `RJC` | `Decreto-Lei n.º 125/2025` — o RJC é o anexo e cita-se como o DL |
+| `RJC` | `do RJC` — ver regra assimétrica abaixo |
 | `REG756` | `Regulamento CNCS n.º 756/2026` |
 | `REC361` | `Recomendação 2003/361/CE` |
 | `REC361A` | `anexo à Recomendação 2003/361/CE` |
+
+**A convenção é assimétrica e ambas as formas coexistem no código, corretas:**
+
+| O que se cita | Literal | Porquê |
+|---|---|---|
+| **Artigos** do RJC | `do RJC` | O Art. 3.º do decreto-lei é «Alteração à Lei n.º 53/2008»; o Art. 3.º do RJC é «Âmbito de aplicação subjetivo». Citar «Art. 3.º do DL 125/2025» seria uma referência falsa. |
+| **Anexos** I, II e III | `ao Decreto-Lei n.º 125/2025` | É o literal do diploma: `anexo iii ao presente decreto-lei`. |
+
+O módulo NÃO deve uniformizar as duas.
 
 Os Anexos I, II e III imprimem-se como **`Anexo III ao Decreto-Lei n.º 125/2025`**.
 Está verificado. Não alterar.
@@ -109,6 +118,7 @@ Estas entradas saem de `docs/REFERENCIAS-LEGAIS-verificadas.md` e entram com
 | `DL125-10` | 10.º | Produção de efeitos | `DL-10` |
 | `DL125-11` | 11.º | Entrada em vigor | `DL-11` |
 | `RJC-3` | 3.º | Âmbito de aplicação subjetivo | `RJC-03` |
+| `RJC-3-2` | 3.º/2 | Âmbito — critério qualitativo | usado como fallback cravado em `decision-engine.ts:330` |
 | `RJC-6` | 6.º | Entidades essenciais e entidades importantes | `RJC-06` |
 | `RJC-7` | 7.º | Entidades públicas relevantes | `RJC-07` |
 | `RJC-8` | 8.º | Procedimento de qualificação das entidades | `RJC-08` |
