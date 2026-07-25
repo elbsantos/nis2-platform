@@ -11,9 +11,11 @@
  * guardados para os obter — motor é puro/determinístico, mesmas respostas = mesmo resultado.
  * ENGINE_VERSION "3" — cálculo em gémeo de dimensão: a_confirmar só quando o balanço
  * é o factor decisivo (dim(B=0) ≠ dim(B=∞)); VN≤10 com B omitido → fora_condicional.
+ * ENGINE_VERSION "4" — trilha do nó C passa a citar o legalRef da opção escolhida
+ * (ex: "Art. 3.º/4 do anexo à Rec. 2003/361/CE") em vez do legalRef do nó.
  */
 
-export const ENGINE_VERSION = "3";
+export const ENGINE_VERSION = "4";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -386,13 +388,14 @@ export function evaluateTree(
   path.push("C");
   legalBasis.push("Rec. 2003/361/CE");
 
-  const estrutura = answers["C.estrutura"] ?? "autonoma";
+  const estrutura    = answers["C.estrutura"] ?? "autonoma";
+  const estruturaOpt = findOpt("C", estrutura);
   const condicionalGrupo = estrutura === "parceira" || estrutura === "nao_sei";
 
   steps.push({
     nodeId:  "C",
     label:   `Grupo: ${ESTRUTURA_PT[estrutura] ?? estrutura}`,
-    article: tree.nodes["C"].legalRef,
+    article: estruturaOpt?.legalRef ?? tree.nodes["C"].legalRef,
   });
 
   // ── Nó D: Dimensão ───────────────────────────────────────────────────────

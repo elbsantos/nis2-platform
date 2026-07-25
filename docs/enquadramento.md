@@ -61,11 +61,21 @@ são partilhadas entre backend e frontend sem duplicação.
 Definida em `backend/utils/decision-engine.ts:16`:
 
 ```
-export const ENGINE_VERSION = "3";
+export const ENGINE_VERSION = "4";
 ```
 
-Sobe **apenas** quando a mesma combinação de respostas produz uma classificação
-diferente. Correcções de texto, citações legais e labels não sobem a versão.
+Sobe quando a mesma combinação de respostas produz um **output diferente** — seja
+a classificação final, seja a base legal citada na trilha auditável. Correcções
+de texto em labels e citações que não alteram o que é gravado na trilha não sobem
+a versão.
+
+Histórico de subidas:
+
+| Versão | Motivo |
+|---|---|
+| `"2"` | Adicionado campo `steps` (trilha legível nó a nó) |
+| `"3"` | Cálculo em gémeo de dimensão: `a_confirmar` só quando o balanço é o factor decisivo |
+| `"4"` | Trilha do nó C passa a citar o `legalRef` da opção escolhida (ex: `"Art. 3.º/4 do anexo à Rec. 2003/361/CE"`) em vez do `legalRef` do nó (`"Rec. 2003/361/CE; Art. 3.º/1 do RJC"`) |
 
 Todos os assessments gravados incluem o `engineVersion` no momento do cálculo.
 Se o motor for actualizado, os assessments antigos continuam válidos — o

@@ -30,8 +30,8 @@ const BASE_ENERGIA_MEDIA: Answers = {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 describe("ENGINE_VERSION", () => {
-  it("é '3' (v3 — cálculo em gémeo: a_confirmar só quando balanço é decisivo)", () => {
-    expect(ENGINE_VERSION).toBe("3");
+  it("é '4' (v4 — trilha nó C cita legalRef da opção, não do nó)", () => {
+    expect(ENGINE_VERSION).toBe("4");
   });
 });
 
@@ -226,6 +226,7 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     // step C mostra "subsidiária/associada"; step D mostra valores agregados do grupo
     const sC = r.steps.find(s => s.nodeId === "C")!;
     expect(sC.label).toContain("subsidiária/associada");
+    expect(sC.article).toBe("Art. 3.º/4 do anexo à Rec. 2003/361/CE"); // v4: cita opção, não nó
     const sD = r.steps.find(s => s.nodeId === "D")!;
     expect(sD.label).toContain("valores agregados do grupo");
     expect(sD.label).toContain("trabalhadores: 260");
@@ -318,7 +319,7 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     expect(r.resultLabel).toMatch(/Provável/);
   });
 
-  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "3" ────────────
+  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "4" ────────────
 
   it("[EQ8-T1] N=30, VN=8, B=desconhecido → fora_condicional (VN≤10, balanço irrelevante)", () => {
     const r = evaluateTree(
