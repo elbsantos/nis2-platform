@@ -361,7 +361,7 @@ export function evaluateTree(
       return {
         classification: "a_confirmar_contratual",
         resultLabel:
-          "Possível abrangência via cadeia de fornecimento de entidade abrangida — confirmar com o cliente ou autoridade competente.",
+          "Como fornecedor de uma entidade abrangida, não fica sujeito ao Regime Jurídico da Cibersegurança apenas por essa relação. As obrigações de cibersegurança podem chegar-lhe por via contratual: o Art. 28.º do RJC impõe à entidade cliente o dever de acautelar a segurança da sua cadeia de abastecimento. Confirme com o seu cliente quais os requisitos aplicáveis.",
         path,
         legalBasis,
         steps,

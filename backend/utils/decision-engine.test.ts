@@ -78,6 +78,9 @@ describe("Nó B — Exceções Art. 3.º/2 (entidade fora de setor)", () => {
     );
     expect(r.classification).toBe("a_confirmar_contratual");
     expect(r.path).toEqual(["A", "B"]);
+    // Não deve afirmar abrangência directa — a obrigação chega por contrato (Art. 28.º)
+    expect(r.resultLabel).toContain("Art. 28.º do RJC");
+    expect(r.resultLabel).not.toContain("abrangência via cadeia");
   });
 
   it("nenhuma exceção → fora_condicional", () => {
