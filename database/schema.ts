@@ -174,7 +174,7 @@ export const frameworkAssessments = mysqlTable(
     decisionPath:   json("decisionPath").$type<string[]>(),
     legalBasis:     json("legalBasis").$type<string[]>(),
     classification: varchar("classification", { length: 30 }),
-    resultLabel:    varchar("resultLabel", { length: 255 }),
+    resultLabel:    text("resultLabel"),
     engineVersion:  varchar("engineVersion", { length: 16 }).notNull(),
     status:         mysqlEnum("status", ["in_progress", "completed"]).notNull().default("in_progress"),
     completedAt:    timestamp("completedAt"),
