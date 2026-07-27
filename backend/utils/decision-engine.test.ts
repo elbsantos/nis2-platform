@@ -31,8 +31,8 @@ const BASE_ENERGIA_MEDIA: Answers = {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 describe("ENGINE_VERSION", () => {
-  it("é '5' (v5 — motor devolve coverageState explícito)", () => {
-    expect(ENGINE_VERSION).toBe("5");
+  it("é '6' (v6 — rótulos ramo fornecedor passam a 'obrigações por via contratual')", () => {
+    expect(ENGINE_VERSION).toBe("6");
   });
 });
 
@@ -129,6 +129,11 @@ describe("Nó B — Exceções Art. 3.º/2 (entidade fora de setor)", () => {
     // Não deve afirmar abrangência directa — a obrigação chega por contrato (Art. 28.º)
     expect(r.resultLabel).toContain("Art. 28.º do RJC");
     expect(r.resultLabel).not.toContain("abrangência via cadeia");
+    // steps.label do nó E não deve dizer "abrangência" nem "cadeia" (v6)
+    const sE = r.steps.find(s => s.nodeId === "E")!;
+    expect(sE.label).toContain("via contratual");
+    expect(sE.label).not.toContain("abrangência");
+    expect(sE.label).not.toContain("cadeia");
   });
 
   it("nenhuma exceção → fora_condicional", () => {
@@ -370,7 +375,7 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     expect(r.resultLabel).toMatch(/Provável/);
   });
 
-  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "5" ────────────
+  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "6" ────────────
 
   it("[EQ8-T1] N=30, VN=8, B=desconhecido → fora_condicional (VN≤10, balanço irrelevante)", () => {
     const r = evaluateTree(

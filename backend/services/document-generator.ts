@@ -459,7 +459,7 @@ export async function generateRelatorioEnquadramento(
     essencial:              "Entidade essencial",
     importante:             "Entidade importante",
     a_confirmar:            "A confirmar",
-    a_confirmar_contratual: "A confirmar (via cadeia de fornecimento)",
+    a_confirmar_contratual: "A confirmar (obrigações por via contratual)",
     fora_condicional:       "Fora do âmbito (orientação preliminar)",
     fora_mvp:               "Fora do âmbito do CISPLAN (regime autónomo)",
   };

@@ -15,9 +15,11 @@
  * (ex: "Art. 3.º/4 do anexo à Rec. 2003/361/CE") em vez do legalRef do nó.
  * ENGINE_VERSION "5" — motor devolve coverageState explícito ('abrangida' | 'condicional'
  * | 'fora'); o gerador deixa de adivinhar o estado por classification.
+ * ENGINE_VERSION "6" — rótulos do ramo fornecedor deixam de dizer 'abrangência via cadeia'
+ * (contradiziam o resultLabel); passam a 'obrigações por via contratual'.
  */
 
-export const ENGINE_VERSION = "5";
+export const ENGINE_VERSION = "6";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -379,7 +381,7 @@ export function evaluateTree(
     if (excecao === "fornecedor") {
       steps.push({
         nodeId:  "E",
-        label:   "Resultado: a confirmar — abrangência via cadeia de abastecimento",
+        label:   "Resultado: a confirmar — obrigações podem chegar por via contratual (Art. 28.º)",
         article: bArticle,
       });
       return {

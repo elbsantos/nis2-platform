@@ -1330,7 +1330,7 @@ describe("generateRelatorioEnquadramento — textos por coverageState (C-EQ15)",
     setupWith(ANSWERS_CONTRATUAL, "a_confirmar_contratual");
     await generateRelatorioEnquadramento(99, 1);
     expect(_psiRenderArgs!.classificacaoLabel).toContain("Provável");
-    expect(_psiRenderArgs!.classificacaoLabel).toContain("cadeia de fornecimento");
+    expect(_psiRenderArgs!.classificacaoLabel).toContain("obrigações por via contratual");
   });
 
   // ── fora (fora_condicional) ────────────────────────────────────────────────
