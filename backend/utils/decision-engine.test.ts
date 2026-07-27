@@ -3,6 +3,7 @@ import {
   ENGINE_VERSION,
   NIS2_PT_TREE,
   evaluateTree,
+  resolveCoverageState,
   type Answers,
   type TrailStep,
 } from "./decision-engine";
@@ -30,8 +31,55 @@ const BASE_ENERGIA_MEDIA: Answers = {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 describe("ENGINE_VERSION", () => {
-  it("é '4' (v4 — trilha nó C cita legalRef da opção, não do nó)", () => {
-    expect(ENGINE_VERSION).toBe("4");
+  it("é '5' (v5 — motor devolve coverageState explícito)", () => {
+    expect(ENGINE_VERSION).toBe("5");
+  });
+});
+
+// ── coverageState — mapa por classification ───────────────────────────────────
+
+describe("coverageState", () => {
+  const cases: Array<[Parameters<typeof evaluateTree>[1], string, string]> = [
+    [A({ "A.setor": "energia",     "C.estrutura": "autonoma", "D.n": "300", "D.vn": "60", "D.b": "50" }), "essencial",              "abrangida"],
+    [A({ "A.setor": "industria",   "C.estrutura": "autonoma", "D.n": "60",  "D.vn": "12", "D.b": "10" }), "importante",             "abrangida"],
+    [A({ "A.setor": "outro",       "B.excecao": "qualitativo" }),                                          "a_confirmar",            "condicional"],
+    [A({ "A.setor": "outro",       "B.excecao": "fornecedor" }),                                           "a_confirmar_contratual", "condicional"],
+    [A({ "A.setor": "outro",       "B.excecao": "nenhum" }),                                               "fora_condicional",       "fora"],
+    [A({ "A.setor": "admin_publica" }),                                                                    "fora_mvp",               "fora"],
+  ];
+
+  it.each(cases)(
+    "classification %s → coverageState %s",
+    (answers, expectedClass, expectedCoverage) => {
+      const r = evaluateTree(NIS2_PT_TREE, answers);
+      expect(r.classification).toBe(expectedClass);
+      expect(r.coverageState).toBe(expectedCoverage);
+    },
+  );
+
+  it("nenhum resultado do motor tem coverageState undefined", () => {
+    // Corre todos os cenários do ficheiro e verifica que coverageState está sempre definido
+    const scenarios = [
+      A({ "A.setor": "energia",   "C.estrutura": "autonoma",        "D.n": "300", "D.vn": "60", "D.b": "50" }),
+      A({ "A.setor": "industria", "C.estrutura": "autonoma",        "D.n": "60",  "D.vn": "12", "D.b": "10" }),
+      A({ "A.setor": "outro",     "B.excecao": "qualitativo" }),
+      A({ "A.setor": "outro",     "B.excecao": "fornecedor" }),
+      A({ "A.setor": "outro",     "B.excecao": "nenhum" }),
+      A({ "A.setor": "admin_publica" }),
+      A({ "A.setor": "energia",   "C.estrutura": "autonoma",        "D.n": "30",  "D.vn": "5" }),
+      A({ "A.setor": "energia",   "C.estrutura": "associada_total", "D.n": "240", "D.vn": "45", "D.b": "38", "D.grupo_n": "20", "D.grupo_vn": "8", "D.grupo_b": "5" }),
+    ];
+    for (const s of scenarios) {
+      const r = evaluateTree(NIS2_PT_TREE, s);
+      expect(r.coverageState).toBeDefined();
+      expect(['abrangida', 'condicional', 'fora']).toContain(r.coverageState);
+    }
+  });
+
+  it("resolveCoverageState lança se classification não está mapeada", () => {
+    expect(() => resolveCoverageState("xpto")).toThrow(
+      "coverageState em falta para classification: xpto",
+    );
   });
 });
 
@@ -322,7 +370,7 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
     expect(r.resultLabel).toMatch(/Provável/);
   });
 
-  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "4" ────────────
+  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "5" ────────────
 
   it("[EQ8-T1] N=30, VN=8, B=desconhecido → fora_condicional (VN≤10, balanço irrelevante)", () => {
     const r = evaluateTree(

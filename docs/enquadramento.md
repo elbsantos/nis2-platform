@@ -61,7 +61,7 @@ são partilhadas entre backend e frontend sem duplicação.
 Definida em `backend/utils/decision-engine.ts:16`:
 
 ```
-export const ENGINE_VERSION = "4";
+export const ENGINE_VERSION = "5";
 ```
 
 Sobe quando a mesma combinação de respostas produz um **output diferente** — seja
@@ -76,6 +76,7 @@ Histórico de subidas:
 | `"2"` | Adicionado campo `steps` (trilha legível nó a nó) |
 | `"3"` | Cálculo em gémeo de dimensão: `a_confirmar` só quando o balanço é o factor decisivo |
 | `"4"` | Trilha do nó C passa a citar o `legalRef` da opção escolhida (ex: `"Art. 3.º/4 do anexo à Rec. 2003/361/CE"`) em vez do `legalRef` do nó (`"Rec. 2003/361/CE; Art. 3.º/1 do RJC"`) |
+| `"5"` | Motor devolve `coverageState` explícito (`'abrangida'` \| `'condicional'` \| `'fora'`); o gerador deixa de adivinhar o estado por `classification` |
 
 Todos os assessments gravados incluem o `engineVersion` no momento do cálculo.
 Se o motor for actualizado, os assessments antigos continuam válidos — o

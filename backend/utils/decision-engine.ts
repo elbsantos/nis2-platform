@@ -13,9 +13,11 @@
  * é o factor decisivo (dim(B=0) ≠ dim(B=∞)); VN≤10 com B omitido → fora_condicional.
  * ENGINE_VERSION "4" — trilha do nó C passa a citar o legalRef da opção escolhida
  * (ex: "Art. 3.º/4 do anexo à Rec. 2003/361/CE") em vez do legalRef do nó.
+ * ENGINE_VERSION "5" — motor devolve coverageState explícito ('abrangida' | 'condicional'
+ * | 'fora'); o gerador deixa de adivinhar o estado por classification.
  */
 
-export const ENGINE_VERSION = "4";
+export const ENGINE_VERSION = "5";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -55,8 +57,11 @@ export interface TrailStep {
   article: string;  // base legal deste passo específico
 }
 
+export type CoverageState = 'abrangida' | 'condicional' | 'fora';
+
 export interface DecisionResult {
   classification: Classification;
+  coverageState:  CoverageState;
   resultLabel:    string;
   path:           string[];      // ids dos nós visitados — retrocompatível
   legalBasis:     string[];      // artigos citados — retrocompatível
@@ -94,6 +99,23 @@ const ESTRUTURA_PT: Record<string, string> = {
   parceira:        "empresa parceira — participação 25–50 % (cálculo proporcional, resultado condicional)",
   nao_sei:         "estrutura de grupo não identificada (resultado condicional)",
 };
+
+// ── Mapa classification → coverageState ─────────────────────────────────────
+
+const COVERAGE_STATE: Record<string, CoverageState> = {
+  essencial:              'abrangida',
+  importante:             'abrangida',
+  a_confirmar:            'condicional',
+  a_confirmar_contratual: 'condicional',
+  fora_condicional:       'fora',
+  fora_mvp:               'fora',
+};
+
+export function resolveCoverageState(classification: string): CoverageState {
+  const cs = COVERAGE_STATE[classification];
+  if (!cs) throw new Error(`coverageState em falta para classification: ${classification}`);
+  return cs;
+}
 
 // ── Árvore concreta NIS2-PT (DL 125/2025) ────────────────────────────────────
 
@@ -314,6 +336,7 @@ export function evaluateTree(
     });
     return {
       classification: "fora_mvp",
+      coverageState:  COVERAGE_STATE["fora_mvp"],
       resultLabel:
         "Administração Pública — regime autónomo (Art. 3.º/3 e Art. 7.º do RJC). Consulte o CNCS diretamente.",
       path,
@@ -345,6 +368,7 @@ export function evaluateTree(
       });
       return {
         classification: "a_confirmar",
+        coverageState:  COVERAGE_STATE["a_confirmar"],
         resultLabel:
           "Não foi possível enquadrar a sua atividade nas opções apresentadas. Os critérios qualitativos do Art. 3.º/2 do RJC aplicam-se a entidades que constam dos Anexos I ou II, independentemente da dimensão — verifique se a sua atividade consta desses anexos e confirme junto do CNCS.",
         path,
@@ -360,6 +384,7 @@ export function evaluateTree(
       });
       return {
         classification: "a_confirmar_contratual",
+        coverageState:  COVERAGE_STATE["a_confirmar_contratual"],
         resultLabel:
           "Como fornecedor de uma entidade abrangida, não fica sujeito ao Regime Jurídico da Cibersegurança apenas por essa relação. As obrigações de cibersegurança podem chegar-lhe por via contratual: o Art. 28.º do RJC impõe à entidade cliente o dever de acautelar a segurança da sua cadeia de abastecimento. Confirme com o seu cliente quais os requisitos aplicáveis.",
         path,
@@ -374,6 +399,7 @@ export function evaluateTree(
     });
     return {
       classification: "fora_condicional",
+      coverageState:  COVERAGE_STATE["fora_condicional"],
       resultLabel:
         "Organização fora do âmbito da NIS2. Reavalie se o setor ou relações contratuais se alterarem.",
       path,
@@ -472,6 +498,7 @@ export function evaluateTree(
     });
     return {
       classification: "a_confirmar",
+      coverageState:  COVERAGE_STATE["a_confirmar"],
       resultLabel:
         "Dimensão a confirmar — o balanço desconhecido determina se a organização é abrangida e em que categoria. Forneça o balanço para obter uma classificação definitiva.",
       path,
@@ -503,8 +530,9 @@ function classifyE(
     eLabel:         string,
     eArticle:       string,
   ): DecisionResult => {
+    const coverageState = resolveCoverageState(classification);
     steps.push({ nodeId: "E", label: eLabel, article: eArticle });
-    return { classification, resultLabel, path, legalBasis, steps };
+    return { classification, coverageState, resultLabel, path, legalBasis, steps };
   };
 
   // Regra 1: TLD / DNS / Confiança Qualificada → ESSENCIAL independentemente da dimensão.
