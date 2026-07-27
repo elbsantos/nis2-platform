@@ -167,13 +167,13 @@ ${ep}
 ${pLoop("{#isFora}")}
 ${p("As secções seguintes descrevem as obrigações aplicáveis às entidades abrangidas pelo Regime Jurídico da Cibersegurança. De acordo com este enquadramento preliminar, a sua organização não é abrangida, pelo que estas obrigações não lhe são exigíveis. São apresentadas a título informativo, para o caso de a situação da organização se alterar ou de se verificarem os critérios qualitativos do artigo 3.º, n.º 2, do RJC.")}
 ${pLoop("{/isFora}")}
-${pLoop("{#isAConfirmar}")}
+${pLoop("{#isCondicional}")}
 ${p("As secções seguintes descrevem as obrigações aplicáveis às entidades abrangidas pelo Regime Jurídico da Cibersegurança. De acordo com este enquadramento preliminar, o enquadramento da sua organização não está determinado, pelo que estas obrigações só lhe serão exigíveis caso se confirme que está abrangida. São apresentadas a título informativo, para o caso de a situação da organização se alterar ou de se verificarem os critérios qualitativos do artigo 3.º, n.º 2, do RJC.")}
-${pLoop("{/isAConfirmar}")}
+${pLoop("{/isCondicional}")}
 ${ep}
 
 ${p("{sec3Title}", { bold: true, sz: 14 })}
-${p("Estas obrigações estão em vigor desde a entrada em vigor do Regime Jurídico da Cibersegurança, em 3 de abril de 2026 (artigo 11.º do Decreto-Lei n.º 125/2025). O Regulamento n.º 756/2026, em vigor desde 23 de junho de 2026, não as criou: operacionalizou-as, definindo o funcionamento da plataforma eletrónica MyCiber e os procedimentos de autoidentificação, qualificação, comunicação e notificação.")}
+${p("{emVigorTexto}")}
 ${p("  • Autoidentificação (artigo 8.º, n.º 1, do RJC): 60 dias após a disponibilização da plataforma eletrónica, para entidades já em atividade à data de entrada em vigor do RJC; 30 dias após o início de atividade, para as restantes. O CNCS refere na sua página estes prazos em dias úteis e a lei não fixa a data de disponibilização da plataforma — confirme o prazo aplicável junto do CNCS.")}
 ${p("  • Designação obrigatória de responsável de cibersegurança (artigo 31.º) e de ponto de contacto permanente (artigo 32.º). A comunicação faz-se no prazo de 20 dias úteis a contar do início de funções. Para as entidades que já exerciam atividade à data de entrada em vigor do RJC, os artigos 14.º, n.º 2, e 15.º, n.º 2, do Regulamento n.º 756/2026 determinam que o prazo se conta a partir da notificação da qualificação da entidade (artigo 8.º, n.º 5, do RJC).")}
 ${p("  • Ativação do canal de notificação de incidentes significativos — artigo 40.º do RJC.")}

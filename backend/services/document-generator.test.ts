@@ -1246,3 +1246,120 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
     expect(buf.length).toBeGreaterThan(0);
   });
 });
+
+// ===========================================================================
+// C-EQ15 — coverageState no gerador: textos por estado
+// ===========================================================================
+
+describe("generateRelatorioEnquadramento — textos por coverageState (C-EQ15)", () => {
+  // Fixtures de answers para cada estado
+  // abrangida (importante): FAKE_ASSESSMENT.answers
+  const ANSWERS_ABRANGIDA    = { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" };
+  // condicional (a_confirmar): setor não mapeado, excecao qualitativa
+  const ANSWERS_CONDICIONAL  = { "A.setor": "outro", "B.excecao": "qualitativo" };
+  // condicional (a_confirmar_contratual): setor não mapeado, excecao fornecedor
+  const ANSWERS_CONTRATUAL   = { "A.setor": "outro", "B.excecao": "fornecedor" };
+  // fora (fora_condicional): setor não mapeado, sem excecao
+  const ANSWERS_FORA         = { "A.setor": "outro", "B.excecao": "nenhum" };
+  // fora (fora_mvp): admin pública
+  const ANSWERS_FORA_MVP     = { "A.setor": "admin_publica" };
+
+  const setupWith = (answers: object, classificationOverride?: string) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getFrameworkAssessmentById).mockResolvedValue({
+      ...FAKE_ASSESSMENT,
+      answers,
+      classification: classificationOverride ?? undefined,
+    });
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ASSESSMENT, id: 1, name: "Org Teste" } as any);
+  };
+
+  // ── abrangida ──────────────────────────────────────────────────────────────
+
+  it("abrangida → sec3Title 'de si hoje', provavel=false, emVigorTexto afirmativo", async () => {
+    setupWith(ANSWERS_ABRANGIDA, "importante");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.sec3Title).toBe("3. O que a lei já exige de si hoje");
+    expect(_psiRenderArgs!.provavel).toBe(false);
+    expect(_psiRenderArgs!.emVigorTexto).toContain("estão em vigor desde a entrada em vigor");
+    expect(_psiRenderArgs!.isFora).toBe(false);
+    expect(_psiRenderArgs!.isCondicional).toBe(false);
+    expect(_psiRenderArgs!.isAbrangida).toBe(true);
+  });
+
+  it("abrangida → classificacaoLabel sem prefixo 'Provável'", async () => {
+    setupWith(ANSWERS_ABRANGIDA, "importante");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.classificacaoLabel).toBe("Entidade importante");
+    expect(_psiRenderArgs!.classificacaoLabel).not.toContain("Provável");
+  });
+
+  // ── condicional (a_confirmar) ──────────────────────────────────────────────
+
+  it("a_confirmar → sec3Title 'das entidades abrangidas', provavel=true, emVigorTexto condicionado", async () => {
+    setupWith(ANSWERS_CONDICIONAL, "a_confirmar");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.sec3Title).toBe("3. O que a lei exige das entidades abrangidas");
+    expect(_psiRenderArgs!.provavel).toBe(true);
+    expect(_psiRenderArgs!.emVigorTexto).toContain("depende de se confirmar que está abrangida");
+    expect(_psiRenderArgs!.isCondicional).toBe(true);
+    expect(_psiRenderArgs!.isFora).toBe(false);
+  });
+
+  it("a_confirmar → classificacaoLabel com prefixo 'Provável'", async () => {
+    setupWith(ANSWERS_CONDICIONAL, "a_confirmar");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.classificacaoLabel).toContain("Provável");
+    expect(_psiRenderArgs!.classificacaoLabel).toContain("A confirmar");
+  });
+
+  // ── condicional (a_confirmar_contratual) — o ramo que escapava ────────────
+
+  it("a_confirmar_contratual → sec3Title 'das entidades abrangidas' (era 'de si hoje' antes do fix)", async () => {
+    setupWith(ANSWERS_CONTRATUAL, "a_confirmar_contratual");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.sec3Title).toBe("3. O que a lei exige das entidades abrangidas");
+    expect(_psiRenderArgs!.provavel).toBe(true);
+    expect(_psiRenderArgs!.emVigorTexto).toContain("depende de se confirmar que está abrangida");
+    expect(_psiRenderArgs!.isCondicional).toBe(true);
+    expect(_psiRenderArgs!.isFora).toBe(false);
+  });
+
+  it("a_confirmar_contratual → classificacaoLabel com prefixo 'Provável'", async () => {
+    setupWith(ANSWERS_CONTRATUAL, "a_confirmar_contratual");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.classificacaoLabel).toContain("Provável");
+    expect(_psiRenderArgs!.classificacaoLabel).toContain("cadeia de fornecimento");
+  });
+
+  // ── fora (fora_condicional) ────────────────────────────────────────────────
+
+  it("fora_condicional → sec3Title 'das entidades abrangidas', provavel=false, emVigorTexto informativo", async () => {
+    setupWith(ANSWERS_FORA, "fora_condicional");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.sec3Title).toBe("3. O que a lei exige das entidades abrangidas");
+    expect(_psiRenderArgs!.provavel).toBe(false);
+    expect(_psiRenderArgs!.emVigorTexto).toContain("não são exigíveis a esta organização");
+    expect(_psiRenderArgs!.isFora).toBe(true);
+    expect(_psiRenderArgs!.isCondicional).toBe(false);
+  });
+
+  it("fora_condicional → classificacaoLabel sem 'Provavelmente' (removido)", async () => {
+    setupWith(ANSWERS_FORA, "fora_condicional");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.classificacaoLabel).not.toContain("Provavelmente");
+    expect(_psiRenderArgs!.classificacaoLabel).toContain("orientação preliminar");
+  });
+
+  // ── fora (fora_mvp) — também escapava ─────────────────────────────────────
+
+  it("fora_mvp → sec3Title 'das entidades abrangidas', isFora=true (era 'de si hoje' antes do fix)", async () => {
+    setupWith(ANSWERS_FORA_MVP, "fora_mvp");
+    await generateRelatorioEnquadramento(99, 1);
+    expect(_psiRenderArgs!.sec3Title).toBe("3. O que a lei exige das entidades abrangidas");
+    expect(_psiRenderArgs!.isFora).toBe(true);
+    expect(_psiRenderArgs!.provavel).toBe(false);
+    expect(_psiRenderArgs!.emVigorTexto).toContain("não são exigíveis a esta organização");
+  });
+});

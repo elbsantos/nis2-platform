@@ -423,40 +423,65 @@ export async function generateRelatorioEnquadramento(
   const answers = (assessment.answers ?? {}) as Record<string, string>;
   const result  = evaluateTree(NIS2_PT_TREE, answers);
 
-  const classification = assessment.classification ?? "";
-  const isForaOuConfirmar =
-    classification === "fora_condicional" || classification === "a_confirmar";
+  const { coverageState } = result;
 
+  // ── Ponto de decisão único: todo o texto varia aqui, nunca abaixo ────────────
+  const TEXTOS = {
+    abrangida: {
+      sec3Title: "3. O que a lei já exige de si hoje",
+      sec4Title: "4. O que terá de estar pronto até junho de 2028",
+      sec5Title: "5. Exposição sancionatória",
+      sec5Intro: "Escalões aplicáveis à sua categoria (artigos 61.º e 62.º do RJC). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente. Há um caminho de conformidade e ainda há tempo.",
+      emVigor:   "Estas obrigações estão em vigor desde a entrada em vigor do Regime Jurídico da Cibersegurança, em 3 de abril de 2026 (artigo 11.º do Decreto-Lei n.º 125/2025). O Regulamento n.º 756/2026, em vigor desde 23 de junho de 2026, não as criou: operacionalizou-as, definindo o funcionamento da plataforma eletrónica MyCiber e os procedimentos de autoidentificação, qualificação, comunicação e notificação.",
+      provavel:  false,
+    },
+    condicional: {
+      sec3Title: "3. O que a lei exige das entidades abrangidas",
+      sec4Title: "4. O que terá de estar pronto até junho de 2028, se abrangida",
+      sec5Title: "5. Exposição sancionatória das entidades abrangidas",
+      sec5Intro: "Escalões aplicáveis às entidades abrangidas (artigos 61.º e 62.º do RJC). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente.",
+      emVigor:   "As obrigações abaixo vigoram, na ordem jurídica, desde a entrada em vigor do RJC (3 de abril de 2026). A sua exigibilidade a esta organização depende de se confirmar que está abrangida.",
+      provavel:  true,
+    },
+    fora: {
+      sec3Title: "3. O que a lei exige das entidades abrangidas",
+      sec4Title: "4. O que terá de estar pronto até junho de 2028, se abrangida",
+      sec5Title: "5. Exposição sancionatória das entidades abrangidas",
+      sec5Intro: "Escalões aplicáveis às entidades abrangidas (artigos 61.º e 62.º do RJC). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente.",
+      emVigor:   "As obrigações abaixo vigoram na ordem jurídica desde 3 de abril de 2026, mas não são exigíveis a esta organização com o enquadramento atual.",
+      provavel:  false,
+    },
+  } as const;
+  const textos = TEXTOS[coverageState];
+
+  const classification = assessment.classification ?? "";
   const CLASSIFICACAO_LABELS: Record<string, string> = {
     essencial:              "Entidade essencial",
     importante:             "Entidade importante",
     a_confirmar:            "A confirmar",
     a_confirmar_contratual: "A confirmar (via cadeia de fornecimento)",
-    fora_condicional:       "Provavelmente fora do âmbito",
+    fora_condicional:       "Fora do âmbito (orientação preliminar)",
     fora_mvp:               "Fora do âmbito do CISPLAN (regime autónomo)",
   };
 
+  const rawLabel        = (CLASSIFICACAO_LABELS[classification] ?? classification) || "—";
+  const classificacaoLabel = textos.provavel ? `Provável — ${rawLabel}` : rawLabel;
+
   const data = {
-    empresa:            cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
-    data:               formatDate(new Date()),
-    classificacaoLabel: (CLASSIFICACAO_LABELS[classification] ?? classification) || "—",
-    resultLabel:        assessment.resultLabel ?? "—",
-    engineVersion:      assessment.engineVersion,
-    isFora:             classification === "fora_condicional",
-    isAConfirmar:       classification === "a_confirmar",
-    sec3Title: isForaOuConfirmar
-      ? "3. O que a lei exige das entidades abrangidas"
-      : "3. O que a lei já exige de si hoje",
-    sec4Title: isForaOuConfirmar
-      ? "4. O que terá de estar pronto até junho de 2028, se abrangida"
-      : "4. O que terá de estar pronto até junho de 2028",
-    sec5Title: isForaOuConfirmar
-      ? "5. Exposição sancionatória das entidades abrangidas"
-      : "5. Exposição sancionatória",
-    sec5Intro: isForaOuConfirmar
-      ? "Escalões aplicáveis às entidades abrangidas (artigos 61.º e 62.º do RJC). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente."
-      : "Escalões aplicáveis à sua categoria (artigos 61.º e 62.º do RJC). Os valores são tetos máximos; a coima concreta é fixada caso a caso pela autoridade de cibersegurança competente. Há um caminho de conformidade e ainda há tempo.",
-    isAbrangida: classification === "essencial" || classification === "importante",
+    empresa:          cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    data:             formatDate(new Date()),
+    classificacaoLabel,
+    resultLabel:      assessment.resultLabel ?? "—",
+    engineVersion:    assessment.engineVersion,
+    isFora:           coverageState === 'fora',
+    isCondicional:    coverageState === 'condicional',
+    isAbrangida:      coverageState === 'abrangida',
+    sec3Title:        textos.sec3Title,
+    sec4Title:        textos.sec4Title,
+    sec5Title:        textos.sec5Title,
+    sec5Intro:        textos.sec5Intro,
+    emVigorTexto:     textos.emVigor,
+    provavel:         textos.provavel,
     // Loop {#steps}…{/steps}: um item por nó visitado, com label legível e base legal
     steps: result.steps.map(s => ({ label: s.label, article: s.article })),
   };
