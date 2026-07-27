@@ -198,9 +198,9 @@ ${p("Nota: as contraordenações muito graves previstas nas alíneas b), c) e f)
 ${pLoop("{#isAbrangida}")}
 ${p("O incumprimento dos deveres de designação do responsável de cibersegurança (artigo 31.º) e de ponto de contacto permanente (artigo 32.º) constitui contraordenação muito grave, nos termos das alíneas d) e e) do n.º 1 do artigo 61.º do RJC. Estas alíneas não constam do diferimento previsto no artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
 ${pLoop("{/isAbrangida}")}
-${pLoop("{#isAConfirmar}")}
+${pLoop("{#isCondicional}")}
 ${p("O incumprimento dos deveres de designação do responsável de cibersegurança (artigo 31.º) e de ponto de contacto permanente (artigo 32.º) constitui contraordenação muito grave, nos termos das alíneas d) e e) do n.º 1 do artigo 61.º do RJC. Estas alíneas não constam do diferimento previsto no artigo 10.º, n.º 2, do Decreto-Lei n.º 125/2025.", { italic: true })}
-${pLoop("{/isAConfirmar}")}
+${pLoop("{/isCondicional}")}
 ${p("Salvo em caso de dolo, a instauração de processo de contraordenação depende de prévia advertência da autoridade competente para cumprimento da obrigação omitida em prazo razoável (artigo 66.º, n.º 5, do RJC).", { italic: true })}
 ${ep}
 
@@ -238,12 +238,12 @@ ${p("  2. Verifique se lhe são aplicáveis os critérios qualitativos do artigo
 ${p("  3. Reavalie o enquadramento se a dimensão da organização aumentar ou se a estrutura de grupo se alterar.")}
 ${p("  4. Ainda que não abrangida, pode adotar voluntariamente o Quadro Nacional de Referência para a Cibersegurança. O CNCS pode recomendá-lo a entidades fora do âmbito de aplicação (artigo 24.º, n.º 2, e artigo 30.º, n.º 8, do Regulamento n.º 756/2026).")}
 ${pLoop("{/isFora}")}
-${pLoop("{#isAConfirmar}")}
+${pLoop("{#isCondicional}")}
 ${p("  1. Confirme este enquadramento com assessor jurídico ou junto do CNCS. Este relatório é uma orientação preliminar e não substitui a qualificação oficial.")}
 ${p("  2. Reúna os dados em falta que determinam o enquadramento — nomeadamente o balanço total anual e a estrutura de grupo — e repita a avaliação. São esses dados que decidem se a organização está abrangida e em que categoria.")}
 ${p("  3. Verifique se lhe são aplicáveis os critérios qualitativos do artigo 3.º, n.º 2, do RJC, que abrangem determinadas entidades independentemente da dimensão.")}
 ${p("  4. Caso se confirme que está abrangida, os passos aplicáveis são os descritos nas secções 3 e 4 deste relatório.")}
-${pLoop("{/isAConfirmar}")}
+${pLoop("{/isCondicional}")}
 ${ep}
 ${p("Gerado automaticamente pelo CISPLAN — cisplan.com", { bold: true })}
 
