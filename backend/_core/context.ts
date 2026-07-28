@@ -8,16 +8,12 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import { jwtVerify } from "jose";
 import { getUserById } from "../db";
 import type { User } from "../db";
+import { getJwtSecret } from "./env";
 
 export interface Context {
   user: User | null;
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-}
-
-function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET ?? "dev-secret-change-in-production-min-32-chars";
-  return new TextEncoder().encode(secret);
 }
 
 async function getUserFromCookie(req: CreateExpressContextOptions["req"]): Promise<User | null> {

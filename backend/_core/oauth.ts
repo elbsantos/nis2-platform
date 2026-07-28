@@ -11,6 +11,7 @@ import { scryptSync, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { z } from "zod";
 import { getUserByEmail, getUserById, createUser, createOrganization, getOrCreateOrgForOwner, setResetToken, getUserByResetToken, resetUserPassword, deleteAccount } from "../db";
 import { sendPasswordReset } from "../integrations/resend";
+import { getJwtSecret } from "./env";
 
 const COOKIE_NAME = "auth_token";
 const COOKIE_OPTIONS = {
@@ -75,14 +76,6 @@ function verifyPassword(password: string, stored: string): boolean {
 // ---------------------------------------------------------------------------
 // JWT
 // ---------------------------------------------------------------------------
-
-function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("[Auth] JWT_SECRET is not set in production");
-  }
-  return new TextEncoder().encode(secret ?? "dev-secret-change-in-production-min-32-chars");
-}
 
 async function signToken(userId: number): Promise<string> {
   return new SignJWT({ sub: String(userId) })

@@ -68,6 +68,18 @@ export const ENV = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Shared JWT secret — single source of truth; fail-closed in production
+// ---------------------------------------------------------------------------
+
+export function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("[Auth] JWT_SECRET is not set in production");
+  }
+  return new TextEncoder().encode(secret ?? "dev-secret-change-in-production-min-32-chars");
+}
+
+// ---------------------------------------------------------------------------
 // Startup validation log (non-blocking in dev)
 // ---------------------------------------------------------------------------
 
