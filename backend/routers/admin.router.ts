@@ -8,13 +8,14 @@
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getRedisClient } from "../middlewares/rateLimit";
+import { isPlatformAdmin } from "../_core/env";
 
 // ---------------------------------------------------------------------------
 // Admin-only procedure
 // ---------------------------------------------------------------------------
 
 const adminProcedure = protectedProcedure.use((opts) => {
-  if (opts.ctx.user.role !== "admin") {
+  if (!isPlatformAdmin(opts.ctx.user.email)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Acesso restrito a administradores.",

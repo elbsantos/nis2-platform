@@ -65,6 +65,9 @@ export const ENV = {
   // ── Internal ──────────────────────────────────────────────────────────────
   forgeApiUrl: optional("BUILT_IN_FORGE_API_URL"),
   forgeApiKey: optional("BUILT_IN_FORGE_API_KEY"),
+
+  // ── Platform admins (comma-separated emails; empty = ninguém é admin) ─────
+  platformAdminEmails: optional("PLATFORM_ADMIN_EMAILS"),
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -77,6 +80,17 @@ export function getJwtSecret(): Uint8Array {
     throw new Error("[Auth] JWT_SECRET is not set in production");
   }
   return new TextEncoder().encode(secret ?? "dev-secret-change-in-production-min-32-chars");
+}
+
+// ---------------------------------------------------------------------------
+// Platform admin allowlist — fail-closed: lista vazia = ninguém é admin
+// ---------------------------------------------------------------------------
+
+export function isPlatformAdmin(email: string): boolean {
+  const raw = process.env.PLATFORM_ADMIN_EMAILS ?? "";
+  if (!raw.trim()) return false;
+  const allowed = raw.split(",").map((e) => e.trim().toLowerCase());
+  return allowed.includes(email.toLowerCase());
 }
 
 // ---------------------------------------------------------------------------
