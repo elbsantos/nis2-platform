@@ -194,10 +194,14 @@ export function safeLookup(
       }
     }
 
-    // Escolher um IP respeitando a preferência de family
-    const preferred = (options.family
-      ? addresses.find((a) => a.family === options.family)
-      : undefined) ?? addresses[0];
+    // Escolher um IP respeitando a preferência de family.
+    // family=4 ou 6: filtrar estritamente por essa família.
+    // family=0 ou undefined: sem preferência — preferir IPv4 para evitar falhas
+    // em ambientes com routing IPv6 incompleto (Railway em produção).
+    // Nota: family=0 é falsy em JS, pelo que `options.family ? ...` era incorrecto.
+    const preferred = (options.family === 4 || options.family === 6)
+      ? (addresses.find((a) => a.family === options.family) ?? addresses[0])
+      : (addresses.find((a) => a.family === 4) ?? addresses[0]);
 
     if (!preferred) {
       callback(
