@@ -7,6 +7,7 @@
  */
 
 import net from "net";
+import { safeLookup } from "../middlewares/security";
 import { cvssToSeverity } from "../utils/cvss";
 import { getCisControls } from "../utils/cis-mapping";
 import { getIso27001Controls, getNistCsfControls } from "../utils/framework-mapping";
@@ -45,7 +46,7 @@ function grabSshBanner(host: string, port: number, timeoutMs = 5_000): Promise<s
     let banner = "";
 
     socket.setTimeout(timeoutMs);
-    socket.connect(port, host);
+    socket.connect({ port, host, lookup: safeLookup });
 
     socket.on("data", (chunk) => {
       banner += chunk.toString("utf8");

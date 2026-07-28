@@ -11,6 +11,7 @@ import http from "http";
 import type { IncomingHttpHeaders } from "http";
 import { CHECK_CIS } from "../utils/cis-mapping";
 import { CHECK_ISO27001, CHECK_NIST } from "../utils/framework-mapping";
+import { safeLookup, assertSafeRedirect } from "../middlewares/security";
 
 export interface HttpHeaderCheck {
   name: string;
@@ -40,13 +41,18 @@ function fetchHeaders(url: string, redirectsLeft = 3): Promise<IncomingHttpHeade
         timeout: 8000,
         headers: { "User-Agent": "Mozilla/5.0 NIS2-Scanner/1.0 (+https://nis2.pt)" },
         rejectUnauthorized: false,
+        lookup: safeLookup,
       },
       (res) => {
         const location = res.headers["location"];
         if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) && location && redirectsLeft > 0) {
           res.destroy();
           const next = location.startsWith("http") ? location : new URL(location, url).href;
-          fetchHeaders(next, redirectsLeft - 1).then(resolve).catch(reject);
+          // Revalidar o destino do redirect antes de seguir (A2 — SSRF redirect chain)
+          assertSafeRedirect(next)
+            .then(() => fetchHeaders(next, redirectsLeft - 1))
+            .then(resolve)
+            .catch(reject);
           return;
         }
         res.destroy();

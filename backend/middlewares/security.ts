@@ -5,6 +5,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import dns from "dns";
 
 // ---------------------------------------------------------------------------
 // Security headers middleware
@@ -141,5 +142,96 @@ export function assertSafeTarget(target: string): void {
     throw new Error(
       `Target inválido: "${target}". Apenas domínios públicos são permitidos.`
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SSRF connection-time guards — aplicar a TODOS os pontos de conexão (A2)
+// ---------------------------------------------------------------------------
+
+/** Verifica se um IP resolvido é privado ou bloqueado — reutiliza os ranges existentes. */
+export function isPrivateOrBlockedIp(ip: string): boolean {
+  const lower = ip.toLowerCase().trim();
+  return BLOCKED_HOSTNAMES.has(lower) || PRIVATE_IP_RE.test(lower);
+}
+
+/**
+ * lookup function para http/https/net/tls: resolve o hostname, valida TODOS
+ * os IPs devolvidos antes de conectar. Fecha a janela de DNS rebinding.
+ *
+ * Assinatura compatível com a opção `lookup` do Node.js (http.RequestOptions,
+ * net.TcpNetConnectOpts, tls.ConnectionOptions).
+ */
+export function safeLookup(
+  hostname: string,
+  options: dns.LookupOptions,
+  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+): void {
+  // Caminho rápido: hostname conhecido como bloqueado ou IP literal privado
+  const lower = hostname.toLowerCase();
+  if (BLOCKED_HOSTNAMES.has(lower) || PRIVATE_IP_RE.test(lower)) {
+    callback(
+      Object.assign(new Error(`SSRF bloqueado: ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
+      "", 0
+    );
+    return;
+  }
+
+  // Resolver todos os IPs e validar cada um
+  dns.lookup(hostname, { all: true }, (err, addresses) => {
+    if (err) return callback(err, "", 0);
+
+    for (const { address } of addresses) {
+      if (isPrivateOrBlockedIp(address)) {
+        callback(
+          Object.assign(
+            new Error(`SSRF bloqueado: ${hostname} → ${address} (IP privado/bloqueado)`),
+            { code: "SSRF_BLOCKED" }
+          ) as NodeJS.ErrnoException,
+          "", 0
+        );
+        return;
+      }
+    }
+
+    // Escolher um IP respeitando a preferência de family
+    const preferred = (options.family
+      ? addresses.find((a) => a.family === options.family)
+      : undefined) ?? addresses[0];
+
+    if (!preferred) {
+      callback(
+        Object.assign(new Error(`SSRF bloqueado: sem endereço para ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
+        "", 0
+      );
+      return;
+    }
+    callback(null, preferred.address, preferred.family);
+  });
+}
+
+/**
+ * Valida o destino de um redirect antes de o seguir.
+ * Rejeita hostnames/IPs privados (inclui resolução DNS).
+ */
+export async function assertSafeRedirect(url: string): Promise<void> {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    throw new Error(`SSRF bloqueado: URL de redirect inválido: ${url}`);
+  }
+
+  // IP literal ou hostname bloqueado — sem DNS
+  if (PRIVATE_IP_RE.test(hostname) || BLOCKED_HOSTNAMES.has(hostname.toLowerCase())) {
+    throw new Error(`SSRF bloqueado: redirect para ${hostname} não permitido`);
+  }
+
+  // Hostname — resolver e validar todos os IPs
+  const addresses = await dns.promises.lookup(hostname, { all: true } as dns.LookupAllOptions) as dns.LookupAddress[];
+  for (const { address } of addresses) {
+    if (isPrivateOrBlockedIp(address)) {
+      throw new Error(`SSRF bloqueado: ${hostname} resolve para IP privado (${address})`);
+    }
   }
 }

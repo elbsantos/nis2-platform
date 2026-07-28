@@ -6,6 +6,7 @@
  */
 
 import http from "http";
+import { safeLookup } from "../middlewares/security";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
 import type { DirectTlsResult } from "../integrations/direct-tls";
@@ -201,7 +202,7 @@ export function isIpAddress(target: string): boolean {
 function fetchWellKnownToken(ip: string): Promise<string | null> {
   return new Promise((resolve) => {
     const req = http.get(
-      { host: ip, path: "/.well-known/nis2pt.txt", timeout: 5000 },
+      { host: ip, path: "/.well-known/nis2pt.txt", timeout: 5000, lookup: safeLookup },
       (res) => {
         let body = "";
         res.on("data", (chunk: Buffer) => { body += chunk.toString(); });

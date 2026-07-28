@@ -11,6 +11,8 @@
 
 import tls from "tls";
 import net from "net";
+import https from "https";
+import { safeLookup } from "../middlewares/security";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,7 +97,7 @@ function checkPortOpen(host: string, port: number, timeoutMs = 3_000): Promise<b
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(timeoutMs);
-    socket.connect(port, host, () => { socket.destroy(); resolve(true); });
+    socket.connect({ port, host, lookup: safeLookup }, () => { socket.destroy(); resolve(true); });
     socket.on("error", () => { socket.destroy(); resolve(false); });
     socket.on("timeout", () => { socket.destroy(); resolve(false); });
   });
@@ -105,36 +107,46 @@ function checkPortOpen(host: string, port: number, timeoutMs = 3_000): Promise<b
 // CDN detection via HTTP response headers
 // ---------------------------------------------------------------------------
 
-export async function detectCdn(domain: string): Promise<CdnInfo> {
-  try {
-    const res = await fetch(`https://${domain}`, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(8_000),
-      redirect: "follow",
-    });
-
-    const h = (name: string) => res.headers.get(name) ?? "";
-
-    if (h("cf-ray") || h("cf-cache-status") || h("server").toLowerCase().includes("cloudflare")) {
-      return { detected: true, provider: "Cloudflare", isProtected: true };
-    }
-    if (h("x-fastly-request-id")) {
-      return { detected: true, provider: "Fastly", isProtected: true };
-    }
-    if (h("x-akamai-transformed") || h("akamai-cache-status")) {
-      return { detected: true, provider: "Akamai", isProtected: true };
-    }
-    if (h("x-amz-cf-id")) {
-      return { detected: true, provider: "AWS CloudFront", isProtected: true };
-    }
-    if (h("x-cache").includes("HIT") || h("via").includes("proxy")) {
-      return { detected: true, provider: "CDN/Proxy", isProtected: true };
-    }
-
-    return { detected: false, provider: null, isProtected: false };
-  } catch {
-    return { detected: false, provider: null, isProtected: false };
-  }
+export function detectCdn(domain: string): Promise<CdnInfo> {
+  // Substituído de fetch() para https.request() para suportar safeLookup (A2).
+  // Redirects não são seguidos — headers de CDN estão presentes na resposta inicial.
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname:          domain,
+        method:            "HEAD",
+        port:              443,
+        rejectUnauthorized: false,
+        timeout:           8_000,
+        lookup:            safeLookup,
+      },
+      (res) => {
+        const h = (name: string): string => {
+          const val = res.headers[name.toLowerCase()];
+          return Array.isArray(val) ? (val[0] ?? "") : (val ?? "");
+        };
+        if (h("cf-ray") || h("cf-cache-status") || h("server").toLowerCase().includes("cloudflare")) {
+          return resolve({ detected: true, provider: "Cloudflare", isProtected: true });
+        }
+        if (h("x-fastly-request-id")) {
+          return resolve({ detected: true, provider: "Fastly", isProtected: true });
+        }
+        if (h("x-akamai-transformed") || h("akamai-cache-status")) {
+          return resolve({ detected: true, provider: "Akamai", isProtected: true });
+        }
+        if (h("x-amz-cf-id")) {
+          return resolve({ detected: true, provider: "AWS CloudFront", isProtected: true });
+        }
+        if (h("x-cache").includes("HIT") || h("via").includes("proxy")) {
+          return resolve({ detected: true, provider: "CDN/Proxy", isProtected: true });
+        }
+        resolve({ detected: false, provider: null, isProtected: false });
+      }
+    );
+    req.on("error",   () => resolve({ detected: false, provider: null, isProtected: false }));
+    req.on("timeout", () => { req.destroy(); resolve({ detected: false, provider: null, isProtected: false }); });
+    req.end();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +170,7 @@ function tlsHandshake(domain: string): Promise<DirectTlsResult> {
         servername: domain,
         timeout: 10_000,
         rejectUnauthorized: false, // We validate manually below
+        lookup: safeLookup,
       },
       () => {
         result.accessible = true;
@@ -296,6 +309,7 @@ function checkLegacyProtocol(domain: string, timeoutMs = 5_000): Promise<LegacyP
         ciphers: "DEFAULT:@SECLEVEL=0",
         rejectUnauthorized: false,
         timeout: timeoutMs,
+        lookup: safeLookup,
       },
       () => {
         // Handshake succeeded — server accepted TLS 1.0/1.1.
