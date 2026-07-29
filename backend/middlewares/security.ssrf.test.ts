@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import dns from "dns";
+import http from "http";
 
 // Importar após qualquer mock de módulo (vi.mock é hoisted automaticamente pelo Vitest)
 import { isPrivateOrBlockedIp, safeLookup, assertSafeRedirect } from "./security";
@@ -207,6 +208,91 @@ describe("safeLookup", () => {
     const [err] = cb.mock.calls[0] as [NodeJS.ErrnoException, string, number];
     expect((err as NodeJS.ErrnoException).code).toBe("SSRF_BLOCKED");
   });
+
+  // ---------------------------------------------------------------------------
+  // Contrato all:true — Node.js >=22 com autoSelectFamily (Happy Eyeballs)
+  //
+  // Node chama o lookup com { all: true } e espera callback(null, LookupAddress[]).
+  // Antes do fix: callback(null, "45.33.32.156", 4) → Node itera a string
+  // char-a-char → char.address = undefined → ERR_INVALID_IP_ADDRESS.
+  // ---------------------------------------------------------------------------
+
+  it("all:true → callback devolve LookupAddress[] em vez de string (contrato Node autoSelectFamily)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(dns, "lookup").mockImplementation(((h: string, o: unknown, cb: any) => {
+      cb(null, [{ address: "93.184.216.34", family: 4 }]);
+    }) as any);
+    const cb = vi.fn();
+    // Invocar exatamente como Node.js faz em produção: { all: true }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    safeLookup("example.com", { all: true } as any, cb as any);
+    const [err, addresses] = cb.mock.calls[0] as [NodeJS.ErrnoException | null, unknown];
+    expect(err).toBeNull();
+    // CONTRATO: quando all:true, o 2.º arg deve ser LookupAddress[], não string.
+    // Antes do fix este assert falha: Array.isArray("93.184.216.34") === false.
+    expect(Array.isArray(addresses)).toBe(true);
+    const arr = addresses as Array<{ address: string; family: number }>;
+    expect(arr[0].address).toBe("93.184.216.34");
+    expect(arr[0].family).toBe(4);
+  });
+
+  it("all:true com mix IPv6+IPv4 → array contém preferred IPv4 (seleção 20ea552 preservada)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(dns, "lookup").mockImplementation(((h: string, o: unknown, cb: any) => {
+      cb(null, [
+        { address: "2001:db8::1",   family: 6 }, // IPv6 primeiro
+        { address: "93.184.216.34", family: 4 }, // IPv4 segundo
+      ]);
+    }) as any);
+    const cb = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    safeLookup("example.com", { all: true } as any, cb as any);
+    const [err, addresses] = cb.mock.calls[0] as [null, Array<{ address: string; family: number }>];
+    expect(err).toBeNull();
+    expect(Array.isArray(addresses)).toBe(true);
+    // Opção B: preferred IPv4 é o único elemento devolvido — evita tentativa IPv6
+    expect(addresses[0].address).toBe("93.184.216.34");
+    expect(addresses[0].family).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E2E-lite — http.get real com lookup:safeLookup
+//
+// Prova que o contrato all:true funciona ponta-a-ponta com o Node.js HTTP client:
+// a conexão pode falhar por rede (ECONNREFUSED/ETIMEDOUT) mas NUNCA por formato
+// de endereço inválido (ERR_INVALID_IP_ADDRESS — o bug pré-fix).
+// ---------------------------------------------------------------------------
+
+describe("safeLookup — E2E-lite (contrato all:true ponta-a-ponta com http.get real)", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it("http.get com lookup:safeLookup não produz ERR_INVALID_IP_ADDRESS (Node autoSelectFamily)", async () => {
+    // Mock dns.lookup: devolve IPv4 público sem rede real — isola o teste de DNS flaky.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(dns, "lookup").mockImplementation(((h: string, o: unknown, cb: any) => {
+      cb(null, [{ address: "45.33.32.156", family: 4 }]);
+    }) as any);
+
+    let caughtCode: string | undefined;
+
+    await new Promise<void>((resolve) => {
+      const req = http.get(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { hostname: "scanme.nmap.org", port: 80, path: "/", timeout: 2000, lookup: safeLookup as any },
+        (res) => { res.destroy(); resolve(); }
+      );
+      req.on("error", (err) => {
+        caughtCode = (err as NodeJS.ErrnoException).code;
+        resolve();
+      });
+      req.on("timeout", () => { req.destroy(); resolve(); });
+    });
+
+    // Antes do fix: caughtCode === "ERR_INVALID_IP_ADDRESS" (string iterada char-a-char)
+    // Após o fix:   ECONNREFUSED / ECONNRESET / ETIMEDOUT (falha de rede normal) ou undefined (sucesso)
+    expect(caughtCode).not.toBe("ERR_INVALID_IP_ADDRESS");
+  }, 5000);
 });
 
 // ---------------------------------------------------------------------------

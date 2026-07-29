@@ -165,12 +165,11 @@ export function isPrivateOrBlockedIp(ip: string): boolean {
 export function safeLookup(
   hostname: string,
   options: dns.LookupOptions,
-  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+  callback: (err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void
 ): void {
   // Caminho rápido: hostname conhecido como bloqueado ou IP literal privado
   const lower = hostname.toLowerCase();
   if (BLOCKED_HOSTNAMES.has(lower) || PRIVATE_IP_RE.test(lower)) {
-    console.log(`[SSRF-DEBUG] safeLookup ${hostname}: fast-path BLOCKED (sem DNS)`);
     callback(
       Object.assign(new Error(`SSRF bloqueado: ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
       "", 0
@@ -205,20 +204,24 @@ export function safeLookup(
       : (addresses.find((a) => a.family === 4) ?? addresses[0]);
 
     if (!preferred) {
-      console.log(`[SSRF-DEBUG] safeLookup ${hostname}: sem endereço após resolução`);
       callback(
         Object.assign(new Error(`SSRF bloqueado: sem endereço para ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
         "", 0
       );
       return;
     }
-    console.log(
-      `[SSRF-DEBUG] safeLookup ${hostname}: ` +
-      `family_opt=${options.family ?? "undefined"} | ` +
-      `dns=[${addresses.map((a) => `${a.address}(v${a.family})`).join(",")}] | ` +
-      `preferred=${preferred.address}(v${preferred.family})`
-    );
-    callback(null, preferred.address, preferred.family);
+
+    // Node.js >=22 com autoSelectFamily (Happy Eyeballs) chama o lookup com
+    // options.all=true e espera callback(null, LookupAddress[]). Devolver uma
+    // string faz o Node iterar os caracteres dela → char.address = undefined →
+    // ERR_INVALID_IP_ADDRESS. Quando all=true: devolver [preferred] (Opção B —
+    // array com o IPv4 escolhido, evitando tentativa IPv6 desnecessária no Railway).
+    // Quando all=false/undefined: manter contrato single-address para compatibilidade.
+    if (options.all) {
+      callback(null, [preferred], preferred.family);
+    } else {
+      callback(null, preferred.address, preferred.family);
+    }
   });
 }
 
