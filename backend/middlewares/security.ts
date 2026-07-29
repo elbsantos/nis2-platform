@@ -170,6 +170,7 @@ export function safeLookup(
   // Caminho rápido: hostname conhecido como bloqueado ou IP literal privado
   const lower = hostname.toLowerCase();
   if (BLOCKED_HOSTNAMES.has(lower) || PRIVATE_IP_RE.test(lower)) {
+    console.log(`[SSRF-DEBUG] safeLookup ${hostname}: fast-path BLOCKED (sem DNS)`);
     callback(
       Object.assign(new Error(`SSRF bloqueado: ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
       "", 0
@@ -204,12 +205,19 @@ export function safeLookup(
       : (addresses.find((a) => a.family === 4) ?? addresses[0]);
 
     if (!preferred) {
+      console.log(`[SSRF-DEBUG] safeLookup ${hostname}: sem endereço após resolução`);
       callback(
         Object.assign(new Error(`SSRF bloqueado: sem endereço para ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
         "", 0
       );
       return;
     }
+    console.log(
+      `[SSRF-DEBUG] safeLookup ${hostname}: ` +
+      `family_opt=${options.family ?? "undefined"} | ` +
+      `dns=[${addresses.map((a) => `${a.address}(v${a.family})`).join(",")}] | ` +
+      `preferred=${preferred.address}(v${preferred.family})`
+    );
     callback(null, preferred.address, preferred.family);
   });
 }

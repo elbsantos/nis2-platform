@@ -220,19 +220,26 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
   let usedUrl = httpsUrl;
   let isHttps = true;
 
+  console.log(`[SSRF-DEBUG] checkHttpHeaders ${target}: tentativa HTTPS → ${httpsUrl}`);
   try {
     headers = await fetchHeaders(httpsUrl);
-  } catch {
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    console.log(`[SSRF-DEBUG] checkHttpHeaders ${target}: HTTPS falhou code=${e.code ?? "?"} msg=${e.message}`);
+    console.log(`[SSRF-DEBUG] checkHttpHeaders ${target}: tentativa HTTP → ${httpUrl}`);
     try {
       headers = await fetchHeaders(httpUrl);
       usedUrl = httpUrl;
       isHttps = false;
-    } catch {
+    } catch (err2) {
+      const e2 = err2 as NodeJS.ErrnoException;
+      console.log(`[SSRF-DEBUG] checkHttpHeaders ${target}: HTTP falhou code=${e2.code ?? "?"} msg=${e2.message} → inacessível`);
       return { checks: UNREACHABLE_CHECKS, score: null, url: httpsUrl };
     }
   }
 
   const serverBanner = headerValue(headers, "server");
+  console.log(`[SSRF-DEBUG] checkHttpHeaders ${target}: OK url=${usedUrl} serverBanner=${serverBanner ?? "(vazio)"}`);
 
   const checks: HttpHeaderCheck[] = [
     checkHSTS(headers, isHttps),
