@@ -164,6 +164,35 @@ export async function getOrCreateOrgForOwner(
   return created;
 }
 
+/**
+ * Cria utilizador + organização + associação num único bloco atómico (tudo ou nada).
+ * Elimina a janela de inconsistência do registo em 3 passos separados.
+ */
+export async function registerUserAtomically(data: {
+  email:        string;
+  name?:        string;
+  passwordHash: string;
+  orgName:      string;
+}): Promise<{ userId: number; orgId: number }> {
+  return getDb().transaction(async (tx) => {
+    const [userRow] = await tx
+      .insert(users)
+      .values({ email: data.email, name: data.name, passwordHash: data.passwordHash, role: "admin" as const })
+      .$returningId();
+    const userId = userRow.id;
+
+    const [orgRow] = await tx
+      .insert(organizations)
+      .values({ name: data.orgName, ownerId: userId })
+      .$returningId();
+    const orgId = orgRow.id;
+
+    await tx.update(users).set({ organizationId: orgId }).where(eq(users.id, userId));
+
+    return { userId, orgId };
+  });
+}
+
 export async function getOrganizationById(orgId: number) {
   const rows = await getDb()
     .select()

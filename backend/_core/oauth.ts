@@ -9,7 +9,7 @@ import type { Application } from "express";
 import { SignJWT } from "jose";
 import { scryptSync, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { z } from "zod";
-import { getUserByEmail, getUserById, createUser, createOrganization, getOrCreateOrgForOwner, setResetToken, getUserByResetToken, resetUserPassword, deleteAccount } from "../db";
+import { getUserByEmail, getUserById, registerUserAtomically, getOrCreateOrgForOwner, setResetToken, getUserByResetToken, resetUserPassword, deleteAccount } from "../db";
 import { sendPasswordReset } from "../integrations/resend";
 import { getJwtSecret } from "./env";
 
@@ -107,21 +107,11 @@ export function registerOAuthRoutes(app: Application): void {
       }
 
       const passwordHash = hashPassword(password);
-      const user = await createUser({ email, name, passwordHash, role: "admin" });
-      const org  = await createOrganization({ name: orgName, ownerId: user.id });
+      const { userId, orgId } = await registerUserAtomically({ email, name, passwordHash, orgName });
 
-      await import("../db").then(({ getDb }) => {
-        const { users } = require("../../database/schema");
-        const { eq }    = require("drizzle-orm");
-        return getDb()!
-          .update(users)
-          .set({ organizationId: org.id })
-          .where(eq(users.id, user.id));
-      });
-
-      const token = await signToken(user.id);
+      const token = await signToken(userId);
       res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
-      res.json({ id: user.id, email, name, orgId: org.id });
+      res.json({ id: userId, email, name, orgId });
     } catch (err) {
       console.error("[Auth] Register error:", err);
       res.status(500).json({ error: "Erro ao registar" });
