@@ -10,6 +10,8 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getRedisClient } from "../middlewares/rateLimit";
 import { isPlatformAdmin } from "../_core/env";
 
+type RedisClient = Awaited<ReturnType<typeof getRedisClient>>;
+
 // ---------------------------------------------------------------------------
 // Admin-only procedure
 // ---------------------------------------------------------------------------
@@ -42,6 +44,22 @@ async function redisMultiGet(keys: string[]): Promise<Map<string, number>> {
   return map;
 }
 
+/**
+ * Itera SCAN por cursor até cursor=0, acumula e devolve chaves sem bloquear o Redis.
+ * Substitui redis.keys() (O(N), bloqueia) por iteração incremental não-bloqueante.
+ * SCAN pode devolver chaves duplicadas entre iterações — o Set garante dedup.
+ */
+export async function scanRedisKeys(redis: RedisClient, pattern: string): Promise<string[]> {
+  const found = new Set<string>();
+  let cursor = 0;
+  do {
+    const result = await redis.scan(cursor, { MATCH: pattern, COUNT: 100 });
+    cursor = result.cursor;
+    for (const key of result.keys) found.add(key as string);
+  } while (cursor !== 0);
+  return [...found];
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -54,7 +72,7 @@ export const adminRouter = router({
     const ym = currentYM();
     try {
       const redis = await getRedisClient();
-      const keys  = await redis.keys(`ai:tokens:org:*:${ym}`);
+      const keys  = await scanRedisKeys(redis, `ai:tokens:org:*:${ym}`);
       const vals  = await redisMultiGet(keys);
       const entries = keys.map((key) => {
         const orgId = parseInt(key.split(":")[3] ?? "0", 10);
@@ -78,20 +96,20 @@ export const adminRouter = router({
     try {
       const redis = await getRedisClient();
 
-      const [scanKeys, forceKeys] = await Promise.all([
-        redis.keys(`scan:credits:org:*:${ym}`),
-        redis.keys(`force-rescan:org:*:${today}`),
+      const [creditKeys, forceKeys] = await Promise.all([
+        scanRedisKeys(redis, `scan:credits:org:*:${ym}`),
+        scanRedisKeys(redis, `force-rescan:org:*:${today}`),
       ]);
 
       const [scanVals, forceVals] = await Promise.all([
-        redisMultiGet(scanKeys),
+        redisMultiGet(creditKeys),
         redisMultiGet(forceKeys),
       ]);
 
       const scanMap  = new Map<number, number>();
       const forceMap = new Map<number, number>();
 
-      scanKeys.forEach((k) => {
+      creditKeys.forEach((k) => {
         const orgId = parseInt(k.split(":")[3] ?? "0", 10);
         scanMap.set(orgId, scanVals.get(k) ?? 0);
       });
