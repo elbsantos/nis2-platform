@@ -217,4 +217,29 @@ describe("organization.updateProfile — validação", () => {
     const { ok } = await caller.updateProfile({ securityOfficerEmail: "" });
     expect(ok).toBe(true);
   });
+
+  it("rejeita NIF com formato errado quando taxIdType é NIPC", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const err = await caller.updateProfile({ taxId: "12345", taxIdType: "NIPC" }).catch(e => e);
+    expect(err).toBeDefined();
+    expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("aceita NIF com 9 dígitos quando taxIdType é NIPC", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ taxId: "509123456", taxIdType: "NIPC" });
+    expect(ok).toBe(true);
+  });
+
+  it("aceita taxId livre quando taxIdType não é PT (ex.: EIN)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ taxId: "12-3456789", taxIdType: "EIN" });
+    expect(ok).toBe(true);
+  });
 });

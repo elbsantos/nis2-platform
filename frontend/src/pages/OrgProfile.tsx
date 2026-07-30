@@ -1,45 +1,21 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { trpc } from "../lib/trpc";
+import {
+  SECTOR_OPTIONS,
+  SIZE_OPTIONS,
+  TAX_ID_TYPE_OPTIONS,
+} from "../../../backend/utils/org-options";
 
 // ---------------------------------------------------------------------------
-// Opções de dropdown (espelham as constantes do router)
+// Campos essenciais para geração de documentos
 // ---------------------------------------------------------------------------
 
-const SECTOR_OPTIONS = [
-  { value: "",                    label: "— Seleccionar setor —" },
-  { value: "tld_dns_confianca",   label: "Registos TLD, DNS autoritativos ou Serviços de Confiança Qualificados" },
-  { value: "telecom",             label: "Redes ou serviços de comunicações eletrónicas" },
-  { value: "cloud_ixp_datacenter",label: "Cloud computing, centros de dados, CDN ou IXP" },
-  { value: "gestao_tic",          label: "Gestão de serviços TIC B2B (MSP / MSSP)" },
-  { value: "energia",             label: "Energia (eletricidade, gás, petróleo, hidrogénio)" },
-  { value: "transportes",         label: "Transportes (aéreo, ferroviário, aquático, rodoviário)" },
-  { value: "banca_financeiro",    label: "Banca ou infraestruturas de mercados financeiros" },
-  { value: "saude",               label: "Saúde (prestadores, laboratórios, I&D, farmácias)" },
-  { value: "agua",                label: "Água potável e/ou residual" },
-  { value: "espaco",              label: "Espaço (operadores de infraestruturas terrestres)" },
-  { value: "postais_residuos",    label: "Serviços postais/estafetas ou gestão de resíduos" },
-  { value: "quimicos_alimentar",  label: "Químicos ou setor alimentar (distribuição a grande escala)" },
-  { value: "industria",           label: "Indústria e manufatura" },
-  { value: "digital_b2c",         label: "Mercados online, motores de busca ou redes sociais" },
-  { value: "admin_publica",       label: "Administração Pública" },
-  { value: "outro",               label: "Outro setor" },
-];
-
-const SIZE_OPTIONS = [
-  { value: "",        label: "— Seleccionar dimensão —" },
-  { value: "micro",   label: "Micro (< 10 trabalhadores)" },
-  { value: "pequena", label: "Pequena (10–49 trabalhadores)" },
-  { value: "media",   label: "Média (50–249 trabalhadores)" },
-  { value: "grande",  label: "Grande (≥ 250 trabalhadores)" },
-];
-
-const TAX_TYPE_OPTIONS = [
-  { value: "NIPC",  label: "NIPC (Portugal — empresas)" },
-  { value: "NIF",   label: "NIF (Portugal — singulares)" },
-  { value: "NIT",   label: "NIT (Brasil)" },
-  { value: "EIN",   label: "EIN (EUA)" },
-  { value: "VAT",   label: "VAT / IVA (UE)" },
-  { value: "OTHER", label: "Outro" },
+const ESSENTIAL_FIELDS: { key: string; label: string }[] = [
+  { key: "legalName",           label: "Denominação social" },
+  { key: "taxId",               label: "NIF / NIPC" },
+  { key: "sector",              label: "Setor de atividade NIS2" },
+  { key: "legalRepresentative", label: "Representante legal" },
+  { key: "securityOfficerName", label: "Nome do CISO" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -126,10 +102,24 @@ export default function OrgProfile() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Campos essenciais em falta (calculados a partir dos valores actuais do formulário)
+  const formValues: Record<string, string> = {
+    legalName, taxId, sector, legalRepresentative, securityOfficerName,
+  };
+  const missingEssential = !isLoading
+    ? ESSENTIAL_FIELDS.filter((f) => !formValues[f.key]?.trim())
+    : [];
+
   function validate(): boolean {
     if (securityOfficerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(securityOfficerEmail)) {
       setError("Email do CISO inválido.");
       return false;
+    }
+    if (taxId && (taxIdType === "NIPC" || taxIdType === "NIF")) {
+      if (!/^\d{9}$/.test(taxId.replace(/\s/g, ""))) {
+        setError("NIF/NIPC português deve ter exactamente 9 dígitos (apenas números).");
+        return false;
+      }
     }
     setError("");
     return true;
@@ -177,13 +167,33 @@ export default function OrgProfile() {
       )}
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Perfil da Entidade</h1>
         <p className="text-slate-400 mt-1 text-sm">
           Dados de identidade reutilizados automaticamente em todos os documentos NIS2 gerados
           pela plataforma (Carta CISO, IRP, Notificação CNCS, etc.).
         </p>
       </div>
+
+      {/* Banner — campos essenciais em falta */}
+      {missingEssential.length > 0 && (
+        <div className="mb-6 bg-amber-950/40 border border-amber-700 rounded-xl px-5 py-4">
+          <p className="text-sm font-semibold text-amber-300 mb-2">
+            Complete o perfil para gerar documentos NIS2
+          </p>
+          <ul className="space-y-1">
+            {missingEssential.map((f) => (
+              <li key={f.key} className="flex items-center gap-2 text-xs text-amber-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                {f.label}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-amber-500">
+            {missingEssential.length} de {ESSENTIAL_FIELDS.length} campos essenciais por preencher.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
 
@@ -194,7 +204,7 @@ export default function OrgProfile() {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field id="legalName" label="Denominação social (nome legal)">
+            <Field id="legalName" label="Denominação social (nome legal)" required>
               <input
                 id="legalName" type="text" value={legalName}
                 onChange={e => setLegalName(e.target.value)}
@@ -220,13 +230,13 @@ export default function OrgProfile() {
                 onChange={e => setTaxIdType(e.target.value)}
                 className={SELECT_CLS}
               >
-                {TAX_TYPE_OPTIONS.map(o => (
+                {TAX_ID_TYPE_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </Field>
 
-            <Field id="taxId" label="NIF / NIPC">
+            <Field id="taxId" label="NIF / NIPC" required>
               <input
                 id="taxId" type="text" value={taxId}
                 onChange={e => setTaxId(e.target.value)}
@@ -258,12 +268,13 @@ export default function OrgProfile() {
           </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field id="sector" label="Setor de atividade (NIS2)">
+            <Field id="sector" label="Setor de atividade (NIS2)" required>
               <select
                 id="sector" value={sector}
                 onChange={e => setSector(e.target.value)}
                 className={SELECT_CLS}
               >
+                <option value="">— Seleccionar setor —</option>
                 {SECTOR_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -276,6 +287,7 @@ export default function OrgProfile() {
                 onChange={e => setSize(e.target.value)}
                 className={SELECT_CLS}
               >
+                <option value="">— Seleccionar dimensão —</option>
                 {SIZE_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -283,7 +295,7 @@ export default function OrgProfile() {
             </Field>
           </div>
 
-          <Field id="legalRepresentative" label="Representante legal (nome e cargo)">
+          <Field id="legalRepresentative" label="Representante legal (nome e cargo)" required>
             <input
               id="legalRepresentative" type="text" value={legalRepresentative}
               onChange={e => setLegalRepresentative(e.target.value)}
@@ -301,7 +313,7 @@ export default function OrgProfile() {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field id="ciso-name" label="Nome completo do CISO">
+            <Field id="ciso-name" label="Nome completo do CISO" required>
               <input
                 id="ciso-name" type="text" value={securityOfficerName}
                 onChange={e => setSecurityOfficerName(e.target.value)}
