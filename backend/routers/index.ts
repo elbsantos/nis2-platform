@@ -5,16 +5,17 @@
  */
 
 import { router } from "../_core/trpc";
-import { scanRouter }          from "./scan.router";
-import { questionnaireRouter } from "./questionnaire.router";
-import { remediationRouter }   from "./remediation.router";
-import { billingRouter }       from "./billing.router";
-import { courseRouter }        from "./course.router";
-import { docsRouter }          from "./docs.router";
-import { reportRouter }        from "./report.router";
-import { adminRouter }         from "./admin.router";
+import { scanRouter }            from "./scan.router";
+import { questionnaireRouter }   from "./questionnaire.router";
+import { remediationRouter }     from "./remediation.router";
+import { billingRouter }         from "./billing.router";
+import { courseRouter }          from "./course.router";
+import { docsRouter }            from "./docs.router";
+import { reportRouter }          from "./report.router";
+import { adminRouter }           from "./admin.router";
 import { documentsRouter }       from "./documents.router";
 import { enquadramentoRouter }   from "./enquadramento.router";
+import { organizationRouter }    from "./organization.router";
 
 export const appRouter = router({
   scan:            scanRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   admin:           adminRouter,
   documents:       documentsRouter,
   enquadramento:   enquadramentoRouter,
+  organization:    organizationRouter,
 });
 
 export type AppRouter = typeof appRouter;

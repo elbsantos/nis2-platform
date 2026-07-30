@@ -846,3 +846,52 @@ export async function getFrameworkAssessmentsByOrgId(orgId: number) {
     .where(eq(frameworkAssessments.organizationId, orgId))
     .orderBy(desc(frameworkAssessments.createdAt));
 }
+
+// ---------------------------------------------------------------------------
+// Organization profile (Perfil da Entidade)
+// ---------------------------------------------------------------------------
+
+export type OrgProfileData = {
+  legalName?:           string | null;
+  taxId?:               string | null;
+  taxIdType?:           string | null;
+  address?:             string | null;
+  sector?:              string | null;
+  size?:                string | null;
+  contactPhone?:        string | null;
+  securityOfficerName?: string | null;
+  securityOfficerEmail?:string | null;
+  legalRepresentative?: string | null;
+  jurisdiction?:        string | null;
+  domain?:              string | null;
+};
+
+export async function getOrgProfile(orgId: number) {
+  const rows = await getDb()
+    .select({
+      name:                 organizations.name,
+      legalName:            organizations.legalName,
+      taxId:                organizations.taxId,
+      taxIdType:            organizations.taxIdType,
+      address:              organizations.address,
+      sector:               organizations.sector,
+      size:                 organizations.size,
+      contactPhone:         organizations.contactPhone,
+      securityOfficerName:  organizations.securityOfficerName,
+      securityOfficerEmail: organizations.securityOfficerEmail,
+      legalRepresentative:  organizations.legalRepresentative,
+      jurisdiction:         organizations.jurisdiction,
+      domain:               organizations.domain,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateOrgProfile(orgId: number, data: OrgProfileData) {
+  return getDb()
+    .update(organizations)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(organizations.id, orgId));
+}

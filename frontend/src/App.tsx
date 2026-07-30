@@ -18,6 +18,7 @@ import Remediation   from "./pages/Remediation";
 import Billing       from "./pages/Billing";
 import Course        from "./pages/Course";
 import Lesson        from "./pages/Lesson";
+import OrgProfile    from "./pages/OrgProfile";
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function RequireAuth() {
@@ -58,6 +59,7 @@ function AppNav() {
         <NavLink to="/remediation"     className={({ isActive }) => isActive ? active : inactive}>Remediação</NavLink>
         <NavLink to="/course"        className={({ isActive }) => isActive ? active : inactive}>Curso</NavLink>
         <NavLink to="/billing"       className={({ isActive }) => isActive ? active : inactive}>Planos</NavLink>
+        <NavLink to="/perfil"        className={({ isActive }) => isActive ? active : inactive}>Perfil</NavLink>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-slate-400 hidden sm:block">{user?.email}</span>
           <button
@@ -108,6 +110,7 @@ export default function App() {
           <Route path="/enquadramento/:id"                  element={<EnquadramentoResult />} />
           <Route path="/remediation"                        element={<Remediation />} />
           <Route path="/billing"                  element={<Billing />} />
+          <Route path="/perfil"                   element={<OrgProfile />} />
           <Route path="/course"                   element={<Course />} />
           <Route path="/course/:lessonId"         element={<Lesson />} />
           <Route path="*"                         element={<Navigate to="/scan/start" replace />} />
