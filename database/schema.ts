@@ -29,6 +29,8 @@ export const organizations = mysqlTable("organizations", {
   size:                 varchar("size", { length: 50 }),
   securityOfficerName:  varchar("securityOfficerName", { length: 255 }),
   securityOfficerEmail: varchar("securityOfficerEmail", { length: 255 }),
+  contactPhone:         varchar("contactPhone", { length: 50 }),
+  legalRepresentative:  varchar("legalRepresentative", { length: 255 }),
   keyAssets:            json("keyAssets").$type<string[]>(),
   createdAt:            timestamp("createdAt").notNull().defaultNow(),
   updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),

@@ -204,6 +204,28 @@ const MIGRATIONS: Migration[] = [
   },
 
   {
+    name: "organizations.contactPhone",
+    run: async (db) => {
+      if (await columnExists(db, "organizations", "contactPhone")) return "skipped";
+      await db.execute(sql.raw(
+        "ALTER TABLE `organizations` ADD COLUMN `contactPhone` VARCHAR(50) NULL"
+      ));
+      return "applied";
+    },
+  },
+
+  {
+    name: "organizations.legalRepresentative",
+    run: async (db) => {
+      if (await columnExists(db, "organizations", "legalRepresentative")) return "skipped";
+      await db.execute(sql.raw(
+        "ALTER TABLE `organizations` ADD COLUMN `legalRepresentative` VARCHAR(255) NULL"
+      ));
+      return "applied";
+    },
+  },
+
+  {
     name: "control_evidence.create",
     run: async (db) => {
       if (await tableExists(db, "control_evidence")) return "skipped";
