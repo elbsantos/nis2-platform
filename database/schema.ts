@@ -44,6 +44,7 @@ export const organizations = mysqlTable("organizations", {
   employeeCount:            int("employeeCount"),
   annualTurnover:           decimal("annualTurnover", { precision: 15, scale: 2 }),
   annualBalance:            decimal("annualBalance", { precision: 15, scale: 2 }),
+  city:                     varchar("city", { length: 120 }),
   createdAt:            timestamp("createdAt").notNull().defaultNow(),
   updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
 });
