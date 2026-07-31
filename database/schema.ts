@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
   date,
+  decimal,
 } from "drizzle-orm/mysql-core";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,17 @@ export const organizations = mysqlTable("organizations", {
   contactPhone:         varchar("contactPhone", { length: 50 }),
   legalRepresentative:  varchar("legalRepresentative", { length: 255 }),
   keyAssets:            json("keyAssets").$type<string[]>(),
+  // Perfil da Entidade completo (6 documentos) — aditivas, todas NULL
+  caeCode:                  varchar("caeCode", { length: 20 }),
+  legalRepresentativeRole:  varchar("legalRepresentativeRole", { length: 120 }),
+  securityOfficerRole:      varchar("securityOfficerRole", { length: 120 }),
+  securityOfficerPhone:     varchar("securityOfficerPhone", { length: 30 }),
+  securityOfficerTaxId:     varchar("securityOfficerTaxId", { length: 20 }),
+  securityOfficerStartDate: date("securityOfficerStartDate", { mode: "string" }),
+  ceoName:                  varchar("ceoName", { length: 255 }),
+  employeeCount:            int("employeeCount"),
+  annualTurnover:           decimal("annualTurnover", { precision: 15, scale: 2 }),
+  annualBalance:            decimal("annualBalance", { precision: 15, scale: 2 }),
   createdAt:            timestamp("createdAt").notNull().defaultNow(),
   updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
 });
