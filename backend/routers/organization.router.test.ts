@@ -181,6 +181,22 @@ describe("organization.updateProfile — round-trip", () => {
     const profile = await caller.getProfile();
     expect(profile).toMatchObject(payload);
   });
+
+  it("escreve o campo city e getProfile devolve-o (round-trip)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ city: "Lisboa" });
+    expect(ok).toBe(true);
+    expect(vi.mocked(db.updateOrgProfile)).toHaveBeenCalledWith(
+      ORG_A.id,
+      expect.objectContaining({ city: "Lisboa" })
+    );
+
+    vi.mocked(db.getOrgProfile).mockResolvedValue({ ...PROFILE_A, city: "Lisboa" } as any);
+    const profile = await caller.getProfile();
+    expect(profile.city).toBe("Lisboa");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -45,6 +45,7 @@ const updateProfileInput = z.object({
   employeeCount:            z.number().int("Número inteiro de colaboradores").min(0, "Não pode ser negativo").optional().nullable(),
   annualTurnover:           z.string().trim().regex(DECIMAL_RE, "Valor decimal inválido (ex.: 990000.00)").optional().nullable(),
   annualBalance:            z.string().trim().regex(DECIMAL_RE, "Valor decimal inválido (ex.: 430000.00)").optional().nullable(),
+  city:                     z.string().max(120).trim().optional().nullable(),
 }).refine(
   (data) => {
     if (!data.taxId) return true;

@@ -1072,6 +1072,7 @@ describe("generateCartaCiso — Carta de Nomeação do CISO", () => {
     legalName:                "Empresa Teste, Lda.",
     taxId:                    "509123456",
     address:                  "Rua Exemplo 1, 1000-001 Lisboa",
+    city:                     "Lisboa",
     caeCode:                  "62010",
     legalRepresentative:      "João Silva",
     legalRepresentativeRole:  "Administrador-Delegado",
@@ -1177,14 +1178,14 @@ describe("generateCartaCiso — Carta de Nomeação do CISO", () => {
     expect(_psiRenderArgs!.referencia).toBe("CISO-2026-000042");
   });
 
-  it("localidade derivada da morada (último segmento, sem código postal)", async () => {
-    CARTA_SETUP({ address: "Rua Exemplo 1, 1000-001 Lisboa" });
+  it("localidade = campo city (não deriva da morada)", async () => {
+    CARTA_SETUP({ city: "Porto", address: "Rua Exemplo 1, 86, 4000-000 Porto" });
     await generateCartaCiso(1);
-    expect(_psiRenderArgs!.localidade).toBe("Lisboa");
+    expect(_psiRenderArgs!.localidade).toBe("Porto");
   });
 
-  it("org sem address → localidade = placeholder", async () => {
-    CARTA_SETUP({ address: null });
+  it("org sem city → localidade = placeholder, mesmo com address preenchida", async () => {
+    CARTA_SETUP({ city: null, address: "Rua Exemplo 1, 1000-001 Lisboa" });
     await generateCartaCiso(1);
     expect(_psiRenderArgs!.localidade).toBe("[A PREENCHER: localidade]");
   });
@@ -1198,7 +1199,7 @@ describe("generateCartaCiso — Carta de Nomeação do CISO", () => {
 
   it("perfil incompleto — campos em falta usam '[A PREENCHER]', nunca null/undefined", async () => {
     CARTA_SETUP({
-      taxId: null, address: null, caeCode: null, legalRepresentative: null,
+      taxId: null, address: null, city: null, caeCode: null, legalRepresentative: null,
       legalRepresentativeRole: null, securityOfficerTaxId: null, securityOfficerRole: null,
       securityOfficerStartDate: null, securityOfficerEmail: null, securityOfficerPhone: null,
     });

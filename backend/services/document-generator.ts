@@ -75,16 +75,6 @@ function formatDateOnlyStr(d: string | null | undefined): string | null {
   return `${dd}/${m}/${y}`;
 }
 
-/** Deriva a localidade a partir da morada livre (último segmento após a vírgula, sem código postal). */
-function deriveLocalidade(address: string | null | undefined): string | null {
-  if (!address) return null;
-  const parts = address.split(",");
-  const last = parts[parts.length - 1]?.trim();
-  if (!last) return null;
-  const cleaned = last.replace(/^\d{4}-\d{3}\s*/, "").trim();
-  return cleaned || null;
-}
-
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 const SEVERITY_PT: Record<string, string>    = { critical: "Crítica", high: "Alta", medium: "Média", low: "Baixa" };
 const SEVERITY_PROB: Record<string, number>  = { critical: 5, high: 4, medium: 3, low: 2 };
@@ -440,7 +430,7 @@ export async function generateCartaCiso(orgId: number): Promise<Buffer> {
     ciso_email:     cell(org.securityOfficerEmail, "[A PREENCHER: email do CISO]"),
     ciso_telemovel: cell(org.securityOfficerPhone, "[A PREENCHER: telemóvel do CISO]"),
     referencia,
-    localidade:     cell(deriveLocalidade(org.address), "[A PREENCHER: localidade]"),
+    localidade:     cell(org.city, "[A PREENCHER: localidade]"),
     data_extenso:   hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
   };
 

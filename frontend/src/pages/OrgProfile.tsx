@@ -92,6 +92,7 @@ export default function OrgProfile() {
   const [securityOfficerPhone,     setSecurityOfficerPhone]     = useState("");
   const [securityOfficerTaxId,     setSecurityOfficerTaxId]     = useState("");
   const [securityOfficerStartDate, setSecurityOfficerStartDate] = useState("");
+  const [city,                     setCity]                     = useState("");
 
   const [error,  setError]  = useState("");
   const [toast,  setToast]  = useState("");
@@ -120,6 +121,7 @@ export default function OrgProfile() {
     setSecurityOfficerPhone(profile.securityOfficerPhone       ?? "");
     setSecurityOfficerTaxId(profile.securityOfficerTaxId       ?? "");
     setSecurityOfficerStartDate(profile.securityOfficerStartDate ?? "");
+    setCity(profile.city ?? "");
   }, [profile]);
 
   useEffect(() => {
@@ -194,6 +196,7 @@ export default function OrgProfile() {
       securityOfficerPhone:     securityOfficerPhone      || null,
       securityOfficerTaxId:     securityOfficerTaxId      || null,
       securityOfficerStartDate: securityOfficerStartDate  || null,
+      city:                     city                     || null,
     });
   }
 
@@ -316,6 +319,16 @@ export default function OrgProfile() {
               onChange={e => setAddress(e.target.value)}
               placeholder="Rua Exemplo 1, 1000-001 Lisboa"
               maxLength={500}
+              className={INPUT_CLS}
+            />
+          </Field>
+
+          <Field id="city" label="Localidade">
+            <input
+              id="city" type="text" value={city}
+              onChange={e => setCity(e.target.value)}
+              placeholder="Lisboa"
+              maxLength={120}
               className={INPUT_CLS}
             />
           </Field>

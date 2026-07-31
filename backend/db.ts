@@ -874,6 +874,7 @@ export type OrgProfileData = {
   employeeCount?:            number | null;
   annualTurnover?:           string | null;
   annualBalance?:            string | null;
+  city?:                     string | null;
 };
 
 export async function getOrgProfile(orgId: number) {
@@ -902,6 +903,7 @@ export async function getOrgProfile(orgId: number) {
       employeeCount:            organizations.employeeCount,
       annualTurnover:           organizations.annualTurnover,
       annualBalance:            organizations.annualBalance,
+      city:                     organizations.city,
     })
     .from(organizations)
     .where(eq(organizations.id, orgId))
