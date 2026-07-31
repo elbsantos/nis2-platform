@@ -864,6 +864,16 @@ export type OrgProfileData = {
   legalRepresentative?: string | null;
   jurisdiction?:        string | null;
   domain?:              string | null;
+  caeCode?:                  string | null;
+  legalRepresentativeRole?:  string | null;
+  securityOfficerRole?:      string | null;
+  securityOfficerPhone?:     string | null;
+  securityOfficerTaxId?:     string | null;
+  securityOfficerStartDate?: string | null;
+  ceoName?:                  string | null;
+  employeeCount?:            number | null;
+  annualTurnover?:           string | null;
+  annualBalance?:            string | null;
 };
 
 export async function getOrgProfile(orgId: number) {
@@ -882,6 +892,16 @@ export async function getOrgProfile(orgId: number) {
       legalRepresentative:  organizations.legalRepresentative,
       jurisdiction:         organizations.jurisdiction,
       domain:               organizations.domain,
+      caeCode:                  organizations.caeCode,
+      legalRepresentativeRole:  organizations.legalRepresentativeRole,
+      securityOfficerRole:      organizations.securityOfficerRole,
+      securityOfficerPhone:     organizations.securityOfficerPhone,
+      securityOfficerTaxId:     organizations.securityOfficerTaxId,
+      securityOfficerStartDate: organizations.securityOfficerStartDate,
+      ceoName:                  organizations.ceoName,
+      employeeCount:            organizations.employeeCount,
+      annualTurnover:           organizations.annualTurnover,
+      annualBalance:            organizations.annualBalance,
     })
     .from(organizations)
     .where(eq(organizations.id, orgId))

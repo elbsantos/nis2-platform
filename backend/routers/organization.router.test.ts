@@ -152,6 +152,35 @@ describe("organization.updateProfile — round-trip", () => {
     // legalName não foi enviado — não deve estar no set()
     // (zod omite campos undefined; o spread em db não os inclui)
   });
+
+  it("escreve os 10 campos novos do Perfil da Entidade completo e getProfile devolve-os", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const payload = {
+      caeCode:                  "62010",
+      legalRepresentativeRole:  "Administrador-Delegado",
+      securityOfficerRole:      "Diretor de TI",
+      securityOfficerPhone:     "+351 910 000 000",
+      securityOfficerTaxId:     "123456789",
+      securityOfficerStartDate: "2026-01-15",
+      ceoName:                  "Maria Santos",
+      employeeCount:            230,
+      annualTurnover:           "990000.00",
+      annualBalance:            "430000.00",
+    };
+
+    const { ok } = await caller.updateProfile(payload);
+    expect(ok).toBe(true);
+    expect(vi.mocked(db.updateOrgProfile)).toHaveBeenCalledWith(
+      ORG_A.id,
+      expect.objectContaining(payload)
+    );
+
+    vi.mocked(db.getOrgProfile).mockResolvedValue({ ...PROFILE_A, ...payload } as any);
+    const profile = await caller.getProfile();
+    expect(profile).toMatchObject(payload);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -170,6 +199,22 @@ describe("organization.updateProfile — isolamento", () => {
       expect.objectContaining({ legalName: "Empresa B Modificada" })
     );
     // Confirmar que ORG_A.id (1) nunca foi passado ao updateOrgProfile
+    expect(vi.mocked(db.updateOrgProfile)).not.toHaveBeenCalledWith(
+      ORG_A.id,
+      expect.anything()
+    );
+  });
+
+  it("updateProfile da Org B com os campos novos usa ctx.org.id de B, nunca A", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_B as any);
+    const callerB = organizationRouter.createCaller(makeCtx(USER_B, ORG_B));
+
+    await callerB.updateProfile({ caeCode: "62010", employeeCount: 50, ceoName: "CEO da B" });
+
+    expect(vi.mocked(db.updateOrgProfile)).toHaveBeenCalledWith(
+      ORG_B.id,
+      expect.objectContaining({ caeCode: "62010", employeeCount: 50, ceoName: "CEO da B" })
+    );
     expect(vi.mocked(db.updateOrgProfile)).not.toHaveBeenCalledWith(
       ORG_A.id,
       expect.anything()
@@ -240,6 +285,66 @@ describe("organization.updateProfile — validação", () => {
     const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
 
     const { ok } = await caller.updateProfile({ taxId: "12-3456789", taxIdType: "EIN" });
+    expect(ok).toBe(true);
+  });
+
+  it("rejeita employeeCount negativo", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const err = await caller.updateProfile({ employeeCount: -1 }).catch(e => e);
+    expect(err).toBeDefined();
+    expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("aceita employeeCount zero", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ employeeCount: 0 });
+    expect(ok).toBe(true);
+  });
+
+  it("rejeita securityOfficerStartDate com data de calendário inválida (ex.: 31 de fevereiro)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const err = await caller.updateProfile({ securityOfficerStartDate: "2026-02-31" }).catch(e => e);
+    expect(err).toBeDefined();
+    expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("rejeita securityOfficerStartDate em formato errado", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const err = await caller.updateProfile({ securityOfficerStartDate: "15/01/2026" }).catch(e => e);
+    expect(err).toBeDefined();
+    expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("aceita securityOfficerStartDate válida", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ securityOfficerStartDate: "2026-01-15" });
+    expect(ok).toBe(true);
+  });
+
+  it("rejeita annualTurnover/annualBalance com formato decimal inválido", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const err = await caller.updateProfile({ annualTurnover: "não é número" }).catch(e => e);
+    expect(err).toBeDefined();
+    expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("aceita annualTurnover/annualBalance decimais válidos", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ annualTurnover: "990000.00", annualBalance: "430000.00" });
     expect(ok).toBe(true);
   });
 });

@@ -18,6 +18,10 @@ const ESSENTIAL_FIELDS: { key: string; label: string }[] = [
   { key: "securityOfficerName", label: "Nome do CISO" },
 ];
 
+// Nota: os 10 campos novos (Carta CISO, Notificação CNCS) não entram no banner de
+// essenciais — os documentos que os usam ainda aceitam "[A PREENCHER]" como fallback
+// (mesmo padrão da PSI), para não bloquear quem já usa os documentos existentes hoje.
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -77,6 +81,18 @@ export default function OrgProfile() {
   const [legalRepresentative,  setLegalRepresentative]  = useState("");
   const [domain,               setDomain]               = useState("");
 
+  // Perfil da Entidade completo (6 documentos)
+  const [caeCode,                  setCaeCode]                  = useState("");
+  const [employeeCount,            setEmployeeCount]            = useState("");
+  const [annualTurnover,           setAnnualTurnover]           = useState("");
+  const [annualBalance,            setAnnualBalance]            = useState("");
+  const [legalRepresentativeRole,  setLegalRepresentativeRole]  = useState("");
+  const [ceoName,                  setCeoName]                  = useState("");
+  const [securityOfficerRole,      setSecurityOfficerRole]      = useState("");
+  const [securityOfficerPhone,     setSecurityOfficerPhone]     = useState("");
+  const [securityOfficerTaxId,     setSecurityOfficerTaxId]     = useState("");
+  const [securityOfficerStartDate, setSecurityOfficerStartDate] = useState("");
+
   const [error,  setError]  = useState("");
   const [toast,  setToast]  = useState("");
 
@@ -94,6 +110,16 @@ export default function OrgProfile() {
     setSecurityOfficerEmail(profile.securityOfficerEmail ?? "");
     setLegalRepresentative(profile.legalRepresentative  ?? "");
     setDomain(profile.domain                  ?? "");
+    setCaeCode(profile.caeCode                                 ?? "");
+    setEmployeeCount(profile.employeeCount != null ? String(profile.employeeCount) : "");
+    setAnnualTurnover(profile.annualTurnover                   ?? "");
+    setAnnualBalance(profile.annualBalance                     ?? "");
+    setLegalRepresentativeRole(profile.legalRepresentativeRole ?? "");
+    setCeoName(profile.ceoName                                 ?? "");
+    setSecurityOfficerRole(profile.securityOfficerRole         ?? "");
+    setSecurityOfficerPhone(profile.securityOfficerPhone       ?? "");
+    setSecurityOfficerTaxId(profile.securityOfficerTaxId       ?? "");
+    setSecurityOfficerStartDate(profile.securityOfficerStartDate ?? "");
   }, [profile]);
 
   useEffect(() => {
@@ -121,6 +147,23 @@ export default function OrgProfile() {
         return false;
       }
     }
+    if (employeeCount.trim() && (!/^\d+$/.test(employeeCount.trim()) || Number(employeeCount) < 0)) {
+      setError("Número de colaboradores deve ser um inteiro ≥ 0.");
+      return false;
+    }
+    const decimalRe = /^\d+(\.\d{1,2})?$/;
+    if (annualTurnover.trim() && !decimalRe.test(annualTurnover.trim())) {
+      setError("Volume de negócios deve ser um valor decimal válido (ex.: 990000.00).");
+      return false;
+    }
+    if (annualBalance.trim() && !decimalRe.test(annualBalance.trim())) {
+      setError("Balanço anual deve ser um valor decimal válido (ex.: 430000.00).");
+      return false;
+    }
+    if (securityOfficerStartDate && isNaN(new Date(`${securityOfficerStartDate}T00:00:00Z`).getTime())) {
+      setError("Data de início do CISO inválida.");
+      return false;
+    }
     setError("");
     return true;
   }
@@ -141,6 +184,16 @@ export default function OrgProfile() {
       securityOfficerEmail: securityOfficerEmail || "",
       legalRepresentative:  legalRepresentative  || null,
       domain:               domain               || null,
+      caeCode:                  caeCode                  || null,
+      employeeCount:            employeeCount.trim()     ? Number(employeeCount) : null,
+      annualTurnover:           annualTurnover.trim()     || null,
+      annualBalance:            annualBalance.trim()      || null,
+      legalRepresentativeRole:  legalRepresentativeRole   || null,
+      ceoName:                  ceoName                  || null,
+      securityOfficerRole:      securityOfficerRole       || null,
+      securityOfficerPhone:     securityOfficerPhone      || null,
+      securityOfficerTaxId:     securityOfficerTaxId      || null,
+      securityOfficerStartDate: securityOfficerStartDate  || null,
     });
   }
 
@@ -295,21 +348,91 @@ export default function OrgProfile() {
             </Field>
           </div>
 
-          <Field id="legalRepresentative" label="Representante legal (nome e cargo)" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field id="caeCode" label="Código CAE">
+              <input
+                id="caeCode" type="text" value={caeCode}
+                onChange={e => setCaeCode(e.target.value)}
+                placeholder="62010"
+                maxLength={20}
+                className={INPUT_CLS}
+              />
+            </Field>
+
+            <Field id="employeeCount" label="Nº de colaboradores">
+              <input
+                id="employeeCount" type="number" min={0} step={1} value={employeeCount}
+                onChange={e => setEmployeeCount(e.target.value)}
+                placeholder="230"
+                className={INPUT_CLS}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field id="annualTurnover" label="Volume de negócios anual (€)">
+              <input
+                id="annualTurnover" type="text" inputMode="decimal" value={annualTurnover}
+                onChange={e => setAnnualTurnover(e.target.value)}
+                placeholder="990000.00"
+                className={INPUT_CLS}
+              />
+            </Field>
+
+            <Field id="annualBalance" label="Balanço total anual (€)">
+              <input
+                id="annualBalance" type="text" inputMode="decimal" value={annualBalance}
+                onChange={e => setAnnualBalance(e.target.value)}
+                placeholder="430000.00"
+                className={INPUT_CLS}
+              />
+            </Field>
+          </div>
+        </section>
+
+        {/* ── Secção B: Órgão de Gestão ── */}
+        <section className="bg-[#0f1e38] border border-slate-700 rounded-xl p-6 space-y-5">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
+            B — Órgão de Gestão
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field id="legalRepresentative" label="Representante legal (nome)" required>
+              <input
+                id="legalRepresentative" type="text" value={legalRepresentative}
+                onChange={e => setLegalRepresentative(e.target.value)}
+                placeholder="João Silva"
+                maxLength={255}
+                className={INPUT_CLS}
+              />
+            </Field>
+
+            <Field id="legalRepresentativeRole" label="Cargo do representante legal">
+              <input
+                id="legalRepresentativeRole" type="text" value={legalRepresentativeRole}
+                onChange={e => setLegalRepresentativeRole(e.target.value)}
+                placeholder="Administrador-Delegado"
+                maxLength={120}
+                className={INPUT_CLS}
+              />
+            </Field>
+          </div>
+
+          <Field id="ceoName" label="Nome do CEO / gestão de topo">
             <input
-              id="legalRepresentative" type="text" value={legalRepresentative}
-              onChange={e => setLegalRepresentative(e.target.value)}
-              placeholder="João Silva — Administrador-Delegado"
+              id="ceoName" type="text" value={ceoName}
+              onChange={e => setCeoName(e.target.value)}
+              placeholder="Maria Santos (se distinto do representante legal)"
               maxLength={255}
               className={INPUT_CLS}
             />
           </Field>
         </section>
 
-        {/* ── Secção B: CISO ── */}
+        {/* ── Secção C: CISO ── */}
         <section className="bg-[#0f1e38] border border-slate-700 rounded-xl p-6 space-y-5">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
-            B — Responsável de Segurança (CISO)
+            C — Responsável de Segurança (CISO)
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -329,6 +452,48 @@ export default function OrgProfile() {
                 onChange={e => setSecurityOfficerEmail(e.target.value)}
                 placeholder="ciso@empresa.pt"
                 maxLength={255}
+                className={INPUT_CLS}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field id="securityOfficerRole" label="Cargo actual do CISO">
+              <input
+                id="securityOfficerRole" type="text" value={securityOfficerRole}
+                onChange={e => setSecurityOfficerRole(e.target.value)}
+                placeholder="Diretor de TI"
+                maxLength={120}
+                className={INPUT_CLS}
+              />
+            </Field>
+
+            <Field id="securityOfficerPhone" label="Telemóvel do CISO">
+              <input
+                id="securityOfficerPhone" type="tel" value={securityOfficerPhone}
+                onChange={e => setSecurityOfficerPhone(e.target.value)}
+                placeholder="+351 910 000 000"
+                maxLength={30}
+                className={INPUT_CLS}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field id="securityOfficerTaxId" label="NIF pessoal do CISO">
+              <input
+                id="securityOfficerTaxId" type="text" value={securityOfficerTaxId}
+                onChange={e => setSecurityOfficerTaxId(e.target.value)}
+                placeholder="123456789"
+                maxLength={20}
+                className={INPUT_CLS}
+              />
+            </Field>
+
+            <Field id="securityOfficerStartDate" label="Data de início no cargo">
+              <input
+                id="securityOfficerStartDate" type="date" value={securityOfficerStartDate}
+                onChange={e => setSecurityOfficerStartDate(e.target.value)}
                 className={INPUT_CLS}
               />
             </Field>
