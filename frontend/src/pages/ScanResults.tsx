@@ -400,6 +400,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     undefined,
     { enabled: false, retry: false }
   );
+  const cartaCiso = trpc.documents.cartaCiso.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -432,6 +436,14 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
           label="Política de Segurança (.docx)"
           onDownload={async () => {
             const r = await psi.refetch();
+            if (!r.data) throw new Error("Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Carta de Nomeação do CISO (.docx)"
+          onDownload={async () => {
+            const r = await cartaCiso.refetch();
             if (!r.data) throw new Error("Sem dados");
             return r.data;
           }}

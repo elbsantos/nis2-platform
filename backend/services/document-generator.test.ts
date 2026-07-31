@@ -128,6 +128,7 @@ import {
   generateRegistoRiscos,
   generateInventarioAtivos,
   generatePsi,
+  generateCartaCiso,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
@@ -203,6 +204,13 @@ describe("document-generator — guard de template em falta", () => {
       "[Documentos] Template não encontrado: psi-template.docx"
     );
   });
+
+  it("generateCartaCiso lança erro claro com nome do ficheiro docx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateCartaCiso(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: carta-ciso-template.docx"
+    );
+  });
 });
 
 // ===========================================================================
@@ -255,6 +263,15 @@ describe("document-generator — Buffer base64 com template dummy", () => {
     vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
     vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
     const buf = await generatePsi(1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("generateCartaCiso devolve Buffer não vazio", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    const buf = await generateCartaCiso(1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
   });
@@ -1037,6 +1054,155 @@ describe("generatePsi — PSI auto-preenchida (C17)", () => {
   it("nenhum valor é null, undefined, 'None' ou 'null'", async () => {
     PSI_SETUP({ legalName: null, taxId: null, securityOfficerName: null });
     await generatePsi(1);
+    for (const [k, v] of Object.entries(_psiRenderArgs!)) {
+      expect(v, `"${k}" não deve ser null`).not.toBeNull();
+      expect(v, `"${k}" não deve ser undefined`).not.toBeUndefined();
+      expect(String(v), `"${k}" não deve ser 'None'`).not.toBe("None");
+      expect(String(v), `"${k}" não deve ser 'null'`).not.toBe("null");
+    }
+  });
+});
+
+// ===========================================================================
+// Carta de Nomeação do CISO — generateCartaCiso
+// ===========================================================================
+
+describe("generateCartaCiso — Carta de Nomeação do CISO", () => {
+  const CARTA_ORG_COMPLETA = {
+    legalName:                "Empresa Teste, Lda.",
+    taxId:                    "509123456",
+    address:                  "Rua Exemplo 1, 1000-001 Lisboa",
+    caeCode:                  "62010",
+    legalRepresentative:      "João Silva",
+    legalRepresentativeRole:  "Administrador-Delegado",
+    securityOfficerName:      "Ana Costa",
+    securityOfficerTaxId:     "123456789",
+    securityOfficerRole:      "Diretora de TI",
+    securityOfficerStartDate: "2026-01-15",
+    securityOfficerEmail:     "ciso@empresa.pt",
+    securityOfficerPhone:     "+351 910 000 000",
+  };
+
+  const CARTA_SETUP = (orgOverride: object = {}) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({
+      ...FAKE_ORG,
+      ...CARTA_ORG_COMPLETA,
+      ...orgOverride,
+    } as any);
+  };
+
+  it("perfil completo — todas as tags preenchidas, nenhum '{' remanescente", async () => {
+    CARTA_SETUP();
+    await generateCartaCiso(1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    const TAGS = [
+      "empresa", "nif", "sede", "cae", "representante", "cargo_rep",
+      "ciso_nome", "ciso_nif", "ciso_cargo", "ciso_inicio", "ciso_email",
+      "ciso_telemovel", "referencia", "localidade", "data_extenso",
+    ];
+    for (const tag of TAGS) {
+      const v = (_psiRenderArgs as any)[tag];
+      expect(v, `tag "${tag}" não deve ser undefined`).toBeDefined();
+      expect(String(v), `tag "${tag}" não deve conter "{"`).not.toContain("{");
+      expect(String(v), `tag "${tag}" não deve ser [A PREENCHER] com perfil completo`)
+        .not.toContain("A PREENCHER");
+    }
+  });
+
+  it("org com legalName → empresa = legalName", async () => {
+    CARTA_SETUP({ legalName: "Empresa Legal, SA" });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Legal, SA");
+  });
+
+  it("org sem legalName → empresa = name", async () => {
+    CARTA_SETUP({ legalName: null });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Teste Lda");
+  });
+
+  it("org sem taxId → nif = placeholder", async () => {
+    CARTA_SETUP({ taxId: null });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.nif).toBe("[A PREENCHER: NIF]");
+  });
+
+  it("org sem caeCode → cae = placeholder", async () => {
+    CARTA_SETUP({ caeCode: null });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.cae).toBe("[A PREENCHER: código CAE]");
+  });
+
+  it("org com caeCode → cae = caeCode", async () => {
+    CARTA_SETUP({ caeCode: "62020" });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.cae).toBe("62020");
+  });
+
+  it("representante e cargo do representante mapeados", async () => {
+    CARTA_SETUP();
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.representante).toBe("João Silva");
+    expect(_psiRenderArgs!.cargo_rep).toBe("Administrador-Delegado");
+  });
+
+  it("securityOfficerStartDate 'YYYY-MM-DD' → ciso_inicio 'DD/MM/YYYY'", async () => {
+    CARTA_SETUP({ securityOfficerStartDate: "2026-01-15" });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.ciso_inicio).toBe("15/01/2026");
+  });
+
+  it("org sem securityOfficerStartDate → ciso_inicio = placeholder", async () => {
+    CARTA_SETUP({ securityOfficerStartDate: null });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.ciso_inicio).toBe("[A PREENCHER: data de início]");
+  });
+
+  it("ciso_nif, ciso_cargo, ciso_email, ciso_telemovel mapeados do perfil do CISO", async () => {
+    CARTA_SETUP();
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.ciso_nif).toBe("123456789");
+    expect(_psiRenderArgs!.ciso_cargo).toBe("Diretora de TI");
+    expect(_psiRenderArgs!.ciso_email).toBe("ciso@empresa.pt");
+    expect(_psiRenderArgs!.ciso_telemovel).toBe("+351 910 000 000");
+  });
+
+  it("referência auto-gerada no formato CISO-{ano}-{orgId com 6 dígitos}", async () => {
+    vi.setSystemTime(new Date("2026-07-31"));
+    CARTA_SETUP();
+    await generateCartaCiso(42);
+    expect(_psiRenderArgs!.referencia).toBe("CISO-2026-000042");
+  });
+
+  it("localidade derivada da morada (último segmento, sem código postal)", async () => {
+    CARTA_SETUP({ address: "Rua Exemplo 1, 1000-001 Lisboa" });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.localidade).toBe("Lisboa");
+  });
+
+  it("org sem address → localidade = placeholder", async () => {
+    CARTA_SETUP({ address: null });
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.localidade).toBe("[A PREENCHER: localidade]");
+  });
+
+  it("data_extenso — data actual por extenso em PT", async () => {
+    vi.setSystemTime(new Date("2026-01-15"));
+    CARTA_SETUP();
+    await generateCartaCiso(1);
+    expect(_psiRenderArgs!.data_extenso).toBe("15 de janeiro de 2026");
+  });
+
+  it("perfil incompleto — campos em falta usam '[A PREENCHER]', nunca null/undefined", async () => {
+    CARTA_SETUP({
+      taxId: null, address: null, caeCode: null, legalRepresentative: null,
+      legalRepresentativeRole: null, securityOfficerTaxId: null, securityOfficerRole: null,
+      securityOfficerStartDate: null, securityOfficerEmail: null, securityOfficerPhone: null,
+    });
+    await generateCartaCiso(1);
     for (const [k, v] of Object.entries(_psiRenderArgs!)) {
       expect(v, `"${k}" não deve ser null`).not.toBeNull();
       expect(v, `"${k}" não deve ser undefined`).not.toBeUndefined();

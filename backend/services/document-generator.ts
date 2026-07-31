@@ -35,6 +35,7 @@ export const TEMPLATE_PATHS = {
   inventarioAtivos: path.join(TEMPLATE_DIR, "inventario-ativos.xlsx"),
   psi:              path.join(TEMPLATE_DIR, "psi-template.docx"),
   enquadramento:    path.join(TEMPLATE_DIR, "enquadramento-template.docx"),
+  cartaCiso:        path.join(TEMPLATE_DIR, "carta-ciso-template.docx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -64,6 +65,24 @@ function formatDate(d: Date | null | undefined): string {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+/** Converte uma data em modo string do drizzle ("YYYY-MM-DD") para "DD/MM/YYYY". */
+function formatDateOnlyStr(d: string | null | undefined): string | null {
+  if (!d) return null;
+  const [y, m, dd] = d.split("-");
+  if (!y || !m || !dd) return null;
+  return `${dd}/${m}/${y}`;
+}
+
+/** Deriva a localidade a partir da morada livre (último segmento após a vírgula, sem código postal). */
+function deriveLocalidade(address: string | null | undefined): string | null {
+  if (!address) return null;
+  const parts = address.split(",");
+  const last = parts[parts.length - 1]?.trim();
+  if (!last) return null;
+  const cleaned = last.replace(/^\d{4}-\d{3}\s*/, "").trim();
+  return cleaned || null;
 }
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -387,6 +406,45 @@ export async function generatePsi(orgId: number): Promise<Buffer> {
   };
 
   const content = fs.readFileSync(TEMPLATE_PATHS.psi);
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
+  return doc.getZip().generate({ type: "nodebuffer" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// Carta de Nomeação do CISO (.docx) — 1º dos 6 documentos do Dossier
+// ---------------------------------------------------------------------------
+
+export async function generateCartaCiso(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.cartaCiso);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova: reaproveita o id (já sequencial e único).
+  const referencia = `CISO-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const data = {
+    empresa:        cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    nif:            cell(org.taxId, "[A PREENCHER: NIF]"),
+    sede:           cell(org.address, "[A PREENCHER: sede social]"),
+    cae:            cell(org.caeCode, "[A PREENCHER: código CAE]"),
+    representante:  cell(org.legalRepresentative, "[A PREENCHER: representante legal]"),
+    cargo_rep:      cell(org.legalRepresentativeRole, "[A PREENCHER: cargo do representante]"),
+    ciso_nome:      cell(org.securityOfficerName, "[A PREENCHER: nome do CISO]"),
+    ciso_nif:       cell(org.securityOfficerTaxId, "[A PREENCHER: NIF do CISO]"),
+    ciso_cargo:     cell(org.securityOfficerRole, "[A PREENCHER: cargo actual do CISO]"),
+    ciso_inicio:    cell(formatDateOnlyStr(org.securityOfficerStartDate), "[A PREENCHER: data de início]"),
+    ciso_email:     cell(org.securityOfficerEmail, "[A PREENCHER: email do CISO]"),
+    ciso_telemovel: cell(org.securityOfficerPhone, "[A PREENCHER: telemóvel do CISO]"),
+    referencia,
+    localidade:     cell(deriveLocalidade(org.address), "[A PREENCHER: localidade]"),
+    data_extenso:   hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
+  };
+
+  const content = fs.readFileSync(TEMPLATE_PATHS.cartaCiso);
   const zip     = new PizZip(content);
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);
