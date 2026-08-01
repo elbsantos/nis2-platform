@@ -1382,6 +1382,19 @@ describe("generateRegistoCncs — Registo Inicial CNCS", () => {
     expect(_psiRenderArgs!.colaboradores).toBe("230");
   });
 
+  it("volume_negocios sai formatado em euros (€), não o valor cru da BD", async () => {
+    CNCS_SETUP({ annualTurnover: "990000.00" });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.volume_negocios).toBe("990.000,00 €");
+    expect(_psiRenderArgs!.volume_negocios).not.toBe("990000.00");
+  });
+
+  it("volume_negocios sem annualTurnover → placeholder (não '[A PREENCHER]' genérico do formatMoedaEuro)", async () => {
+    CNCS_SETUP({ annualTurnover: null });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.volume_negocios).toBe("[A PREENCHER: volume de negócios]");
+  });
+
   it("perfil incompleto — campos em falta usam '[A PREENCHER]', nunca null/undefined", async () => {
     CNCS_SETUP({
       taxId: null, address: null, caeCode: null, securityOfficerName: null,

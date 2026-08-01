@@ -30,6 +30,7 @@ import {
   CLASSIFICACAO_LABELS,
   getSectorAnexoLabel,
 } from "../utils/decision-engine";
+import { formatMoedaEuro } from "../utils/money-format";
 
 // ---------------------------------------------------------------------------
 // Caminhos e constantes
@@ -500,7 +501,7 @@ export async function generateRegistoCncs(orgId: number): Promise<Buffer> {
     ciso_cargo:      cell(org.securityOfficerRole, "[A PREENCHER: cargo do CISO]"),
     ceo_contacto:    cell(org.ceoContact, "[A PREENCHER: contacto alternativo de gestão]"),
     colaboradores:   cell(org.employeeCount != null ? String(org.employeeCount) : null, "[A PREENCHER: nº de colaboradores]"),
-    volume_negocios: cell(org.annualTurnover, "[A PREENCHER: volume de negócios]"),
+    volume_negocios: formatMoedaEuro(org.annualTurnover, "[A PREENCHER: volume de negócios]"),
     paises_operacao: paisesOperacao,
     referencia,
     data_extenso:    hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
