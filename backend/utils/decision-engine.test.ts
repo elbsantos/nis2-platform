@@ -12,27 +12,28 @@ import {
 const A = (overrides: Answers): Answers => overrides;
 
 // Respostas base para entidade em setor com dimensão definida
+// D.vn/D.b em EUROS (ENGINE_VERSION 7+) — antes eram em milhões (M€).
 const BASE_ENERGIA_GRANDE: Answers = {
   "A.setor":      "energia",
   "C.estrutura":  "autonoma",
   "D.n":          "300",
-  "D.vn":         "60",
-  "D.b":          "50",
+  "D.vn":         "60000000",
+  "D.b":          "50000000",
 };
 
 const BASE_ENERGIA_MEDIA: Answers = {
   "A.setor":      "energia",
   "C.estrutura":  "autonoma",
   "D.n":          "100",
-  "D.vn":         "20",
-  "D.b":          "15",
+  "D.vn":         "20000000",
+  "D.b":          "15000000",
 };
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 describe("ENGINE_VERSION", () => {
-  it("é '6' (v6 — rótulos ramo fornecedor passam a 'obrigações por via contratual')", () => {
-    expect(ENGINE_VERSION).toBe("6");
+  it("é '7' (v7 — D.vn/D.b passam a ser introduzidos e comparados em euros, não em M€)", () => {
+    expect(ENGINE_VERSION).toBe("7");
   });
 });
 
@@ -40,8 +41,8 @@ describe("ENGINE_VERSION", () => {
 
 describe("coverageState", () => {
   const cases: Array<[Parameters<typeof evaluateTree>[1], string, string]> = [
-    [A({ "A.setor": "energia",     "C.estrutura": "autonoma", "D.n": "300", "D.vn": "60", "D.b": "50" }), "essencial",              "abrangida"],
-    [A({ "A.setor": "industria",   "C.estrutura": "autonoma", "D.n": "60",  "D.vn": "12", "D.b": "10" }), "importante",             "abrangida"],
+    [A({ "A.setor": "energia",     "C.estrutura": "autonoma", "D.n": "300", "D.vn": "60000000", "D.b": "50000000" }), "essencial",              "abrangida"],
+    [A({ "A.setor": "industria",   "C.estrutura": "autonoma", "D.n": "60",  "D.vn": "12000000", "D.b": "10000000" }), "importante",             "abrangida"],
     [A({ "A.setor": "outro",       "B.excecao": "qualitativo" }),                                          "a_confirmar",            "condicional"],
     [A({ "A.setor": "outro",       "B.excecao": "fornecedor" }),                                           "a_confirmar_contratual", "condicional"],
     [A({ "A.setor": "outro",       "B.excecao": "nenhum" }),                                               "fora_condicional",       "fora"],
@@ -60,14 +61,14 @@ describe("coverageState", () => {
   it("nenhum resultado do motor tem coverageState undefined", () => {
     // Corre todos os cenários do ficheiro e verifica que coverageState está sempre definido
     const scenarios = [
-      A({ "A.setor": "energia",   "C.estrutura": "autonoma",        "D.n": "300", "D.vn": "60", "D.b": "50" }),
-      A({ "A.setor": "industria", "C.estrutura": "autonoma",        "D.n": "60",  "D.vn": "12", "D.b": "10" }),
+      A({ "A.setor": "energia",   "C.estrutura": "autonoma",        "D.n": "300", "D.vn": "60000000", "D.b": "50000000" }),
+      A({ "A.setor": "industria", "C.estrutura": "autonoma",        "D.n": "60",  "D.vn": "12000000", "D.b": "10000000" }),
       A({ "A.setor": "outro",     "B.excecao": "qualitativo" }),
       A({ "A.setor": "outro",     "B.excecao": "fornecedor" }),
       A({ "A.setor": "outro",     "B.excecao": "nenhum" }),
       A({ "A.setor": "admin_publica" }),
-      A({ "A.setor": "energia",   "C.estrutura": "autonoma",        "D.n": "30",  "D.vn": "5" }),
-      A({ "A.setor": "energia",   "C.estrutura": "associada_total", "D.n": "240", "D.vn": "45", "D.b": "38", "D.grupo_n": "20", "D.grupo_vn": "8", "D.grupo_b": "5" }),
+      A({ "A.setor": "energia",   "C.estrutura": "autonoma",        "D.n": "30",  "D.vn": "5000000" }),
+      A({ "A.setor": "energia",   "C.estrutura": "associada_total", "D.n": "240", "D.vn": "45000000", "D.b": "38000000", "D.grupo_n": "20", "D.grupo_vn": "8000000", "D.grupo_b": "5000000" }),
     ];
     for (const s of scenarios) {
       const r = evaluateTree(NIS2_PT_TREE, s);
@@ -174,7 +175,7 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     const [sA, sC, sD, sE] = r.steps as [TrailStep, TrailStep, TrailStep, TrailStep];
     expect(sA).toEqual({ nodeId: "A", label: "Setor: Energia (eletricidade, gás, petróleo, hidrogénio, aquecimento/arrefecimento)", article: "Anexo I, ponto 1" });
     expect(sC).toEqual({ nodeId: "C", label: "Grupo: empresa autónoma (sem controlo externo significativo)", article: "Rec. 2003/361/CE; Art. 3.º/1 do RJC" }); // antes: "...Art. 3.º/1 DL 125/2025"
-    expect(sD).toEqual({ nodeId: "D", label: "Dimensão: grande (trabalhadores: 300, VN: 60 M€, balanço: 50 M€)", article: "Anexo III DL 125/2025; Rec. 2003/361/CE" });
+    expect(sD).toEqual({ nodeId: "D", label: "Dimensão: grande (trabalhadores: 300, VN: 60.000.000 €, balanço: 50.000.000 €)", article: "Anexo III DL 125/2025; Rec. 2003/361/CE" }); // ENGINE_VERSION 7: valores em euros, não M€
     expect(sE).toEqual({ nodeId: "E", label: "Resultado: entidade essencial — Anexo I, grande dimensão", article: "Art. 6.º/1 a) do RJC" }); // antes: "Art. 6.º/1 a) DL 125/2025"
   });
 
@@ -184,17 +185,17 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     expect(r.path).toEqual(["A", "C", "D", "E"]);
   });
 
-  it("[obrigatório] caso-limite: N=30, VN=12M, B=8M → pequena → fora_condicional", () => {
-    // N<50; VN=12>10 MAS B=8≤10 → NÃO satisfaz (VN>10 E B>10) → pequena
-    // B=8 é CONHECIDO → condicional=false → fora_condicional (não a_confirmar)
+  it("[obrigatório] caso-limite: N=30, VN=12.000.000€, B=8.000.000€ → pequena → fora_condicional", () => {
+    // N<50; VN=12M>10M MAS B=8M≤10M → NÃO satisfaz (VN>10M E B>10M) → pequena
+    // B=8M é CONHECIDO → condicional=false → fora_condicional (não a_confirmar)
     const r = evaluateTree(
       NIS2_PT_TREE,
       A({
         "A.setor":     "industria",
         "C.estrutura": "autonoma",
         "D.n":         "30",
-        "D.vn":        "12",
-        "D.b":         "8",
+        "D.vn":        "12000000",
+        "D.b":         "8000000",
       })
     );
     expect(r.classification).toBe("fora_condicional");
@@ -220,8 +221,8 @@ describe("Nó E — Classificação por setor e dimensão", () => {
         "A.setor":     "telecom",
         "C.estrutura": "autonoma",
         "D.n":         "30",
-        "D.vn":        "5",
-        "D.b":         "4",
+        "D.vn":        "5000000",
+        "D.b":         "4000000",
       })
     );
     expect(r.classification).toBe("importante");
@@ -238,8 +239,8 @@ describe("Nó E — Classificação por setor e dimensão", () => {
         "A.setor":     "telecom",
         "C.estrutura": "autonoma",
         "D.n":         "80",
-        "D.vn":        "15",
-        "D.b":         "12",
+        "D.vn":        "15000000",
+        "D.b":         "12000000",
       })
     );
     expect(r.classification).toBe("essencial");
@@ -252,8 +253,8 @@ describe("Nó E — Classificação por setor e dimensão", () => {
         "A.setor":     "tld_dns_confianca",
         "C.estrutura": "autonoma",
         "D.n":         "5",
-        "D.vn":        "1",
-        "D.b":         "0.5",
+        "D.vn":        "1000000",
+        "D.b":         "500000",
       })
     );
     expect(r.classification).toBe("essencial");
@@ -267,11 +268,11 @@ describe("Nó E — Classificação por setor e dimensão", () => {
         "A.setor":      "energia",
         "C.estrutura":  "associada_total",
         "D.n":          "240",
-        "D.vn":         "45",
-        "D.b":          "38",
+        "D.vn":         "45000000",
+        "D.b":          "38000000",
         "D.grupo_n":    "20",
-        "D.grupo_vn":   "8",
-        "D.grupo_b":    "5",
+        "D.grupo_vn":   "8000000",
+        "D.grupo_b":    "5000000",
       })
     );
     expect(r.classification).toBe("essencial");
@@ -287,15 +288,15 @@ describe("Nó E — Classificação por setor e dimensão", () => {
     expect(sD.label).toContain("valores agregados do grupo");
     expect(sD.label).toContain("trabalhadores: 260");
 
-    // Confirma que sem o grupo (240 < 250, VN=45≤50) seria apenas média → importante
+    // Confirma que sem o grupo (240 < 250, VN=45M≤50M) seria apenas média → importante
     const semGrupo = evaluateTree(
       NIS2_PT_TREE,
       A({
         "A.setor":     "energia",
         "C.estrutura": "autonoma",
         "D.n":         "240",
-        "D.vn":        "45",
-        "D.b":         "38",
+        "D.vn":        "45000000",
+        "D.b":         "38000000",
       })
     );
     expect(semGrupo.classification).toBe("importante");
@@ -310,8 +311,8 @@ describe("Nó E — Classificação por setor e dimensão", () => {
         "A.setor":     "quimicos_alimentar",
         "C.estrutura": "autonoma",
         "D.n":         "60",
-        "D.vn":        "15",
-        "D.b":         "12",
+        "D.vn":        "15000000",
+        "D.b":         "12000000",
       })
     );
     expect(r.classification).toBe("importante");
@@ -319,42 +320,42 @@ describe("Nó E — Classificação por setor e dimensão", () => {
 });
 
 // ── Dimensão — thresholds e casos especiais ───────────────────────────────────
+// D.vn/D.b em EUROS (ENGINE_VERSION 7+): limiares do Anexo III/Rec. 2003/361/CE
+// são 50.000.000€/43.000.000€ (grande) e 10.000.000€/10.000.000€ (média).
 
 describe("Dimensão — thresholds e casos de fronteira", () => {
   it("N=50 exato → média (threshold inclusivo)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "50", "D.vn": "5", "D.b": "4" })
+      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "50", "D.vn": "5000000", "D.b": "4000000" })
     );
     expect(r.classification).toBe("importante"); // Anexo I média
   });
 
-  it("N=49 com VN=12 e B=8 → pequena (B≤10 impede média por VN+B)", () => {
+  it("N=49 com VN=12.000.000€ e B=8.000.000€ → pequena (B≤10M€ impede média por VN+B)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "49", "D.vn": "12", "D.b": "8" })
+      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "49", "D.vn": "12000000", "D.b": "8000000" })
     );
-    // N<50 AND NOT(VN>10 AND B>10) porque B=8≤10 → pequena
+    // N<50 AND NOT(VN>10M€ AND B>10M€) porque B=8M€≤10M€ → pequena
     expect(r.classification).toBe("fora_condicional");
   });
 
-  it("balanço desconhecido com VN>10 → a_confirmar (o balanço decide entre pequena e média)", () => {
-    // CORRIGIDO: N=10, VN=12, B omitido → dim(B=0)=pequena, dim(B=∞)=média → dims diferem → a_confirmar.
-    // Antes codificava comportamento errado: assumia B=∞ → média → "Provável importante".
+  it("balanço desconhecido com VN>10.000.000€ → a_confirmar (o balanço decide entre pequena e média)", () => {
+    // N=10, VN=12M€, B omitido → dim(B=0)=pequena, dim(B=∞)=média → dims diferem → a_confirmar.
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "saude", "C.estrutura": "autonoma", "D.n": "10", "D.vn": "12" })
+      A({ "A.setor": "saude", "C.estrutura": "autonoma", "D.n": "10", "D.vn": "12000000" })
     );
     expect(r.classification).toBe("a_confirmar");
   });
 
-  it("balanço desconhecido com VN≤10 → fora_condicional (VN decide sozinho, balanço irrelevante)", () => {
-    // CORRIGIDO: N=30, VN=8, B omitido → dim(B=0)=pequena, dim(B=∞)=pequena → dims iguais → fora_condicional.
-    // VN=8≤10 faz (VN>10 AND B>10) falhar para qualquer B — o balanço não muda a decisão.
-    // Antes codificava comportamento errado: piccola+condicional→a_confirmar (incerteza falsa).
+  it("balanço desconhecido com VN≤10.000.000€ → fora_condicional (VN decide sozinho, balanço irrelevante)", () => {
+    // N=30, VN=8M€, B omitido → dim(B=0)=pequena, dim(B=∞)=pequena → dims iguais → fora_condicional.
+    // VN=8M€≤10M€ faz (VN>10M€ AND B>10M€) falhar para qualquer B — o balanço não muda a decisão.
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8000000" })
     );
     expect(r.classification).toBe("fora_condicional");
     expect(r.classification).not.toBe("a_confirmar");
@@ -367,72 +368,102 @@ describe("Dimensão — thresholds e casos de fronteira", () => {
         "A.setor":     "saude",
         "C.estrutura": "parceira",
         "D.n":         "80",
-        "D.vn":        "18",
-        "D.b":         "14",
+        "D.vn":        "18000000",
+        "D.b":         "14000000",
       })
     );
     expect(r.classification).toBe("importante"); // Anexo I média
     expect(r.resultLabel).toMatch(/Provável/);
   });
 
-  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "6" ────────────
+  // ── Cálculo em gémeo — tabela de regressão ENGINE_VERSION "7" (valores em euros) ────────────
 
-  it("[EQ8-T1] N=30, VN=8, B=desconhecido → fora_condicional (VN≤10, balanço irrelevante)", () => {
+  it("[EQ8-T1] N=30, VN=8.000.000€, B=desconhecido → fora_condicional (VN≤10M€, balanço irrelevante)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8000000" })
     );
     expect(r.classification).toBe("fora_condicional");
   });
 
-  it("[EQ8-T2] N=30, VN=8, B=5 → fora_condicional (B conhecido, pequena determinística)", () => {
+  it("[EQ8-T2] N=30, VN=8.000.000€, B=5.000.000€ → fora_condicional (B conhecido, pequena determinística)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8", "D.b": "5" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "8000000", "D.b": "5000000" })
     );
     expect(r.classification).toBe("fora_condicional");
   });
 
-  it("[EQ8-T3] N=30, VN=12, B=desconhecido → a_confirmar (balanço decide entre pequena e média)", () => {
+  it("[EQ8-T3] N=30, VN=12.000.000€, B=desconhecido → a_confirmar (balanço decide entre pequena e média)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12000000" })
     );
     expect(r.classification).toBe("a_confirmar");
   });
 
-  it("[EQ8-T4] N=30, VN=12, B=8 → fora_condicional (B≤10 torna pequena determinística)", () => {
+  it("[EQ8-T4] N=30, VN=12.000.000€, B=8.000.000€ → fora_condicional (B≤10M€ torna pequena determinística)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12", "D.b": "8" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12000000", "D.b": "8000000" })
     );
     expect(r.classification).toBe("fora_condicional");
   });
 
-  it("[EQ8-T5] N=30, VN=12, B=15 → dentro do âmbito (B>10 → média → importante)", () => {
+  it("[EQ8-T5] N=30, VN=12.000.000€, B=15.000.000€ → dentro do âmbito (B>10M€ → média → importante)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12", "D.b": "15" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "30", "D.vn": "12000000", "D.b": "15000000" })
     );
     expect(r.classification).toBe("importante");
   });
 
-  it("[EQ8-T6] N=60, VN=2, B=desconhecido → dentro do âmbito (N≥50 basta, balanço irrelevante)", () => {
+  it("[EQ8-T6] N=60, VN=2.000.000€, B=desconhecido → dentro do âmbito (N≥50 basta, balanço irrelevante)", () => {
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "60", "D.vn": "2" })
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "60", "D.vn": "2000000" })
     );
     expect(r.classification).toBe("importante"); // Anexo II, média (N≥50)
   });
 
-  it("[EQ8-T7] N=200, VN=60, B=desconhecido → a_confirmar (balanço decide entre média e grande)", () => {
-    // calcDim(B=0)=média (N<250, VN>50 mas B=0 não passa >43)
-    // calcDim(B=∞)=grande (VN=60>50 E ∞>43)
+  it("[EQ8-T7] N=200, VN=60.000.000€, B=desconhecido → a_confirmar (balanço decide entre média e grande)", () => {
+    // calcDim(B=0)=média (N<250, VN>50M€ mas B=0 não passa >43M€)
+    // calcDim(B=∞)=grande (VN=60M€>50M€ E ∞>43M€)
     // dims diferem → o balanço é decisivo → a_confirmar
     const r = evaluateTree(
       NIS2_PT_TREE,
-      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "200", "D.vn": "60" })
+      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "200", "D.vn": "60000000" })
     );
     expect(r.classification).toBe("a_confirmar");
+  });
+
+  // ── Regressão do incidente que motivou a mudança de unidade (M€ → €) ───────
+
+  it("[REGRESSÃO] micro-empresa com VN=15.000€ NÃO é classificada como grande/essencial", () => {
+    // Incidente: utilizador escreveu 15000 a pensar €15.000; com o motor em M€ isso
+    // era lido como 15.000 M€ (quinze mil milhões) → "grande"/essencial, errado.
+    // Em euros, 2 trabalhadores + €15.000 de VN é claramente micro/pequena.
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "2", "D.vn": "15000", "D.b": "5000" })
+    );
+    expect(r.classification).not.toBe("essencial");
+    expect(r.classification).toBe("fora_condicional");
+  });
+
+  it("[REGRESSÃO] média empresa com VN=12.000.000€ (60 trab.) → importante", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "60", "D.vn": "12000000", "D.b": "11000000" })
+    );
+    expect(r.classification).toBe("importante");
+  });
+
+  it("[REGRESSÃO] grande empresa com VN=60.000.000€ (300 trab.) → essencial (setor Anexo I)", () => {
+    const r = evaluateTree(
+      NIS2_PT_TREE,
+      A({ "A.setor": "energia", "C.estrutura": "autonoma", "D.n": "300", "D.vn": "60000000", "D.b": "50000000" })
+    );
+    expect(r.classification).toBe("essencial");
   });
 });

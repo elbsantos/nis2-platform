@@ -17,9 +17,17 @@
  * | 'fora'); o gerador deixa de adivinhar o estado por classification.
  * ENGINE_VERSION "6" — rótulos do ramo fornecedor deixam de dizer 'abrangência via cadeia'
  * (contradiziam o resultLabel); passam a 'obrigações por via contratual'.
+ * ENGINE_VERSION "7" — D.vn/D.b (e D.grupo_vn/D.grupo_b) passam a ser introduzidos e
+ * comparados em EUROS, não em milhões (M€) — alinhado com annualTurnover/annualBalance
+ * do Perfil da Entidade, que já sempre foram em euros. Limiares do Anexo III/Rec.
+ * 2003/361/CE (50/43/10) passam de literais em milhões para 50_000_000/43_000_000/
+ * 10_000_000. Assessments de versões anteriores (D.vn/D.b guardados em milhões) NÃO
+ * são reprocessáveis com este motor — o guard de ENGINE_VERSION já existente em
+ * generateRelatorioEnquadramento/generateRegistoCncs recusa-os e pede para repetir o
+ * enquadramento, em vez de os reinterpretar (evita misturar milhões com euros).
  */
 
-export const ENGINE_VERSION = "6";
+export const ENGINE_VERSION = "7";
 
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
@@ -106,6 +114,16 @@ export function getSectorAnexoLabel(setorId: string | null | undefined): string 
   if (!setorId) return null;
   const cat = SECTOR_ANEXO[setorId];
   return cat ? ANEXO_ROMANO[cat] : null;
+}
+
+/**
+ * Formata um valor em euros com "." como separador de milhares — determinístico,
+ * não depende de toLocaleString("pt-PT") (cujo ICU pode usar espaço não-quebrável
+ * em vez de ponto, consoante o ambiente Node).
+ */
+export function formatEuros(n: number): string {
+  const inteiro = Math.round(n).toString();
+  return inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
 // ── Rótulos legíveis para Classification ─────────────────────────────────────
@@ -296,13 +314,13 @@ export const NIS2_PT_TREE: DecisionTree = {
     D: {
       id: "D",
       question:
-        "Qual é a dimensão da sua organização? Introduza os valores agregados do grupo quando aplicável (número de trabalhadores, volume de negócios em M€, balanço total em M€).",
+        "Qual é a dimensão da sua organização? Introduza os valores agregados do grupo quando aplicável (número de trabalhadores, volume de negócios em €, balanço total em €).",
       legalRef: "Anexo III DL 125/2025; Rec. 2003/361/CE",
       options: [
         {
           id: "form",
           label:
-            "Preencher os campos: D.n (trabalhadores), D.vn (VN em M€), D.b (balanço em M€, opcional). " +
+            "Preencher os campos: D.n (trabalhadores), D.vn (VN em €), D.b (balanço em €, opcional). " +
             "Para grupo associado (C = associada_total): D.grupo_n, D.grupo_vn, D.grupo_b.",
         },
       ],
@@ -324,11 +342,11 @@ export const NIS2_PT_TREE: DecisionTree = {
 //   "B.excecao"   — id de opção do Nó B (só se A.setor = "outro")
 //   "C.estrutura" — id de opção do Nó C
 //   "D.n"         — trabalhadores próprios (inteiro)
-//   "D.vn"        — volume de negócios em M€ (decimal)
-//   "D.b"         — balanço total em M€ (decimal; omitir = desconhecido)
+//   "D.vn"        — volume de negócios em € (decimal) — ENGINE_VERSION 7+; antes em M€
+//   "D.b"         — balanço total em € (decimal; omitir = desconhecido) — ENGINE_VERSION 7+; antes em M€
 //   "D.grupo_n"   — trabalhadores adicionais do grupo (para associada_total)
-//   "D.grupo_vn"  — VN adicional do grupo em M€
-//   "D.grupo_b"   — balanço adicional do grupo em M€
+//   "D.grupo_vn"  — VN adicional do grupo em € — ENGINE_VERSION 7+; antes em M€
+//   "D.grupo_b"   — balanço adicional do grupo em € — ENGINE_VERSION 7+; antes em M€
 
 export function evaluateTree(
   tree: DecisionTree,
@@ -477,12 +495,14 @@ export function evaluateTree(
   }
 
   const bDesconhecido = totalB < 0;
-  const bLabelStr     = bDesconhecido ? "não informado" : `${totalB} M€`;
+  const bLabelStr     = bDesconhecido ? "não informado" : `${formatEuros(totalB)} €`;
 
-  // Thresholds do Anexo III DL 125/2025 / Rec. 2003/361/CE
+  // Thresholds do Anexo III DL 125/2025 / Rec. 2003/361/CE — em EUROS (ENGINE_VERSION 7+).
+  // Grande: VN > 50 M€ (50_000_000) e balanço > 43 M€ (43_000_000).
+  // Média:  VN > 10 M€ (10_000_000) e balanço > 10 M€ (10_000_000).
   const calcDim = (b: number): "grande" | "media" | "pequena" => {
-    if (totalN >= 250 || (totalVn > 50 && b > 43)) return "grande";
-    if (totalN >= 50  || (totalVn > 10 && b > 10)) return "media";
+    if (totalN >= 250 || (totalVn > 50_000_000 && b > 43_000_000)) return "grande";
+    if (totalN >= 50  || (totalVn > 10_000_000 && b > 10_000_000)) return "media";
     return "pequena";
   };
 
@@ -508,7 +528,7 @@ export function evaluateTree(
 
   steps.push({
     nodeId:  "D",
-    label:   `Dimensão: ${dimensaoLabel}${grupoSufixo} (trabalhadores: ${totalN}, VN: ${totalVn} M€, balanço: ${bLabelStr})`,
+    label:   `Dimensão: ${dimensaoLabel}${grupoSufixo} (trabalhadores: ${totalN}, VN: ${formatEuros(totalVn)} €, balanço: ${bLabelStr})`,
     article: tree.nodes["D"].legalRef,
   });
 

@@ -292,7 +292,7 @@ describe("document-generator — Buffer base64 com template dummy", () => {
     vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
       id: 1, organizationId: 1, engineVersion: ENGINE_VERSION,
       classification: "importante",
-      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" },
+      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
     } as any);
     const buf = await generateRegistoCncs(1);
     expect(buf).toBeInstanceOf(Buffer);
@@ -1310,6 +1310,15 @@ describe("generateRegistoCncs — Registo Inicial CNCS", () => {
     );
   });
 
+  it("[REGRESSÃO unidades] assessment da versão imediatamente anterior (v6, D.vn/D.b em M€) é recusado pelo bump para v7", async () => {
+    // Prova que o mecanismo já existente (guard de ENGINE_VERSION) trata sozinho a
+    // migração de unidade — não é preciso SQL de conversão dos assessments antigos.
+    CNCS_SETUP({}, { engineVersion: "6", answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" } });
+    await expect(generateRegistoCncs(1)).rejects.toThrow(
+      /versão 6 do motor de decisão/
+    );
+  });
+
   it("classificação 'essencial' → classificacao = 'Entidade essencial'", async () => {
     CNCS_SETUP({}, { classification: "essencial" });
     await generateRegistoCncs(1);
@@ -1401,11 +1410,11 @@ describe("generateRegistoCncs — Registo Inicial CNCS", () => {
 // C-EQ4 — generateRelatorioEnquadramento
 // ===========================================================================
 
-// Fixture com output REAL do evaluateTree (motor v3):
-//   evaluateTree(NIS2_PT_TREE, { "A.setor":"industria","C.estrutura":"autonoma","D.n":"80","D.vn":"12","D.b":"5" })
+// Fixture com output REAL do evaluateTree (motor v7 — D.vn/D.b em euros, não M€):
+//   evaluateTree(NIS2_PT_TREE, { "A.setor":"industria","C.estrutura":"autonoma","D.n":"80","D.vn":"12000000","D.b":"5000000" })
 //   → path: ["A","C","D","E"]
 //   → legalBasis: ["Art. 3.º do RJC","Rec. 2003/361/CE","Anexo III DL 125/2025","Art. 6.º do RJC"]
-//   → classification: "importante"
+//   → classification: "importante" (N=80 ≥ 50 já satisfaz o limiar de "média", independente de VN/B)
 //   → resultLabel: "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 do RJC)."
 const FAKE_ASSESSMENT = {
   id:             99,
@@ -1414,11 +1423,11 @@ const FAKE_ASSESSMENT = {
   frameworkSlug:  "nis2-pt-dl125",
   classification: "importante",
   resultLabel:    "Entidade importante — Anexo II, média/grande dimensão (Art. 6.º/2 do RJC).",
-  engineVersion:  ENGINE_VERSION, // antes: "1" (motor está em v3; guard exige versão actual)
+  engineVersion:  ENGINE_VERSION, // antes: "1" (motor está em v7; guard exige versão actual)
   status:         "completed",
   decisionPath:   ["A", "C", "D", "E"],
   legalBasis:     ["Art. 3.º do RJC", "Rec. 2003/361/CE", "Anexo III DL 125/2025", "Art. 6.º do RJC"],
-  answers:        { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" },
+  answers:        { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
   completedAt:    new Date("2026-07-15"),
   createdAt:      new Date("2026-07-15"),
   updatedAt:      new Date("2026-07-15"),
@@ -1510,7 +1519,7 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
     // Step D: dimensão com valores concretos
     expect(steps[2]!.label).toContain("média");
     expect(steps[2]!.label).toContain("trabalhadores: 80");
-    expect(steps[2]!.label).toContain("VN: 12 M€");
+    expect(steps[2]!.label).toContain("VN: 12.000.000 €");
     expect(steps[2]!.article).toContain("Anexo III DL 125/2025");
 
     // Step E: resultado final
@@ -1605,7 +1614,7 @@ describe("generateRelatorioEnquadramento — enquadramento NIS2 (C-EQ4)", () => 
 describe("generateRelatorioEnquadramento — textos por coverageState (C-EQ15)", () => {
   // Fixtures de answers para cada estado
   // abrangida (importante): FAKE_ASSESSMENT.answers
-  const ANSWERS_ABRANGIDA    = { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" };
+  const ANSWERS_ABRANGIDA    = { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" };
   // condicional (a_confirmar): setor não mapeado, excecao qualitativa
   const ANSWERS_CONDICIONAL  = { "A.setor": "outro", "B.excecao": "qualitativo" };
   // condicional (a_confirmar_contratual): setor não mapeado, excecao fornecedor
