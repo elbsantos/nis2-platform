@@ -20,9 +20,16 @@ import {
   getOrganizationById,
   getVulnerabilitiesByScanId,
   getFrameworkAssessmentById,
+  getLatestFrameworkAssessmentByOrgId,
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
-import { evaluateTree, NIS2_PT_TREE, ENGINE_VERSION } from "../utils/decision-engine";
+import {
+  evaluateTree,
+  NIS2_PT_TREE,
+  ENGINE_VERSION,
+  CLASSIFICACAO_LABELS,
+  getSectorAnexoLabel,
+} from "../utils/decision-engine";
 
 // ---------------------------------------------------------------------------
 // Caminhos e constantes
@@ -36,6 +43,7 @@ export const TEMPLATE_PATHS = {
   psi:              path.join(TEMPLATE_DIR, "psi-template.docx"),
   enquadramento:    path.join(TEMPLATE_DIR, "enquadramento-template.docx"),
   cartaCiso:        path.join(TEMPLATE_DIR, "carta-ciso-template.docx"),
+  registoCncs:      path.join(TEMPLATE_DIR, "registo-cncs-template.docx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -442,6 +450,70 @@ export async function generateCartaCiso(orgId: number): Promise<Buffer> {
 }
 
 // ---------------------------------------------------------------------------
+// Registo Inicial CNCS (.docx) — 2º dos 6 documentos do Dossier
+// ---------------------------------------------------------------------------
+
+export async function generateRegistoCncs(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.registoCncs);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const assessment = await getLatestFrameworkAssessmentByOrgId(orgId);
+  if (!assessment)
+    throw new Error(
+      "[Documentos] É necessário completar o Enquadramento NIS2 antes de gerar o Registo CNCS."
+    );
+
+  if (String(assessment.engineVersion) !== String(ENGINE_VERSION))
+    throw new Error(
+      `Este enquadramento foi calculado com a versão ${assessment.engineVersion} do motor de decisão; a versão actual é ${ENGINE_VERSION}. Para garantir a coerência do registo, é necessário repetir o enquadramento.`
+    );
+
+  // Re-corre o motor a partir das respostas guardadas — mesmo padrão de generateRelatorioEnquadramento.
+  const answers = (assessment.answers ?? {}) as Record<string, string>;
+  evaluateTree(NIS2_PT_TREE, answers); // valida que as respostas ainda produzem um resultado coerente
+
+  const classification     = assessment.classification ?? "";
+  const classificacaoLabel = (CLASSIFICACAO_LABELS[classification] ?? classification) || "—";
+  const setorAnexoLabel    = getSectorAnexoLabel(answers["A.setor"]);
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão da Carta CISO).
+  const referencia = `REG-CNCS-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  // Lista vazia é resposta válida ("só opera em Portugal") — não é dado em falta.
+  const paisesOperacao = Array.isArray(org.countriesOfOperation) && org.countriesOfOperation.length > 0
+    ? org.countriesOfOperation.join(", ")
+    : "Nenhum — opera apenas em Portugal";
+
+  const data = {
+    empresa:         cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    nif:             cell(org.taxId, "[A PREENCHER: NIF]"),
+    sede:            cell(org.address, "[A PREENCHER: sede social]"),
+    cae:             cell(org.caeCode, "[A PREENCHER: código CAE]"),
+    setor_anexo:     cell(setorAnexoLabel, "[A CONFIRMAR: setor não consta dos Anexos I/II]"),
+    classificacao:   classificacaoLabel,
+    ciso_nome:       cell(org.securityOfficerName, "[A PREENCHER: nome do CISO]"),
+    ciso_email:      cell(org.securityOfficerEmail, "[A PREENCHER: email do CISO]"),
+    ciso_telefone:   cell(org.securityOfficerPhone, "[A PREENCHER: telefone do CISO]"),
+    ciso_cargo:      cell(org.securityOfficerRole, "[A PREENCHER: cargo do CISO]"),
+    ceo_contacto:    cell(org.ceoContact, "[A PREENCHER: contacto alternativo de gestão]"),
+    colaboradores:   cell(org.employeeCount != null ? String(org.employeeCount) : null, "[A PREENCHER: nº de colaboradores]"),
+    volume_negocios: cell(org.annualTurnover, "[A PREENCHER: volume de negócios]"),
+    paises_operacao: paisesOperacao,
+    referencia,
+    data_extenso:    hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
+  };
+
+  const content = fs.readFileSync(TEMPLATE_PATHS.registoCncs);
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
+  return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
 // C-EQ4 — Relatório de Enquadramento NIS2 (.docx)
 // ---------------------------------------------------------------------------
 
@@ -503,15 +575,6 @@ export async function generateRelatorioEnquadramento(
   const textos = TEXTOS[coverageState];
 
   const classification = assessment.classification ?? "";
-  const CLASSIFICACAO_LABELS: Record<string, string> = {
-    essencial:              "Entidade essencial",
-    importante:             "Entidade importante",
-    a_confirmar:            "A confirmar",
-    a_confirmar_contratual: "A confirmar (obrigações por via contratual)",
-    fora_condicional:       "Fora do âmbito (orientação preliminar)",
-    fora_mvp:               "Fora do âmbito do CISPLAN (regime autónomo)",
-  };
-
   const rawLabel        = (CLASSIFICACAO_LABELS[classification] ?? classification) || "—";
   const classificacaoLabel = textos.provavel ? `Provável — ${rawLabel}` : rawLabel;
 

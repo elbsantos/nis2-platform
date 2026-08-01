@@ -405,6 +405,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     undefined,
     { enabled: false, retry: false }
   );
+  const registoCncs = trpc.documents.registoCncs.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -438,6 +442,16 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
           onDownload={async () => {
             const r = await cartaCiso.refetch();
             if (!r.data) throw new Error("Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Registo Inicial CNCS (.docx)"
+          onDownload={async () => {
+            const r = await registoCncs.refetch();
+            // Surge a mensagem real do servidor (ex.: "complete o Enquadramento
+            // primeiro") em vez do genérico "Sem dados" — precondição legível.
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}
         />

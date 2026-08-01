@@ -110,10 +110,11 @@ vi.mock("docxtemplater", () => ({
 }));
 
 vi.mock("../db", () => ({
-  getScanById:                  vi.fn(),
-  getOrganizationById:          vi.fn(),
-  getVulnerabilitiesByScanId:   vi.fn(),
-  getFrameworkAssessmentById:   vi.fn(),
+  getScanById:                       vi.fn(),
+  getOrganizationById:               vi.fn(),
+  getVulnerabilitiesByScanId:        vi.fn(),
+  getFrameworkAssessmentById:        vi.fn(),
+  getLatestFrameworkAssessmentByOrgId: vi.fn(),
 }));
 
 vi.mock("./ai-remediation", () => ({
@@ -129,6 +130,7 @@ import {
   generateInventarioAtivos,
   generatePsi,
   generateCartaCiso,
+  generateRegistoCncs,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
@@ -211,6 +213,13 @@ describe("document-generator — guard de template em falta", () => {
       "[Documentos] Template não encontrado: carta-ciso-template.docx"
     );
   });
+
+  it("generateRegistoCncs lança erro claro com nome do ficheiro docx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateRegistoCncs(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: registo-cncs-template.docx"
+    );
+  });
 });
 
 // ===========================================================================
@@ -272,6 +281,20 @@ describe("document-generator — Buffer base64 com template dummy", () => {
     vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
     vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
     const buf = await generateCartaCiso(1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("generateRegistoCncs devolve Buffer não vazio (com assessment válido)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION,
+      classification: "importante",
+      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" },
+    } as any);
+    const buf = await generateRegistoCncs(1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
   });
@@ -1210,6 +1233,167 @@ describe("generateCartaCiso — Carta de Nomeação do CISO", () => {
       expect(String(v), `"${k}" não deve ser 'None'`).not.toBe("None");
       expect(String(v), `"${k}" não deve ser 'null'`).not.toBe("null");
     }
+  });
+});
+
+// ===========================================================================
+// Registo Inicial CNCS — generateRegistoCncs
+// ===========================================================================
+
+describe("generateRegistoCncs — Registo Inicial CNCS", () => {
+  const CNCS_ORG_COMPLETA = {
+    legalName:            "Empresa Teste, Lda.",
+    taxId:                "509123456",
+    address:              "Rua Exemplo 1, 1000-001 Lisboa",
+    caeCode:              "62010",
+    securityOfficerName:  "Ana Costa",
+    securityOfficerEmail: "ciso@empresa.pt",
+    securityOfficerPhone: "+351 910 000 000",
+    securityOfficerRole:  "Diretora de TI",
+    ceoContact:           "ceo@empresa.pt",
+    employeeCount:        230,
+    annualTurnover:       "990000.00",
+    countriesOfOperation: ["Espanha", "França"],
+  };
+
+  const CNCS_ASSESSMENT_COMPLETA = {
+    id: 1, organizationId: 1, engineVersion: ENGINE_VERSION,
+    classification: "importante",
+    answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12", "D.b": "5" },
+  };
+
+  const CNCS_SETUP = (orgOverride: object = {}, assessmentOverride: object | null = {}) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({
+      ...FAKE_ORG,
+      ...CNCS_ORG_COMPLETA,
+      ...orgOverride,
+    } as any);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue(
+      assessmentOverride === null
+        ? null
+        : ({ ...CNCS_ASSESSMENT_COMPLETA, ...assessmentOverride } as any)
+    );
+  };
+
+  it("perfil + enquadramento completos — todas as tags preenchidas, nenhum '{' nem '[A PREENCHER]'/'[A CONFIRMAR]'", async () => {
+    CNCS_SETUP();
+    await generateRegistoCncs(1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    const TAGS = [
+      "empresa", "nif", "sede", "cae", "setor_anexo", "classificacao",
+      "ciso_nome", "ciso_email", "ciso_telefone", "ciso_cargo", "ceo_contacto",
+      "colaboradores", "volume_negocios", "paises_operacao", "referencia", "data_extenso",
+    ];
+    for (const tag of TAGS) {
+      const v = (_psiRenderArgs as any)[tag];
+      expect(v, `tag "${tag}" não deve ser undefined`).toBeDefined();
+      expect(String(v), `tag "${tag}" não deve conter "{"`).not.toContain("{");
+      expect(String(v), `tag "${tag}" não deve ser [A PREENCHER]/[A CONFIRMAR] com dados completos`)
+        .not.toMatch(/A PREENCHER|A CONFIRMAR/);
+    }
+  });
+
+  it("sem assessment de enquadramento → erro claro, não gera documento incompleto", async () => {
+    CNCS_SETUP({}, null);
+    await expect(generateRegistoCncs(1)).rejects.toThrow(
+      "É necessário completar o Enquadramento NIS2 antes de gerar o Registo CNCS."
+    );
+  });
+
+  it("assessment com engineVersion desatualizada → erro claro a pedir para repetir o enquadramento", async () => {
+    CNCS_SETUP({}, { engineVersion: "1" });
+    await expect(generateRegistoCncs(1)).rejects.toThrow(
+      /versão 1 do motor de decisão/
+    );
+  });
+
+  it("classificação 'essencial' → classificacao = 'Entidade essencial'", async () => {
+    CNCS_SETUP({}, { classification: "essencial" });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.classificacao).toBe("Entidade essencial");
+  });
+
+  it("classificação 'fora_mvp' (fora de âmbito) — reflete o estatuto real, não força EE/EI", async () => {
+    CNCS_SETUP({}, { classification: "fora_mvp" });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.classificacao).toBe("Fora do âmbito do CISPLAN (regime autónomo)");
+    expect(_psiRenderArgs!.classificacao).not.toContain("Entidade");
+  });
+
+  it("classificação 'a_confirmar' — mostra 'A confirmar', não uma classificação inventada", async () => {
+    CNCS_SETUP({}, { classification: "a_confirmar" });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.classificacao).toBe("A confirmar");
+  });
+
+  it("setor 'industria' (Anexo II) → setor_anexo = 'Anexo II'", async () => {
+    CNCS_SETUP({}, { answers: { ...CNCS_ASSESSMENT_COMPLETA.answers, "A.setor": "industria" } });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.setor_anexo).toBe("Anexo II");
+  });
+
+  it("setor 'energia' (Anexo I) → setor_anexo = 'Anexo I'", async () => {
+    CNCS_SETUP({}, { answers: { ...CNCS_ASSESSMENT_COMPLETA.answers, "A.setor": "energia" } });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.setor_anexo).toBe("Anexo I");
+  });
+
+  it("setor fora dos Anexos I/II (ex.: admin_publica) → placeholder de confirmação, não inventa Anexo", async () => {
+    CNCS_SETUP({}, { answers: { ...CNCS_ASSESSMENT_COMPLETA.answers, "A.setor": "admin_publica" } });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.setor_anexo).toBe("[A CONFIRMAR: setor não consta dos Anexos I/II]");
+  });
+
+  it("referência auto-gerada no formato REG-CNCS-{ano}-{orgId com 6 dígitos}", async () => {
+    vi.setSystemTime(new Date("2026-07-31"));
+    CNCS_SETUP();
+    await generateRegistoCncs(42);
+    expect(_psiRenderArgs!.referencia).toBe("REG-CNCS-2026-000042");
+  });
+
+  it("countriesOfOperation preenchido → paises_operacao junta a lista", async () => {
+    CNCS_SETUP({ countriesOfOperation: ["Espanha", "França"] });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.paises_operacao).toBe("Espanha, França");
+  });
+
+  it("countriesOfOperation vazio/null → 'Nenhum — opera apenas em Portugal' (resposta válida, não placeholder)", async () => {
+    CNCS_SETUP({ countriesOfOperation: null });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.paises_operacao).toBe("Nenhum — opera apenas em Portugal");
+    expect(_psiRenderArgs!.paises_operacao).not.toContain("A PREENCHER");
+  });
+
+  it("colaboradores (employeeCount número) → string no documento", async () => {
+    CNCS_SETUP({ employeeCount: 230 });
+    await generateRegistoCncs(1);
+    expect(_psiRenderArgs!.colaboradores).toBe("230");
+  });
+
+  it("perfil incompleto — campos em falta usam '[A PREENCHER]', nunca null/undefined", async () => {
+    CNCS_SETUP({
+      taxId: null, address: null, caeCode: null, securityOfficerName: null,
+      securityOfficerEmail: null, securityOfficerPhone: null, securityOfficerRole: null,
+      ceoContact: null, employeeCount: null, annualTurnover: null,
+    });
+    await generateRegistoCncs(1);
+    for (const [k, v] of Object.entries(_psiRenderArgs!)) {
+      expect(v, `"${k}" não deve ser null`).not.toBeNull();
+      expect(v, `"${k}" não deve ser undefined`).not.toBeUndefined();
+      expect(String(v), `"${k}" não deve ser 'None'`).not.toBe("None");
+      expect(String(v), `"${k}" não deve ser 'null'`).not.toBe("null");
+    }
+  });
+
+  it("isolamento — getOrganizationById e getLatestFrameworkAssessmentByOrgId chamados com o MESMO orgId, nunca outro", async () => {
+    CNCS_SETUP();
+    await generateRegistoCncs(7);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
   });
 });
 
