@@ -74,9 +74,9 @@ export type Answers = Record<string, string>;
 
 // ── Mapeamento setor → categoria de Anexo ─────────────────────────────────────
 
-type SectorAnexo = "tld_dns_confianca" | "telecom" | "anexo_i_outros" | "anexo_ii";
+export type SectorAnexo = "tld_dns_confianca" | "telecom" | "anexo_i_outros" | "anexo_ii";
 
-const SECTOR_ANEXO: Record<string, SectorAnexo> = {
+export const SECTOR_ANEXO: Record<string, SectorAnexo> = {
   tld_dns_confianca:    "tld_dns_confianca",
   telecom:              "telecom",
   cloud_ixp_datacenter: "anexo_i_outros",
@@ -91,6 +91,32 @@ const SECTOR_ANEXO: Record<string, SectorAnexo> = {
   quimicos_alimentar:   "anexo_ii",
   industria:            "anexo_ii",
   digital_b2c:          "anexo_ii",
+};
+
+/** "tld_dns_confianca"/"telecom"/"anexo_i_outros" → Anexo I; "anexo_ii" → Anexo II. */
+const ANEXO_ROMANO: Record<SectorAnexo, "Anexo I" | "Anexo II"> = {
+  tld_dns_confianca:    "Anexo I",
+  telecom:              "Anexo I",
+  anexo_i_outros:       "Anexo I",
+  anexo_ii:             "Anexo II",
+};
+
+/** Devolve "Anexo I"/"Anexo II" para o id de setor (org.sector / answers["A.setor"]), ou null se o setor não constar dos Anexos (ex.: admin_publica, outro). */
+export function getSectorAnexoLabel(setorId: string | null | undefined): string | null {
+  if (!setorId) return null;
+  const cat = SECTOR_ANEXO[setorId];
+  return cat ? ANEXO_ROMANO[cat] : null;
+}
+
+// ── Rótulos legíveis para Classification ─────────────────────────────────────
+
+export const CLASSIFICACAO_LABELS: Record<string, string> = {
+  essencial:              "Entidade essencial",
+  importante:             "Entidade importante",
+  a_confirmar:            "A confirmar",
+  a_confirmar_contratual: "A confirmar (obrigações por via contratual)",
+  fora_condicional:       "Fora do âmbito (orientação preliminar)",
+  fora_mvp:               "Fora do âmbito do CISPLAN (regime autónomo)",
 };
 
 // ── Labels legíveis para C.estrutura ─────────────────────────────────────────

@@ -847,6 +847,16 @@ export async function getFrameworkAssessmentsByOrgId(orgId: number) {
     .orderBy(desc(frameworkAssessments.createdAt));
 }
 
+export async function getLatestFrameworkAssessmentByOrgId(orgId: number) {
+  const rows = await getDb()
+    .select()
+    .from(frameworkAssessments)
+    .where(eq(frameworkAssessments.organizationId, orgId))
+    .orderBy(desc(frameworkAssessments.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Organization profile (Perfil da Entidade)
 // ---------------------------------------------------------------------------
