@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import type { DecisionTree, Answers } from "../../../backend/utils/decision-engine";
+import { formatEuroPreview } from "../lib/formatEuroPreview";
 
 // ── Lógica de navegação ───────────────────────────────────────────────────────
 
@@ -213,8 +214,8 @@ function DimensionForm({ estrutura, onSubmit }: DimensionFormProps) {
       {/* Campos próprios */}
       <div className="grid grid-cols-3 gap-3">
         <Field label="Trabalhadores" sub="n.º total" value={n} onChange={setN} placeholder="ex. 85" />
-        <Field label="Vol. de negócios" sub="M€/ano" value={vn} onChange={setVn} placeholder="ex. 12.5" />
-        <Field label="Balanço total" sub="M€ (opcional)" value={b} onChange={setB} placeholder="ex. 9.0" />
+        <Field label="Vol. de negócios" sub="€/ano" value={vn} onChange={setVn} placeholder="ex. 15000" currency />
+        <Field label="Balanço total" sub="€ (opcional)" value={b} onChange={setB} placeholder="ex. 9000" currency />
       </div>
 
       {/* Campos do grupo */}
@@ -225,8 +226,8 @@ function DimensionForm({ estrutura, onSubmit }: DimensionFormProps) {
           </p>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Trab. grupo" sub="adicionais" value={gn}  onChange={setGn}  placeholder="ex. 20" />
-            <Field label="VN grupo"   sub="M€ adicionais" value={gvn} onChange={setGvn} placeholder="ex. 8" />
-            <Field label="Balanço gr." sub="M€ (opcional)" value={gb}  onChange={setGb}  placeholder="ex. 5" />
+            <Field label="VN grupo"   sub="€ adicionais" value={gvn} onChange={setGvn} placeholder="ex. 8000" currency />
+            <Field label="Balanço gr." sub="€ (opcional)" value={gb}  onChange={setGb}  placeholder="ex. 5000" currency />
           </div>
         </div>
       )}
@@ -243,11 +244,12 @@ function DimensionForm({ estrutura, onSubmit }: DimensionFormProps) {
 }
 
 function Field({
-  label, sub, value, onChange, placeholder,
+  label, sub, value, onChange, placeholder, currency,
 }: {
   label: string; sub: string; value: string;
-  onChange: (v: string) => void; placeholder: string;
+  onChange: (v: string) => void; placeholder: string; currency?: boolean;
 }) {
+  const preview = currency ? formatEuroPreview(value) : null;
   return (
     <div className="space-y-1">
       <label className="block text-xs font-medium text-slate-300">{label}</label>
@@ -261,6 +263,7 @@ function Field({
         placeholder={placeholder}
         className="w-full px-3 py-2 bg-[#0b1526] border border-[#1e3a5f] rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-600 transition-colors"
       />
+      {preview && <p className="text-xs text-blue-400">{preview}</p>}
     </div>
   );
 }

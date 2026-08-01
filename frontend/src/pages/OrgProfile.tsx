@@ -5,6 +5,7 @@ import {
   SIZE_OPTIONS,
   TAX_ID_TYPE_OPTIONS,
 } from "../../../backend/utils/org-options";
+import { formatEuroPreview } from "../lib/formatEuroPreview";
 
 // ---------------------------------------------------------------------------
 // Campos essenciais para geração de documentos
@@ -404,6 +405,9 @@ export default function OrgProfile() {
                 placeholder="990000.00"
                 className={INPUT_CLS}
               />
+              {formatEuroPreview(annualTurnover) && (
+                <p className="text-xs text-blue-400 mt-1">{formatEuroPreview(annualTurnover)}</p>
+              )}
             </Field>
 
             <Field id="annualBalance" label="Balanço total anual (€)">
@@ -413,6 +417,9 @@ export default function OrgProfile() {
                 placeholder="430000.00"
                 className={INPUT_CLS}
               />
+              {formatEuroPreview(annualBalance) && (
+                <p className="text-xs text-blue-400 mt-1">{formatEuroPreview(annualBalance)}</p>
+              )}
             </Field>
           </div>
 
