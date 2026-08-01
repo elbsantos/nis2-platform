@@ -149,6 +149,10 @@ export default function OrgProfile() {
       setError("Email do CISO inválido.");
       return false;
     }
+    if (ceoContact && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ceoContact)) {
+      setError("Email de contacto do CEO/gestão de topo inválido.");
+      return false;
+    }
     if (taxId && (taxIdType === "NIPC" || taxIdType === "NIF")) {
       if (!/^\d{9}$/.test(taxId.replace(/\s/g, ""))) {
         setError("NIF/NIPC português deve ter exactamente 9 dígitos (apenas números).");
@@ -203,7 +207,7 @@ export default function OrgProfile() {
       securityOfficerTaxId:     securityOfficerTaxId      || null,
       securityOfficerStartDate: securityOfficerStartDate  || null,
       city:                     city                     || null,
-      ceoContact:               ceoContact               || null,
+      ceoContact:               ceoContact               || "",
       countriesOfOperation:     countriesOfOperation.trim()
         ? countriesOfOperation.split(",").map(s => s.trim()).filter(Boolean)
         : null,
@@ -316,7 +320,7 @@ export default function OrgProfile() {
               <input
                 id="contactPhone" type="tel" value={contactPhone}
                 onChange={e => setContactPhone(e.target.value)}
-                placeholder="+351 210 000 000"
+                placeholder="+351 910 000 000"
                 maxLength={50}
                 className={INPUT_CLS}
               />
@@ -461,11 +465,11 @@ export default function OrgProfile() {
               />
             </Field>
 
-            <Field id="ceoContact" label="Contacto alternativo (CEO/COO)">
+            <Field id="ceoContact" label="Email de contacto (CEO/gestão de topo)">
               <input
-                id="ceoContact" type="text" value={ceoContact}
+                id="ceoContact" type="email" value={ceoContact}
                 onChange={e => setCeoContact(e.target.value)}
-                placeholder="email ou telefone — para quando o CISO não está disponível"
+                placeholder="ceo@empresa.pt"
                 maxLength={120}
                 className={INPUT_CLS}
               />

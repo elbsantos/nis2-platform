@@ -198,7 +198,7 @@ describe("organization.updateProfile — round-trip", () => {
     expect(profile.city).toBe("Lisboa");
   });
 
-  it("escreve ceoContact e countriesOfOperation e getProfile devolve-os (round-trip)", async () => {
+  it("escreve ceoContact (email) e countriesOfOperation e getProfile devolve-os (round-trip)", async () => {
     vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
     const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
 
@@ -294,6 +294,23 @@ describe("organization.updateProfile — validação", () => {
     const err = await caller.updateProfile({ securityOfficerEmail: "nao-e-email" }).catch(e => e);
     expect(err).toBeDefined();
     expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("rejeita ceoContact malformado (agora é email, não telefone livre)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const err = await caller.updateProfile({ ceoContact: "+351 910 000 000" }).catch(e => e);
+    expect(err).toBeDefined();
+    expect(err.code).toBe("BAD_REQUEST");
+  });
+
+  it("aceita ceoContact vazio (limpar o campo)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ ceoContact: "" });
+    expect(ok).toBe(true);
   });
 
   it("rejeita taxIdType fora do enum", async () => {

@@ -46,7 +46,7 @@ const updateProfileInput = z.object({
   annualTurnover:           z.string().trim().regex(DECIMAL_RE, "Valor decimal inválido (ex.: 990000.00)").optional().nullable(),
   annualBalance:            z.string().trim().regex(DECIMAL_RE, "Valor decimal inválido (ex.: 430000.00)").optional().nullable(),
   city:                     z.string().max(120).trim().optional().nullable(),
-  ceoContact:               z.string().max(120).trim().optional().nullable(),
+  ceoContact:               z.string().email().max(120).trim().optional().or(z.literal("")).nullable(),
   countriesOfOperation:     z.array(z.string().max(60).trim()).max(30).optional().nullable(),
 }).refine(
   (data) => {
