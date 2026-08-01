@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["backend/**/*.test.ts"],
+    include: ["backend/**/*.test.ts", "frontend/src/lib/**/*.test.ts"],
     testTimeout: 15_000,
     pool: "forks",        // Isolate each test file in a separate process
     poolOptions: {

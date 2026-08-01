@@ -5,7 +5,8 @@ import {
   SIZE_OPTIONS,
   TAX_ID_TYPE_OPTIONS,
 } from "../../../backend/utils/org-options";
-import { formatEuroPreview } from "../lib/formatEuroPreview";
+import { toIntegerDigits } from "../lib/formatMilhares";
+import { MoneyInput } from "../components/MoneyInput";
 
 // ---------------------------------------------------------------------------
 // Campos essenciais para geração de documentos
@@ -116,8 +117,8 @@ export default function OrgProfile() {
     setDomain(profile.domain                  ?? "");
     setCaeCode(profile.caeCode                                 ?? "");
     setEmployeeCount(profile.employeeCount != null ? String(profile.employeeCount) : "");
-    setAnnualTurnover(profile.annualTurnover                   ?? "");
-    setAnnualBalance(profile.annualBalance                     ?? "");
+    setAnnualTurnover(toIntegerDigits(profile.annualTurnover));
+    setAnnualBalance(toIntegerDigits(profile.annualBalance));
     setLegalRepresentativeRole(profile.legalRepresentativeRole ?? "");
     setCeoName(profile.ceoName                                 ?? "");
     setSecurityOfficerRole(profile.securityOfficerRole         ?? "");
@@ -162,15 +163,6 @@ export default function OrgProfile() {
     }
     if (employeeCount.trim() && (!/^\d+$/.test(employeeCount.trim()) || Number(employeeCount) < 0)) {
       setError("Número de colaboradores deve ser um inteiro ≥ 0.");
-      return false;
-    }
-    const decimalRe = /^\d+(\.\d{1,2})?$/;
-    if (annualTurnover.trim() && !decimalRe.test(annualTurnover.trim())) {
-      setError("Volume de negócios deve ser um valor decimal válido (ex.: 990000.00).");
-      return false;
-    }
-    if (annualBalance.trim() && !decimalRe.test(annualBalance.trim())) {
-      setError("Balanço anual deve ser um valor decimal válido (ex.: 430000.00).");
       return false;
     }
     if (securityOfficerStartDate && isNaN(new Date(`${securityOfficerStartDate}T00:00:00Z`).getTime())) {
@@ -399,27 +391,21 @@ export default function OrgProfile() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="annualTurnover" label="Volume de negócios anual (€)">
-              <input
-                id="annualTurnover" type="text" inputMode="decimal" value={annualTurnover}
-                onChange={e => setAnnualTurnover(e.target.value)}
-                placeholder="990000.00"
+              <MoneyInput
+                id="annualTurnover" value={annualTurnover}
+                onChange={setAnnualTurnover}
+                placeholder="990000"
                 className={INPUT_CLS}
               />
-              {formatEuroPreview(annualTurnover) && (
-                <p className="text-xs text-blue-400 mt-1">{formatEuroPreview(annualTurnover)}</p>
-              )}
             </Field>
 
             <Field id="annualBalance" label="Balanço total anual (€)">
-              <input
-                id="annualBalance" type="text" inputMode="decimal" value={annualBalance}
-                onChange={e => setAnnualBalance(e.target.value)}
-                placeholder="430000.00"
+              <MoneyInput
+                id="annualBalance" value={annualBalance}
+                onChange={setAnnualBalance}
+                placeholder="430000"
                 className={INPUT_CLS}
               />
-              {formatEuroPreview(annualBalance) && (
-                <p className="text-xs text-blue-400 mt-1">{formatEuroPreview(annualBalance)}</p>
-              )}
             </Field>
           </div>
 

@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import type { DecisionTree, Answers } from "../../../backend/utils/decision-engine";
-import { formatEuroPreview } from "../lib/formatEuroPreview";
+import { MoneyInput } from "./MoneyInput";
 
 // ── Lógica de navegação ───────────────────────────────────────────────────────
 
@@ -243,27 +243,37 @@ function DimensionForm({ estrutura, onSubmit }: DimensionFormProps) {
   );
 }
 
+const FIELD_INPUT_CLS =
+  "w-full px-3 py-2 bg-[#0b1526] border border-[#1e3a5f] rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-600 transition-colors";
+
 function Field({
   label, sub, value, onChange, placeholder, currency,
 }: {
   label: string; sub: string; value: string;
   onChange: (v: string) => void; placeholder: string; currency?: boolean;
 }) {
-  const preview = currency ? formatEuroPreview(value) : null;
   return (
     <div className="space-y-1">
       <label className="block text-xs font-medium text-slate-300">{label}</label>
       <p className="text-xs text-slate-500">{sub}</p>
-      <input
-        type="number"
-        min="0"
-        step="any"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 bg-[#0b1526] border border-[#1e3a5f] rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-600 transition-colors"
-      />
-      {preview && <p className="text-xs text-blue-400">{preview}</p>}
+      {currency ? (
+        <MoneyInput
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className={FIELD_INPUT_CLS}
+        />
+      ) : (
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={FIELD_INPUT_CLS}
+        />
+      )}
     </div>
   );
 }
