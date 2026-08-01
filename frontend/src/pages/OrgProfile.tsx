@@ -93,6 +93,8 @@ export default function OrgProfile() {
   const [securityOfficerTaxId,     setSecurityOfficerTaxId]     = useState("");
   const [securityOfficerStartDate, setSecurityOfficerStartDate] = useState("");
   const [city,                     setCity]                     = useState("");
+  const [ceoContact,               setCeoContact]               = useState("");
+  const [countriesOfOperation,     setCountriesOfOperation]     = useState("");
 
   const [error,  setError]  = useState("");
   const [toast,  setToast]  = useState("");
@@ -122,6 +124,10 @@ export default function OrgProfile() {
     setSecurityOfficerTaxId(profile.securityOfficerTaxId       ?? "");
     setSecurityOfficerStartDate(profile.securityOfficerStartDate ?? "");
     setCity(profile.city ?? "");
+    setCeoContact(profile.ceoContact ?? "");
+    setCountriesOfOperation(
+      Array.isArray(profile.countriesOfOperation) ? profile.countriesOfOperation.join(", ") : ""
+    );
   }, [profile]);
 
   useEffect(() => {
@@ -197,6 +203,10 @@ export default function OrgProfile() {
       securityOfficerTaxId:     securityOfficerTaxId      || null,
       securityOfficerStartDate: securityOfficerStartDate  || null,
       city:                     city                     || null,
+      ceoContact:               ceoContact               || null,
+      countriesOfOperation:     countriesOfOperation.trim()
+        ? countriesOfOperation.split(",").map(s => s.trim()).filter(Boolean)
+        : null,
     });
   }
 
@@ -401,6 +411,15 @@ export default function OrgProfile() {
               />
             </Field>
           </div>
+
+          <Field id="countriesOfOperation" label="País(es) de operação, além de Portugal">
+            <input
+              id="countriesOfOperation" type="text" value={countriesOfOperation}
+              onChange={e => setCountriesOfOperation(e.target.value)}
+              placeholder="Espanha, França (deixar vazio se só opera em Portugal)"
+              className={INPUT_CLS}
+            />
+          </Field>
         </section>
 
         {/* ── Secção B: Órgão de Gestão ── */}
@@ -431,15 +450,27 @@ export default function OrgProfile() {
             </Field>
           </div>
 
-          <Field id="ceoName" label="Nome do CEO / gestão de topo">
-            <input
-              id="ceoName" type="text" value={ceoName}
-              onChange={e => setCeoName(e.target.value)}
-              placeholder="Maria Santos (se distinto do representante legal)"
-              maxLength={255}
-              className={INPUT_CLS}
-            />
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field id="ceoName" label="Nome do CEO / gestão de topo">
+              <input
+                id="ceoName" type="text" value={ceoName}
+                onChange={e => setCeoName(e.target.value)}
+                placeholder="Maria Santos (se distinto do representante legal)"
+                maxLength={255}
+                className={INPUT_CLS}
+              />
+            </Field>
+
+            <Field id="ceoContact" label="Contacto alternativo (CEO/COO)">
+              <input
+                id="ceoContact" type="text" value={ceoContact}
+                onChange={e => setCeoContact(e.target.value)}
+                placeholder="email ou telefone — para quando o CISO não está disponível"
+                maxLength={120}
+                className={INPUT_CLS}
+              />
+            </Field>
+          </div>
         </section>
 
         {/* ── Secção C: CISO ── */}

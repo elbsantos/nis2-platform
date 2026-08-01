@@ -197,6 +197,40 @@ describe("organization.updateProfile — round-trip", () => {
     const profile = await caller.getProfile();
     expect(profile.city).toBe("Lisboa");
   });
+
+  it("escreve ceoContact e countriesOfOperation e getProfile devolve-os (round-trip)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const payload = {
+      ceoContact: "ceo@empresa.pt",
+      countriesOfOperation: ["Espanha", "França"],
+    };
+
+    const { ok } = await caller.updateProfile(payload);
+    expect(ok).toBe(true);
+    expect(vi.mocked(db.updateOrgProfile)).toHaveBeenCalledWith(
+      ORG_A.id,
+      expect.objectContaining(payload)
+    );
+
+    vi.mocked(db.getOrgProfile).mockResolvedValue({ ...PROFILE_A, ...payload } as any);
+    const profile = await caller.getProfile();
+    expect(profile.ceoContact).toBe("ceo@empresa.pt");
+    expect(profile.countriesOfOperation).toEqual(["Espanha", "França"]);
+  });
+
+  it("aceita countriesOfOperation vazio (lista vazia é resposta válida — só opera em PT)", async () => {
+    vi.mocked(db.getOrCreateOrgForOwner).mockResolvedValue(ORG_A as any);
+    const caller = organizationRouter.createCaller(makeCtx(USER_A, ORG_A));
+
+    const { ok } = await caller.updateProfile({ countriesOfOperation: [] });
+    expect(ok).toBe(true);
+    expect(vi.mocked(db.updateOrgProfile)).toHaveBeenCalledWith(
+      ORG_A.id,
+      expect.objectContaining({ countriesOfOperation: [] })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
