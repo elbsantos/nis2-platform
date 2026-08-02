@@ -541,6 +541,9 @@ export async function generateIrp(orgId: number): Promise<Buffer> {
     ceo_email:         cell(org.ceoContact, "[A PREENCHER: email do CEO]"),
     referencia,
     data_extenso:      hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
+    // Data da versão 1.0 no historial de versões: é criada hoje, na geração — não "a definir"
+    // como o resto do historial (formato curto DD/MM/AAAA, mais legível numa coluna estreita).
+    data_versao_1:     formatDate(hoje),
   };
 
   const content = fs.readFileSync(TEMPLATE_PATHS.irp);

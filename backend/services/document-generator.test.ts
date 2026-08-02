@@ -1468,7 +1468,7 @@ describe("generateIrp — Plano de Resposta a Incidentes", () => {
     expect(_psiRenderArgs).not.toBeNull();
     const TAGS = [
       "empresa", "nif", "cargo_ic_nome", "cargo_ic_email", "cargo_ic_telefone",
-      "ceo_nome", "ceo_email", "referencia", "data_extenso",
+      "ceo_nome", "ceo_email", "referencia", "data_extenso", "data_versao_1",
     ];
     for (const tag of TAGS) {
       const v = (_psiRenderArgs as any)[tag];
@@ -1521,6 +1521,15 @@ describe("generateIrp — Plano de Resposta a Incidentes", () => {
     vi.setSystemTime(new Date("2026-01-15"));
     IRP_SETUP();
     await generateIrp(1);
+    expect(_psiRenderArgs!.data_extenso).toBe("15 de janeiro de 2026");
+  });
+
+  it("data_versao_1 (historial de versões) é a data de geração, em formato curto DD/MM/AAAA", async () => {
+    vi.setSystemTime(new Date("2026-01-15"));
+    IRP_SETUP();
+    await generateIrp(1);
+    expect(_psiRenderArgs!.data_versao_1).toBe("15/01/2026");
+    // Mesma data-base do data_extenso, só o formato difere (curto vs. por extenso).
     expect(_psiRenderArgs!.data_extenso).toBe("15 de janeiro de 2026");
   });
 
