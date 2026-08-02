@@ -131,6 +131,7 @@ import {
   generatePsi,
   generateCartaCiso,
   generateRegistoCncs,
+  generateIrp,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
@@ -220,6 +221,13 @@ describe("document-generator — guard de template em falta", () => {
       "[Documentos] Template não encontrado: registo-cncs-template.docx"
     );
   });
+
+  it("generateIrp lança erro claro com nome do ficheiro docx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateIrp(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: irp-template.docx"
+    );
+  });
 });
 
 // ===========================================================================
@@ -295,6 +303,15 @@ describe("document-generator — Buffer base64 com template dummy", () => {
       answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
     } as any);
     const buf = await generateRegistoCncs(1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("generateIrp devolve Buffer não vazio", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    const buf = await generateIrp(1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
   });
@@ -1416,6 +1433,122 @@ describe("generateRegistoCncs — Registo Inicial CNCS", () => {
     expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
     expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).toHaveBeenCalledWith(7);
     expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
+  });
+});
+
+// ===========================================================================
+// IRP — generateIrp (Plano de Resposta a Incidentes)
+// ===========================================================================
+
+describe("generateIrp — Plano de Resposta a Incidentes", () => {
+  const IRP_ORG_COMPLETA = {
+    legalName:            "Empresa Teste, Lda.",
+    taxId:                "509123456",
+    securityOfficerName:  "Ana Costa",
+    securityOfficerEmail: "ciso@empresa.pt",
+    securityOfficerPhone: "+351 910 000 000",
+    ceoName:              "João Silva",
+    ceoContact:           "ceo@empresa.pt",
+  };
+
+  const IRP_SETUP = (orgOverride: object = {}) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({
+      ...FAKE_ORG,
+      ...IRP_ORG_COMPLETA,
+      ...orgOverride,
+    } as any);
+  };
+
+  it("perfil completo — todas as tags preenchidas, nenhum '{' nem '[A PREENCHER]'", async () => {
+    IRP_SETUP();
+    await generateIrp(1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    const TAGS = [
+      "empresa", "nif", "cargo_ic_nome", "cargo_ic_email", "cargo_ic_telefone",
+      "ceo_nome", "ceo_email", "referencia", "data_extenso",
+    ];
+    for (const tag of TAGS) {
+      const v = (_psiRenderArgs as any)[tag];
+      expect(v, `tag "${tag}" não deve ser undefined`).toBeDefined();
+      expect(String(v), `tag "${tag}" não deve conter "{"`).not.toContain("{");
+      expect(String(v), `tag "${tag}" não deve ser [A PREENCHER] com perfil completo`)
+        .not.toContain("A PREENCHER");
+    }
+  });
+
+  it("org com legalName → empresa = legalName", async () => {
+    IRP_SETUP({ legalName: "Empresa Legal, SA" });
+    await generateIrp(1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Legal, SA");
+  });
+
+  it("org sem legalName → empresa = name", async () => {
+    IRP_SETUP({ legalName: null });
+    await generateIrp(1);
+    expect(_psiRenderArgs!.empresa).toBe("Empresa Teste Lda");
+  });
+
+  it("CISO (Comandante do Incidente): nome, email e telefone mapeados do perfil", async () => {
+    IRP_SETUP();
+    await generateIrp(1);
+    expect(_psiRenderArgs!.cargo_ic_nome).toBe("Ana Costa");
+    expect(_psiRenderArgs!.cargo_ic_email).toBe("ciso@empresa.pt");
+    expect(_psiRenderArgs!.cargo_ic_telefone).toBe("+351 910 000 000");
+  });
+
+  it("CEO: nome e email mapeados — SEM campo de telefone (decisão: sem linha directa 24/7)", async () => {
+    IRP_SETUP();
+    await generateIrp(1);
+    expect(_psiRenderArgs!.ceo_nome).toBe("João Silva");
+    expect(_psiRenderArgs!.ceo_email).toBe("ceo@empresa.pt");
+    // Confirma estruturalmente que não existe nenhum campo "ceo_telefone"/"ceo_phone" —
+    // o CEO nunca recebe um contacto 24/7 directo, só email (escalado pelo CISO).
+    expect(_psiRenderArgs).not.toHaveProperty("ceo_telefone");
+    expect(_psiRenderArgs).not.toHaveProperty("ceo_phone");
+  });
+
+  it("referência auto-gerada no formato IRP-{ano}-{orgId com 6 dígitos}", async () => {
+    vi.setSystemTime(new Date("2026-07-31"));
+    IRP_SETUP();
+    await generateIrp(42);
+    expect(_psiRenderArgs!.referencia).toBe("IRP-2026-000042");
+  });
+
+  it("data_extenso — data actual por extenso em PT", async () => {
+    vi.setSystemTime(new Date("2026-01-15"));
+    IRP_SETUP();
+    await generateIrp(1);
+    expect(_psiRenderArgs!.data_extenso).toBe("15 de janeiro de 2026");
+  });
+
+  it("perfil incompleto — campos em falta usam '[A PREENCHER]', nunca null/undefined", async () => {
+    IRP_SETUP({
+      taxId: null, securityOfficerName: null, securityOfficerEmail: null,
+      securityOfficerPhone: null, ceoName: null, ceoContact: null,
+    });
+    await generateIrp(1);
+    for (const [k, v] of Object.entries(_psiRenderArgs!)) {
+      expect(v, `"${k}" não deve ser null`).not.toBeNull();
+      expect(v, `"${k}" não deve ser undefined`).not.toBeUndefined();
+      expect(String(v), `"${k}" não deve ser 'None'`).not.toBe("None");
+      expect(String(v), `"${k}" não deve ser 'null'`).not.toBe("null");
+    }
+  });
+
+  it("isolamento — getOrganizationById chamado com o orgId certo, nunca outro", async () => {
+    IRP_SETUP();
+    await generateIrp(7);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
+  });
+
+  it("não depende do enquadramento — getLatestFrameworkAssessmentByOrgId nunca é chamado", async () => {
+    IRP_SETUP();
+    await generateIrp(1);
+    expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).not.toHaveBeenCalled();
   });
 });
 

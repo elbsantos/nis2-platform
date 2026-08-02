@@ -10,6 +10,7 @@
  *   documents.psi              — psi-template.docx      (por org)
  *   documents.cartaCiso        — carta-ciso-template.docx (por org)
  *   documents.registoCncs      — registo-cncs-template.docx (por org)
+ *   documents.irp              — irp-template.docx      (por org)
  */
 
 import { z } from "zod";
@@ -89,6 +90,14 @@ export const documentsRouter = router({
       const { generateRegistoCncs } = await import("../services/document-generator");
       const buffer   = await generateRegistoCncs(ctx.org.id);
       const filename = `Registo_Inicial_CNCS_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
+    }),
+
+  irp: freeProcedure
+    .query(async ({ ctx }) => {
+      const { generateIrp } = await import("../services/document-generator");
+      const buffer   = await generateIrp(ctx.org.id);
+      const filename = `IRP_Plano_Resposta_Incidentes_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
     }),
 

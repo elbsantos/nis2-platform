@@ -45,6 +45,7 @@ export const TEMPLATE_PATHS = {
   enquadramento:    path.join(TEMPLATE_DIR, "enquadramento-template.docx"),
   cartaCiso:        path.join(TEMPLATE_DIR, "carta-ciso-template.docx"),
   registoCncs:      path.join(TEMPLATE_DIR, "registo-cncs-template.docx"),
+  irp:              path.join(TEMPLATE_DIR, "irp-template.docx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -508,6 +509,41 @@ export async function generateRegistoCncs(orgId: number): Promise<Buffer> {
   };
 
   const content = fs.readFileSync(TEMPLATE_PATHS.registoCncs);
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
+  return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// IRP — Plano de Resposta a Incidentes (.docx) — 3º dos 6 documentos do Dossier
+// ---------------------------------------------------------------------------
+
+export async function generateIrp(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.irp);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão da Carta CISO/Registo CNCS).
+  const referencia = `IRP-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const data = {
+    empresa:           cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    nif:               cell(org.taxId, "[A PREENCHER: NIF]"),
+    // CISO — Comandante do Incidente: nome/email/telefone, contacto de emergência directo.
+    cargo_ic_nome:     cell(org.securityOfficerName, "[A PREENCHER: nome do CISO]"),
+    cargo_ic_email:    cell(org.securityOfficerEmail, "[A PREENCHER: email do CISO]"),
+    cargo_ic_telefone: cell(org.securityOfficerPhone, "[A PREENCHER: telefone do CISO]"),
+    // CEO — decisor de negócio escalado pelo CISO: só email, sem linha directa 24/7.
+    ceo_nome:          cell(org.ceoName, "[A PREENCHER: nome do CEO]"),
+    ceo_email:         cell(org.ceoContact, "[A PREENCHER: email do CEO]"),
+    referencia,
+    data_extenso:      hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
+  };
+
+  const content = fs.readFileSync(TEMPLATE_PATHS.irp);
   const zip     = new PizZip(content);
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);
