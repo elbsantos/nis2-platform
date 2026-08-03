@@ -174,6 +174,9 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
   const byArticle = (slug: string) => controls.filter((c) => c.articleSlug === slug);
   const answeredIn = (slug: string) => byArticle(slug).filter((c) => answers[c.id]).length;
   const totalAnswered = controls.filter((c) => answers[c.id]).length;
+  const totalControls = controls.length;
+  const missingCount  = Math.max(totalControls - totalAnswered, 0);
+  const canComplete   = totalControls > 0 && totalAnswered === totalControls;
 
   function setAnswer(controlId: string, val: AnswerValue) {
     setAnswers((prev) => ({ ...prev, [controlId]: val }));
@@ -210,13 +213,13 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
       <aside className="w-52 shrink-0">
         <div className="sticky top-6 space-y-1">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            {totalAnswered}/42 respondidos
+            {totalAnswered}/{totalControls} respondidos
           </p>
           {/* Progress bar */}
           <div className="w-full bg-slate-700 rounded-full h-1.5 mb-4">
             <div
               className="h-1.5 rounded-full bg-blue-600 transition-all"
-              style={{ width: `${(totalAnswered / 42) * 100}%` }}
+              style={{ width: `${totalControls > 0 ? (totalAnswered / totalControls) * 100 : 0}%` }}
             />
           </div>
           {articles.map((slug) => {
@@ -250,13 +253,20 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
               {saving ? "A guardar…" : "Guardar progresso"}
             </button>
             {!isCompleted && (
-              <button
-                onClick={handleComplete}
-                disabled={totalAnswered < 1 || completeMut.isPending}
-                className="w-full px-3 py-2 text-xs bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-40"
-              >
-                {completeMut.isPending ? "A concluir…" : "Concluir avaliação"}
-              </button>
+              <>
+                <button
+                  onClick={handleComplete}
+                  disabled={!canComplete || completeMut.isPending}
+                  className="w-full px-3 py-2 text-xs bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-40"
+                >
+                  {completeMut.isPending ? "A concluir…" : "Concluir avaliação"}
+                </button>
+                {!canComplete && missingCount > 0 && (
+                  <p className="text-xs text-amber-400 text-center">
+                    Faltam {missingCount} pergunta{missingCount === 1 ? "" : "s"} para concluir
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -369,13 +379,20 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
             </button>
           ) : (
             !isCompleted && (
-              <button
-                onClick={handleComplete}
-                disabled={totalAnswered < 1 || completeMut.isPending}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-40"
-              >
-                {completeMut.isPending ? "A concluir…" : "Concluir avaliação ✓"}
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  onClick={handleComplete}
+                  disabled={!canComplete || completeMut.isPending}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-40"
+                >
+                  {completeMut.isPending ? "A concluir…" : "Concluir avaliação ✓"}
+                </button>
+                {!canComplete && missingCount > 0 && (
+                  <p className="text-xs text-amber-400">
+                    Faltam {missingCount} pergunta{missingCount === 1 ? "" : "s"} para concluir
+                  </p>
+                )}
+              </div>
             )
           )}
         </div>

@@ -219,8 +219,17 @@ export const questionnaireRouter = router({
       }
 
       const answers = (session.answers ?? []) as Array<{ controlId: string; answer: string; score: number }>;
-      if (answers.length === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma resposta registada" });
+
+      // As 42 perguntas têm de estar TODAS respondidas antes de concluir — "na" conta
+      // como resposta válida (não é "42 Sim", é "42 sem nenhuma em branco"). Barreira
+      // real: o botão do frontend é só UX, esta validação é a fonte de verdade.
+      const answeredIds = new Set(answers.map((a) => a.controlId));
+      const missing = NIS2_CONTROLS.filter((c) => !answeredIds.has(c.id));
+      if (missing.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `É necessário responder a todas as ${NIS2_CONTROLS.length} perguntas antes de concluir. Faltam ${missing.length} pergunta${missing.length === 1 ? "" : "s"}.`,
+        });
       }
 
       const scores = calculateScores(answers);
