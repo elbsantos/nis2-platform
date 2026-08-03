@@ -15,7 +15,12 @@ const ANSWER_CLASSES: Record<AnswerValue, string> = {
   yes:     "border-green-500 bg-green-50 text-green-800",
   partial: "border-amber-400 bg-amber-50 text-amber-800",
   no:      "border-red-400 bg-red-50 text-red-700",
-  na:      "border-gray-300 bg-gray-50 text-gray-500",
+  // Cor neutra (roxo) — N.A. não é bom/parcial/mau, mas tem de se distinguir
+  // claramente do estado NÃO selecionado ("border-gray-200 text-gray-500").
+  // O cinzento anterior (border-gray-300 bg-gray-50 text-gray-500) tinha a
+  // MESMA cor de texto do estado não selecionado e um fundo sem matiz —
+  // ficava indistinguível de "não escolhido" sobre o cartão branco.
+  na:      "border-purple-400 bg-purple-50 text-purple-800",
 };
 
 const ARTICLE_LABELS: Record<string, string> = {
