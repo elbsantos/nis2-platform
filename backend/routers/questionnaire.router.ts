@@ -46,7 +46,7 @@ for (const c of NIS2_CONTROLS) {
 // Helper partilhado: constrói os dados do relatório a partir de uma sessão.
 // Usado por `report` (query JSON) e `exportPdf` (query PDF).
 // ---------------------------------------------------------------------------
-async function buildReportData(
+export async function buildReportData(
   session: Awaited<ReturnType<typeof getQuestionnaireSessionById>>,
   orgName: string
 ): Promise<QReportData> {
