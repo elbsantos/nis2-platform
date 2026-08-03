@@ -21,6 +21,9 @@ import {
   getVulnerabilitiesByScanId,
   getFrameworkAssessmentById,
   getLatestFrameworkAssessmentByOrgId,
+  getLatestCompletedScanForOrg,
+  getLatestCompletedQuestionnaireForOrg,
+  getQuestionnaireSessionById,
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
 import {
@@ -31,6 +34,7 @@ import {
   getSectorAnexoLabel,
 } from "../utils/decision-engine";
 import { formatMoedaEuro } from "../utils/money-format";
+import { buildReportData } from "../routers/questionnaire.router";
 
 // ---------------------------------------------------------------------------
 // Caminhos e constantes
@@ -46,6 +50,7 @@ export const TEMPLATE_PATHS = {
   cartaCiso:        path.join(TEMPLATE_DIR, "carta-ciso-template.docx"),
   registoCncs:      path.join(TEMPLATE_DIR, "registo-cncs-template.docx"),
   irp:              path.join(TEMPLATE_DIR, "irp-template.docx"),
+  relatorioGestao:  path.join(TEMPLATE_DIR, "registo-gestao-template.docx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -547,6 +552,124 @@ export async function generateIrp(orgId: number): Promise<Buffer> {
   };
 
   const content = fs.readFileSync(TEMPLATE_PATHS.irp);
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
+  return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// Relatório Executivo para a Gestão (.docx) — 4º dos 6 documentos do Dossier
+// ---------------------------------------------------------------------------
+
+/** Limiares de conformidade por medida — mesmos já usados em questionnaire-pdf-generator.ts (scoreColor/scoreLabel). */
+function measureStatusLabel(score: number | null): "Conforme" | "Parcial" | "Em falta" {
+  if (score === null) return "Em falta";
+  if (score >= 80) return "Conforme";
+  if (score >= 60) return "Parcial";
+  return "Em falta";
+}
+
+/**
+ * Verifica as 3 fontes exigidas pelo Relatório Executivo (questionário, enquadramento, scan)
+ * e devolve a lista COMPLETA do que falta — nunca só o primeiro problema encontrado.
+ */
+async function checkRelatorioGestaoPreconditions(orgId: number) {
+  const missing: string[] = [];
+
+  const questionnaire = await getLatestCompletedQuestionnaireForOrg(orgId);
+  if (!questionnaire) missing.push("questionário de autoavaliação");
+
+  const assessment = await getLatestFrameworkAssessmentByOrgId(orgId);
+  if (!assessment) {
+    missing.push("enquadramento NIS2");
+  } else if (String(assessment.engineVersion) !== String(ENGINE_VERSION)) {
+    missing.push("enquadramento NIS2 (motor desatualizado — repita a avaliação)");
+  }
+
+  const scan = await getLatestCompletedScanForOrg(orgId);
+  if (!scan) missing.push("scan de segurança");
+
+  return { missing, questionnaire, assessment, scan };
+}
+
+export async function generateRelatorioGestao(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.relatorioGestao);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const { missing, questionnaire, assessment, scan } = await checkRelatorioGestaoPreconditions(orgId);
+  if (missing.length > 0) {
+    throw new Error(
+      `[Documentos] Não é possível gerar o Relatório Executivo. Complete primeiro: ${missing.join(", ")}.`
+    );
+  }
+
+  // A partir daqui as 3 fontes existem — o guard acima garante non-null.
+  const questionnaireSession = await getQuestionnaireSessionById(questionnaire!.id);
+  const reportData = await buildReportData(questionnaireSession, org.name);
+
+  const answers = (assessment!.answers ?? {}) as Record<string, string>;
+  evaluateTree(NIS2_PT_TREE, answers); // valida coerência — mesmo padrão do Registo CNCS
+  const classification     = assessment!.classification ?? "";
+  const classificacaoLabel = (CLASSIFICACAO_LABELS[classification] ?? classification) || "—";
+
+  let conformes = 0, parciais = 0, falta = 0;
+  const medidas = reportData.measureScores.map((m) => {
+    const estado = measureStatusLabel(m.score);
+    if (estado === "Conforme") conformes++;
+    else if (estado === "Parcial") parciais++;
+    else falta++;
+    return {
+      slug_maiusc: m.slug.toUpperCase(),
+      titulo:      m.title,
+      score_fmt:   m.score !== null ? `${m.score}/100` : "Sem dados",
+      estado,
+      controlos:   String(m.controlCount),
+      lacunas:     String(m.gapCount),
+    };
+  });
+
+  const overallScore = reportData.overallScore;
+  const leituraSumario = overallScore >= 80
+    ? "O nível de conformidade global é elevado; recomenda-se consolidar as últimas lacunas identificadas."
+    : overallScore >= 60
+    ? "O nível de conformidade global é moderado; recomenda-se um plano de ação para as lacunas prioritárias."
+    : "O nível de conformidade global é baixo; é necessário um plano de ação urgente para as medidas em falta.";
+
+  const scanResults    = (scan!.results as any) ?? {};
+  const scanCritical   = Number(scanResults.criticalCount ?? 0);
+  const scanHigh       = Number(scanResults.highCount ?? 0);
+  const scanMedium     = Number(scanResults.mediumCount ?? 0);
+  const scanLow        = Number(scanResults.lowCount ?? 0);
+  const scanVulnsTotal = scanCritical + scanHigh + scanMedium + scanLow;
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão dos outros 3 documentos).
+  const referencia = `REL-GEST-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const data = {
+    empresa:           cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    referencia,
+    data_extenso:      hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
+    classificacao:     classificacaoLabel,
+    score_global:      `${overallScore}/100`,
+    medidas_conformes: String(conformes),
+    medidas_parciais:  String(parciais),
+    medidas_falta:     String(falta),
+    leitura_sumario:   leituraSumario,
+    medidas, // array — secção repetível {#medidas}...{/medidas} no template
+    scan_data:         formatDate(scan!.completedAt),
+    scan_vulns_total:  String(scanVulnsTotal),
+    scan_criticas:     String(scanCritical),
+    scan_altas:        String(scanHigh),
+    scan_medias:       String(scanMedium),
+    scan_baixas:       String(scanLow),
+    ceo_nome:          cell(org.ceoName, "[A PREENCHER: nome do CEO]"),
+  };
+
+  const content = fs.readFileSync(TEMPLATE_PATHS.relatorioGestao);
   const zip     = new PizZip(content);
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);

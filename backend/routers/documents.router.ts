@@ -101,6 +101,14 @@ export const documentsRouter = router({
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
     }),
 
+  relatorioGestao: freeProcedure
+    .query(async ({ ctx }) => {
+      const { generateRelatorioGestao } = await import("../services/document-generator");
+      const buffer   = await generateRelatorioGestao(ctx.org.id);
+      const filename = `Relatorio_Executivo_Gestao_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
+    }),
+
   relatorioEnquadramento: freeProcedure
     .input(z.object({ assessmentId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {

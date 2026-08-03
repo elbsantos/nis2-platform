@@ -413,6 +413,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     undefined,
     { enabled: false, retry: false }
   );
+  const relatorioGestao = trpc.documents.relatorioGestao.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -463,6 +467,16 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
           label="Plano de Resposta a Incidentes (.docx)"
           onDownload={async () => {
             const r = await irp.refetch();
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Relatório Executivo para a Gestão (.docx)"
+          onDownload={async () => {
+            const r = await relatorioGestao.refetch();
+            // Precondição exige questionário + enquadramento + scan — a mensagem
+            // real do servidor lista tudo o que falta de uma vez.
             if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}

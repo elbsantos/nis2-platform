@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import fs from "fs";
 import { ENGINE_VERSION } from "../utils/decision-engine";
+import { NIS2_CONTROLS, calculateScores } from "./ai-questionnaire";
 
 // ---------------------------------------------------------------------------
 // Mocks de módulo (hoisted antes de qualquer import)
@@ -110,11 +111,14 @@ vi.mock("docxtemplater", () => ({
 }));
 
 vi.mock("../db", () => ({
-  getScanById:                       vi.fn(),
-  getOrganizationById:               vi.fn(),
-  getVulnerabilitiesByScanId:        vi.fn(),
-  getFrameworkAssessmentById:        vi.fn(),
+  getScanById:                         vi.fn(),
+  getOrganizationById:                 vi.fn(),
+  getVulnerabilitiesByScanId:          vi.fn(),
+  getFrameworkAssessmentById:          vi.fn(),
   getLatestFrameworkAssessmentByOrgId: vi.fn(),
+  getLatestCompletedScanForOrg:        vi.fn(),
+  getLatestCompletedQuestionnaireForOrg: vi.fn(),
+  getQuestionnaireSessionById:         vi.fn(),
 }));
 
 vi.mock("./ai-remediation", () => ({
@@ -132,10 +136,12 @@ import {
   generateCartaCiso,
   generateRegistoCncs,
   generateIrp,
+  generateRelatorioGestao,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
   CONTENT_TYPES,
+  TEMPLATE_PATHS,
 } from "./document-generator";
 import * as db             from "../db";
 import * as aiRemediation  from "./ai-remediation";
@@ -228,6 +234,13 @@ describe("document-generator — guard de template em falta", () => {
       "[Documentos] Template não encontrado: irp-template.docx"
     );
   });
+
+  it("generateRelatorioGestao lança erro claro com nome do ficheiro docx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateRelatorioGestao(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: registo-gestao-template.docx"
+    );
+  });
 });
 
 // ===========================================================================
@@ -312,6 +325,33 @@ describe("document-generator — Buffer base64 com template dummy", () => {
     vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
     vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
     const buf = await generateIrp(1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  it("generateRelatorioGestao devolve Buffer não vazio (com as 3 fontes válidas)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: {}, completedAt: new Date("2026-07-01"),
+    } as any);
+    vi.mocked(db.getQuestionnaireSessionById).mockResolvedValue({
+      id: 1, organizationId: 1, userId: 1, sector: null, status: "completed",
+      score: "72", articleScores: { a: 100 },
+      answers: [{ controlId: "a-1", answer: "yes", score: 100 }],
+      completedAt: new Date("2026-07-01"), createdAt: new Date(), updatedAt: new Date(),
+    } as any);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION, classification: "importante",
+      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
+    } as any);
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
+      id: 1, organizationId: 1, completedAt: new Date("2026-07-15"),
+      results: { criticalCount: 1, highCount: 2, mediumCount: 3, lowCount: 4 },
+    } as any);
+
+    const buf = await generateRelatorioGestao(1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
   });
@@ -1558,6 +1598,215 @@ describe("generateIrp — Plano de Resposta a Incidentes", () => {
     IRP_SETUP();
     await generateIrp(1);
     expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).not.toHaveBeenCalled();
+  });
+});
+
+// ===========================================================================
+// Relatório Executivo para a Gestão — generateRelatorioGestao
+// ===========================================================================
+
+describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () => {
+  const GESTAO_ORG_COMPLETA = { legalName: "Empresa Teste, Lda.", ceoName: "João Silva" };
+
+  function buildAnswers(overrides: Record<string, "yes" | "partial" | "no" | "na"> = {}) {
+    return NIS2_CONTROLS.map((c) => {
+      const answer = overrides[c.id] ?? "yes";
+      const score  = answer === "yes" ? 100 : answer === "partial" ? 50 : 0;
+      return { controlId: c.id, answer, score };
+    });
+  }
+
+  function mockQuestionnaire(answers: ReturnType<typeof buildAnswers>) {
+    const scores = calculateScores(answers);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: scores.byArticle, completedAt: new Date("2026-07-01"),
+    } as any);
+    vi.mocked(db.getQuestionnaireSessionById).mockResolvedValue({
+      id: 1, organizationId: 1, userId: 1, sector: null, status: "completed",
+      score: String(scores.overall), articleScores: scores.byArticle, answers,
+      completedAt: new Date("2026-07-01"), createdAt: new Date(), updatedAt: new Date(),
+    } as any);
+    return scores;
+  }
+
+  function mockAssessment(engineVersion: string = ENGINE_VERSION) {
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion, classification: "importante",
+      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
+    } as any);
+  }
+
+  function mockScan() {
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
+      id: 1, organizationId: 1, completedAt: new Date("2026-07-15"),
+      results: { criticalCount: 1, highCount: 2, mediumCount: 3, lowCount: 4 },
+    } as any);
+  }
+
+  const GESTAO_SETUP_OK = (orgOverride: object = {}, answers = buildAnswers()) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA, ...orgOverride } as any);
+    mockQuestionnaire(answers);
+    mockAssessment();
+    mockScan();
+  };
+
+  it("3 fontes completas — score, 10 medidas, referência ao scan, declaração; zero chavetas, zero [A PREENCHER]", async () => {
+    GESTAO_SETUP_OK();
+    await generateRelatorioGestao(1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    const TAGS = [
+      "empresa", "referencia", "data_extenso", "classificacao",
+      "score_global", "medidas_conformes", "medidas_parciais", "medidas_falta", "leitura_sumario",
+      "scan_data", "scan_vulns_total", "scan_criticas", "scan_altas", "scan_medias", "scan_baixas",
+      "ceo_nome",
+    ];
+    for (const tag of TAGS) {
+      const v = (_psiRenderArgs as any)[tag];
+      expect(v, `tag "${tag}" não deve ser undefined`).toBeDefined();
+      expect(String(v), `tag "${tag}" não deve conter "{"`).not.toContain("{");
+      expect(String(v), `tag "${tag}" não deve ser [A PREENCHER] com dados completos`)
+        .not.toContain("A PREENCHER");
+    }
+    expect(_psiRenderArgs!.medidas).toHaveLength(10);
+    for (const m of _psiRenderArgs!.medidas as any[]) {
+      expect(String(m.score_fmt)).not.toContain("{");
+      expect(["Conforme", "Parcial", "Em falta"]).toContain(m.estado);
+    }
+  });
+
+  it("todas as 42 respostas 'yes' → 10 medidas conformes, zero parciais, zero em falta", async () => {
+    GESTAO_SETUP_OK();
+    await generateRelatorioGestao(1);
+    expect(_psiRenderArgs!.medidas_conformes).toBe("10");
+    expect(_psiRenderArgs!.medidas_parciais).toBe("0");
+    expect(_psiRenderArgs!.medidas_falta).toBe("0");
+    expect(_psiRenderArgs!.score_global).toBe("100/100");
+  });
+
+  it("mistura de respostas → classifica cada medida corretamente (limiares 80/60)", async () => {
+    const overrides: Record<string, "no" | "partial"> = {};
+    for (const c of NIS2_CONTROLS.filter((c) => c.articleSlug === "b")) overrides[c.id] = "no";
+    const hControls = NIS2_CONTROLS.filter((c) => c.articleSlug === "h");
+    overrides[hControls[0].id] = "partial";
+    overrides[hControls[1].id] = "partial";
+    // hControls[2] fica "yes" (default) — (100+50+50)/3 = 66.7 → round 67 → Parcial (60-79)
+
+    GESTAO_SETUP_OK({}, buildAnswers(overrides));
+    await generateRelatorioGestao(1);
+
+    expect(_psiRenderArgs!.medidas_conformes).toBe("8");
+    expect(_psiRenderArgs!.medidas_parciais).toBe("1");
+    expect(_psiRenderArgs!.medidas_falta).toBe("1");
+
+    const medidas = _psiRenderArgs!.medidas as any[];
+    const medidaB = medidas.find((m) => m.slug_maiusc === "B");
+    const medidaH = medidas.find((m) => m.slug_maiusc === "H");
+    expect(medidaB.estado).toBe("Em falta");
+    expect(medidaB.score_fmt).toBe("0/100");
+    expect(medidaH.estado).toBe("Parcial");
+    expect(medidaH.score_fmt).toBe("67/100");
+  });
+
+  it("referência auto-gerada no formato REL-GEST-{ano}-{orgId com 6 dígitos}", async () => {
+    vi.setSystemTime(new Date("2026-07-31"));
+    GESTAO_SETUP_OK();
+    await generateRelatorioGestao(42);
+    expect(_psiRenderArgs!.referencia).toBe("REL-GEST-2026-000042");
+  });
+
+  it("data_extenso — data actual por extenso em PT", async () => {
+    vi.setSystemTime(new Date("2026-01-15"));
+    GESTAO_SETUP_OK();
+    await generateRelatorioGestao(1);
+    expect(_psiRenderArgs!.data_extenso).toBe("15 de janeiro de 2026");
+  });
+
+  it("visão técnica reflete o último scan (contagens por severidade + total, sem repetir a lista técnica)", async () => {
+    GESTAO_SETUP_OK();
+    await generateRelatorioGestao(1);
+    expect(_psiRenderArgs!.scan_criticas).toBe("1");
+    expect(_psiRenderArgs!.scan_altas).toBe("2");
+    expect(_psiRenderArgs!.scan_medias).toBe("3");
+    expect(_psiRenderArgs!.scan_baixas).toBe("4");
+    expect(_psiRenderArgs!.scan_vulns_total).toBe("10");
+    expect(_psiRenderArgs!.scan_data).toBe("15/07/2026");
+  });
+
+  it("precondição: falta questionário → erro menciona-o", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
+    mockAssessment();
+    mockScan();
+
+    const err = await generateRelatorioGestao(1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("Complete primeiro");
+    expect(err.message).toContain("questionário de autoavaliação");
+  });
+
+  it("precondição: faltam 2 fontes (questionário + scan) → erro lista as 2 de uma vez", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
+    mockAssessment();
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue(null as any);
+
+    const err = await generateRelatorioGestao(1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("questionário de autoavaliação");
+    expect(err.message).toContain("scan de segurança");
+  });
+
+  it("precondição: enquadramento com engineVersion desatualizada → erro específico (não 'em falta' genérico)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    mockQuestionnaire(buildAnswers());
+    mockAssessment("1"); // versão antiga do motor
+    mockScan();
+
+    const err = await generateRelatorioGestao(1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("motor desatualizado");
+  });
+
+  it("isolamento — todas as fontes são pedidas com o MESMO orgId, nunca outro", async () => {
+    GESTAO_SETUP_OK();
+    await generateRelatorioGestao(7);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestCompletedQuestionnaireForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestCompletedScanForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
+  });
+
+  it("declaração de supervisão NÃO afirma conformidade alcançada e inclui o aviso de que não é declaração integral", async () => {
+    // O template global de pizzip/docxtemplater está mockado neste ficheiro (captura só
+    // os dados, não renderiza texto real) — para verificar o TEXTO FIXO da declaração
+    // (que não é um placeholder, é prosa do próprio template), lemos o ficheiro real do
+    // disco com a instância REAL do pizzip (vi.importActual bypassa o mock só aqui).
+    const { default: RealPizZip } = await vi.importActual<typeof import("pizzip")>("pizzip");
+    const content = fs.readFileSync(TEMPLATE_PATHS.relatorioGestao);
+    const zip = new RealPizZip(content);
+    const xml = zip.file("word/document.xml")!.asText();
+
+    const proibidas = [
+      "está em conformidade",
+      "cumpre integralmente",
+      "encontra-se em conformidade",
+      "garante a conformidade",
+    ];
+    for (const frase of proibidas) {
+      expect(xml, `a declaração não deveria conter "${frase}"`).not.toContain(frase);
+    }
+
+    expect(xml).toContain("tomou conhecimento");
+    expect(xml).toContain("assume a responsabilidade de supervisão");
+    expect(xml).toContain("não constitui");
+    expect(xml).toContain("declaração de conformidade integral");
   });
 });
 
