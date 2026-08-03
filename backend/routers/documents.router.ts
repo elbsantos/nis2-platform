@@ -102,9 +102,10 @@ export const documentsRouter = router({
     }),
 
   relatorioGestao: freeProcedure
-    .query(async ({ ctx }) => {
+    .input(z.object({ scanId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
       const { generateRelatorioGestao } = await import("../services/document-generator");
-      const buffer   = await generateRelatorioGestao(ctx.org.id);
+      const buffer   = await generateRelatorioGestao(ctx.org.id, input.scanId);
       const filename = `Relatorio_Executivo_Gestao_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
     }),

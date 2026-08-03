@@ -15,13 +15,13 @@ import path from "path";
 import ExcelJS from "exceljs";
 import Docxtemplater from "docxtemplater";
 import PizZip from "pizzip";
+import { TRPCError } from "@trpc/server";
 import {
   getScanById,
   getOrganizationById,
   getVulnerabilitiesByScanId,
   getFrameworkAssessmentById,
   getLatestFrameworkAssessmentByOrgId,
-  getLatestCompletedScanForOrg,
   getLatestCompletedQuestionnaireForOrg,
   getQuestionnaireSessionById,
 } from "../db";
@@ -571,10 +571,15 @@ function measureStatusLabel(score: number | null): "Conforme" | "Parcial" | "Em 
 }
 
 /**
- * Verifica as 3 fontes exigidas pelo Relatório Executivo (questionário, enquadramento, scan)
- * e devolve a lista COMPLETA do que falta — nunca só o primeiro problema encontrado.
+ * Verifica as 3 fontes exigidas pelo Relatório Executivo (questionário, enquadramento, scan
+ * SELECIONADO pelo utilizador — não "o mais recente") e devolve a lista COMPLETA do que falta
+ * — nunca só o primeiro problema encontrado.
+ *
+ * scanId vem explicitamente da página onde o utilizador estava (histórico de scans), exactamente
+ * como registoRiscos/inventarioAtivos/report.generate já fazem — este documento tinha ficado de
+ * fora desse padrão e usava "o scan mais recente da org", ignorando qual estava selecionado.
  */
-async function checkRelatorioGestaoPreconditions(orgId: number) {
+async function checkRelatorioGestaoPreconditions(orgId: number, scanId: number) {
   const missing: string[] = [];
 
   const questionnaire = await getLatestCompletedQuestionnaireForOrg(orgId);
@@ -587,19 +592,24 @@ async function checkRelatorioGestaoPreconditions(orgId: number) {
     missing.push("enquadramento NIS2 (motor desatualizado — repita a avaliação)");
   }
 
-  const scan = await getLatestCompletedScanForOrg(orgId);
-  if (!scan) missing.push("scan de segurança");
+  const scan = await getScanById(scanId);
+  // Scoping de segurança — mesma validação de registoRiscos/inventarioAtivos/report.generate:
+  // getScanById não filtra por organização, por isso é preciso confirmar aqui explicitamente.
+  if (scan && scan.organizationId !== orgId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Este scan não pertence à sua organização." });
+  }
+  if (!scan || scan.status !== "completed") missing.push("scan de segurança");
 
   return { missing, questionnaire, assessment, scan };
 }
 
-export async function generateRelatorioGestao(orgId: number): Promise<Buffer> {
+export async function generateRelatorioGestao(orgId: number, scanId: number): Promise<Buffer> {
   requireTemplate(TEMPLATE_PATHS.relatorioGestao);
 
   const org = await getOrganizationById(orgId);
   if (!org) throw new Error("[Documentos] Organização não encontrada");
 
-  const { missing, questionnaire, assessment, scan } = await checkRelatorioGestaoPreconditions(orgId);
+  const { missing, questionnaire, assessment, scan } = await checkRelatorioGestaoPreconditions(orgId, scanId);
   if (missing.length > 0) {
     throw new Error(
       `[Documentos] Não é possível gerar o Relatório Executivo. Complete primeiro: ${missing.join(", ")}.`

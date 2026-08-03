@@ -414,7 +414,7 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     { enabled: false, retry: false }
   );
   const relatorioGestao = trpc.documents.relatorioGestao.useQuery(
-    undefined,
+    { scanId },
     { enabled: false, retry: false }
   );
 

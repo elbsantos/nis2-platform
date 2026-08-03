@@ -116,7 +116,6 @@ vi.mock("../db", () => ({
   getVulnerabilitiesByScanId:          vi.fn(),
   getFrameworkAssessmentById:          vi.fn(),
   getLatestFrameworkAssessmentByOrgId: vi.fn(),
-  getLatestCompletedScanForOrg:        vi.fn(),
   getLatestCompletedQuestionnaireForOrg: vi.fn(),
   getQuestionnaireSessionById:         vi.fn(),
 }));
@@ -237,7 +236,7 @@ describe("document-generator — guard de template em falta", () => {
 
   it("generateRelatorioGestao lança erro claro com nome do ficheiro docx", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(false);
-    await expect(generateRelatorioGestao(1)).rejects.toThrow(
+    await expect(generateRelatorioGestao(1, 1)).rejects.toThrow(
       "[Documentos] Template não encontrado: registo-gestao-template.docx"
     );
   });
@@ -346,12 +345,12 @@ describe("document-generator — Buffer base64 com template dummy", () => {
       id: 1, organizationId: 1, engineVersion: ENGINE_VERSION, classification: "importante",
       answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
     } as any);
-    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
-      id: 1, organizationId: 1, completedAt: new Date("2026-07-15"),
+    vi.mocked(db.getScanById).mockResolvedValue({
+      id: 1, organizationId: 1, status: "completed", completedAt: new Date("2026-07-15"),
       results: { criticalCount: 1, highCount: 2, mediumCount: 3, lowCount: 4 },
     } as any);
 
-    const buf = await generateRelatorioGestao(1);
+    const buf = await generateRelatorioGestao(1, 1);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBeGreaterThan(0);
   });
@@ -1636,25 +1635,31 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     } as any);
   }
 
-  function mockScan() {
-    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
-      id: 1, organizationId: 1, completedAt: new Date("2026-07-15"),
-      results: { criticalCount: 1, highCount: 2, mediumCount: 3, lowCount: 4 },
-    } as any);
+  // getScanById devolve o scan certo consoante o id pedido — permite simular vários scans
+  // em simultâneo (ex.: 2 alvos diferentes) e confirmar que o gerador usa o scanId PEDIDO,
+  // não "o mais recente da org" (era esse o bug original).
+  function mockScan(
+    scanId: number,
+    orgId: number,
+    results: object = { criticalCount: 1, highCount: 2, mediumCount: 3, lowCount: 4 },
+    status = "completed"
+  ) {
+    const scanRecord = { id: scanId, organizationId: orgId, status, completedAt: new Date("2026-07-15"), results } as any;
+    vi.mocked(db.getScanById).mockImplementation(async (id: number) => (id === scanId ? scanRecord : null));
   }
 
-  const GESTAO_SETUP_OK = (orgOverride: object = {}, answers = buildAnswers()) => {
+  const GESTAO_SETUP_OK = (orgId = 1, scanId = 1, answers = buildAnswers()) => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
-    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA, ...orgOverride } as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
     mockQuestionnaire(answers);
     mockAssessment();
-    mockScan();
+    mockScan(scanId, orgId);
   };
 
   it("3 fontes completas — score, 10 medidas, referência ao scan, declaração; zero chavetas, zero [A PREENCHER]", async () => {
-    GESTAO_SETUP_OK();
-    await generateRelatorioGestao(1);
+    GESTAO_SETUP_OK(1, 1);
+    await generateRelatorioGestao(1, 1);
 
     expect(_psiRenderArgs).not.toBeNull();
     const TAGS = [
@@ -1678,8 +1683,8 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
   });
 
   it("todas as 42 respostas 'yes' → 10 medidas conformes, zero parciais, zero em falta", async () => {
-    GESTAO_SETUP_OK();
-    await generateRelatorioGestao(1);
+    GESTAO_SETUP_OK(1, 1);
+    await generateRelatorioGestao(1, 1);
     expect(_psiRenderArgs!.medidas_conformes).toBe("10");
     expect(_psiRenderArgs!.medidas_parciais).toBe("0");
     expect(_psiRenderArgs!.medidas_falta).toBe("0");
@@ -1694,8 +1699,8 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     overrides[hControls[1].id] = "partial";
     // hControls[2] fica "yes" (default) — (100+50+50)/3 = 66.7 → round 67 → Parcial (60-79)
 
-    GESTAO_SETUP_OK({}, buildAnswers(overrides));
-    await generateRelatorioGestao(1);
+    GESTAO_SETUP_OK(1, 1, buildAnswers(overrides));
+    await generateRelatorioGestao(1, 1);
 
     expect(_psiRenderArgs!.medidas_conformes).toBe("8");
     expect(_psiRenderArgs!.medidas_parciais).toBe("1");
@@ -1712,21 +1717,21 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
 
   it("referência auto-gerada no formato REL-GEST-{ano}-{orgId com 6 dígitos}", async () => {
     vi.setSystemTime(new Date("2026-07-31"));
-    GESTAO_SETUP_OK();
-    await generateRelatorioGestao(42);
+    GESTAO_SETUP_OK(42, 1);
+    await generateRelatorioGestao(42, 1);
     expect(_psiRenderArgs!.referencia).toBe("REL-GEST-2026-000042");
   });
 
   it("data_extenso — data actual por extenso em PT", async () => {
     vi.setSystemTime(new Date("2026-01-15"));
-    GESTAO_SETUP_OK();
-    await generateRelatorioGestao(1);
+    GESTAO_SETUP_OK(1, 1);
+    await generateRelatorioGestao(1, 1);
     expect(_psiRenderArgs!.data_extenso).toBe("15 de janeiro de 2026");
   });
 
-  it("visão técnica reflete o último scan (contagens por severidade + total, sem repetir a lista técnica)", async () => {
-    GESTAO_SETUP_OK();
-    await generateRelatorioGestao(1);
+  it("visão técnica reflete o SCAN SELECIONADO (contagens por severidade + total, sem repetir a lista técnica)", async () => {
+    GESTAO_SETUP_OK(1, 1);
+    await generateRelatorioGestao(1, 1);
     expect(_psiRenderArgs!.scan_criticas).toBe("1");
     expect(_psiRenderArgs!.scan_altas).toBe("2");
     expect(_psiRenderArgs!.scan_medias).toBe("3");
@@ -1735,14 +1740,42 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     expect(_psiRenderArgs!.scan_data).toBe("15/07/2026");
   });
 
+  it("REGRESSÃO DO BUG — pedir o scan A (mais antigo, selecionado) devolve os números de A, nunca os do scan B (mais recente)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    mockQuestionnaire(buildAnswers());
+    mockAssessment();
+
+    // Simula exatamente o cenário relatado: scan A é mais antigo (scanme.nmap.org, 29/07,
+    // 5 críticas) mas é o que o utilizador tinha aberto/selecionado; scan B é mais recente
+    // (helpgames.app, 02/08, 0 vulns) mas NÃO foi pedido.
+    const scanA = { id: 106, organizationId: 1, status: "completed", completedAt: new Date("2026-07-29"), results: { criticalCount: 5, highCount: 2, mediumCount: 1, lowCount: 0 } };
+    const scanB = { id: 200, organizationId: 1, status: "completed", completedAt: new Date("2026-08-02"), results: { criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0 } };
+    vi.mocked(db.getScanById).mockImplementation(async (id: number) => {
+      if (id === scanA.id) return scanA as any;
+      if (id === scanB.id) return scanB as any;
+      return null;
+    });
+
+    await generateRelatorioGestao(1, scanA.id);
+    expect(_psiRenderArgs!.scan_criticas).toBe("5");
+    expect(_psiRenderArgs!.scan_vulns_total).toBe("8");
+
+    // Inverso: pedir B explicitamente dá os números de B, não os de A.
+    await generateRelatorioGestao(1, scanB.id);
+    expect(_psiRenderArgs!.scan_criticas).toBe("0");
+    expect(_psiRenderArgs!.scan_vulns_total).toBe("0");
+  });
+
   it("precondição: falta questionário → erro menciona-o", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
     vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
     mockAssessment();
-    mockScan();
+    mockScan(1, 1);
 
-    const err = await generateRelatorioGestao(1).catch((e) => e);
+    const err = await generateRelatorioGestao(1, 1).catch((e) => e);
     expect(err).toBeDefined();
     expect(err.message).toContain("Complete primeiro");
     expect(err.message).toContain("questionário de autoavaliação");
@@ -1753,11 +1786,35 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
     vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
     mockAssessment();
-    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue(null as any);
+    vi.mocked(db.getScanById).mockResolvedValue(null as any); // scanId pedido não existe
 
-    const err = await generateRelatorioGestao(1).catch((e) => e);
+    const err = await generateRelatorioGestao(1, 999).catch((e) => e);
     expect(err).toBeDefined();
     expect(err.message).toContain("questionário de autoavaliação");
+    expect(err.message).toContain("scan de segurança");
+  });
+
+  it("precondição: scan selecionado existe mas ainda não está concluído → erro menciona scan de segurança", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    mockQuestionnaire(buildAnswers());
+    mockAssessment();
+    mockScan(1, 1, {}, "running"); // scan pedido ainda a correr
+
+    const err = await generateRelatorioGestao(1, 1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("scan de segurança");
+  });
+
+  it("precondição: scan selecionado não existe (scanId inválido) → erro menciona scan de segurança", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    mockQuestionnaire(buildAnswers());
+    mockAssessment();
+    vi.mocked(db.getScanById).mockResolvedValue(null as any);
+
+    const err = await generateRelatorioGestao(1, 999).catch((e) => e);
+    expect(err).toBeDefined();
     expect(err.message).toContain("scan de segurança");
   });
 
@@ -1766,20 +1823,33 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
     mockQuestionnaire(buildAnswers());
     mockAssessment("1"); // versão antiga do motor
-    mockScan();
+    mockScan(1, 1);
 
-    const err = await generateRelatorioGestao(1).catch((e) => e);
+    const err = await generateRelatorioGestao(1, 1).catch((e) => e);
     expect(err).toBeDefined();
     expect(err.message).toContain("motor desatualizado");
   });
 
-  it("isolamento — todas as fontes são pedidas com o MESMO orgId, nunca outro", async () => {
-    GESTAO_SETUP_OK();
-    await generateRelatorioGestao(7);
+  it("SEGURANÇA — scanId pertence a outra organização → FORBIDDEN, nunca gera com dados de outra org", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...GESTAO_ORG_COMPLETA } as any);
+    mockQuestionnaire(buildAnswers());
+    mockAssessment();
+    mockScan(999, 2); // scan 999 pertence à organização 2
+
+    const err = await generateRelatorioGestao(1, 999).catch((e) => e); // org 1 a tentar aceder
+    expect(err).toBeDefined();
+    expect(err.code).toBe("FORBIDDEN");
+    expect(err.message).toContain("não pertence à sua organização");
+  });
+
+  it("isolamento — getScanById chamado com o scanId PEDIDO (não com o orgId, não 'o mais recente')", async () => {
+    GESTAO_SETUP_OK(7, 55);
+    await generateRelatorioGestao(7, 55);
     expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
     expect(vi.mocked(db.getLatestCompletedQuestionnaireForOrg)).toHaveBeenCalledWith(7);
     expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).toHaveBeenCalledWith(7);
-    expect(vi.mocked(db.getLatestCompletedScanForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getScanById)).toHaveBeenCalledWith(55);
     expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
   });
 
