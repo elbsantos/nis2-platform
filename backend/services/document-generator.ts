@@ -563,9 +563,18 @@ export async function generateIrp(orgId: number): Promise<Buffer> {
 // Relatório Executivo para a Gestão (.docx) — 4º dos 6 documentos do Dossier
 // ---------------------------------------------------------------------------
 
-/** Limiares de conformidade por medida — mesmos já usados em questionnaire-pdf-generator.ts (scoreColor/scoreLabel). */
-function measureStatusLabel(score: number | null): "Conforme" | "Parcial" | "Em falta" {
-  if (score === null) return "Em falta";
+/**
+ * Limiares de conformidade por medida — mesmos já usados em questionnaire-pdf-generator.ts
+ * (scoreColor/scoreLabel). Partilhada por generateRelatorioGestao e generateTracker10Medidas —
+ * uma correção aqui aplica-se aos dois documentos.
+ *
+ * score === null significa que a medida não teve NENHUMA resposta aplicável no questionário
+ * (todos os controlos respondidos "na") — é uma medida NÃO AVALIADA, distinta de "Em falta"
+ * (medida avaliada, com score real abaixo de 60). Confundir os dois penalizava injustamente
+ * empresas para as quais a medida legitimamente não se aplica.
+ */
+function measureStatusLabel(score: number | null): "Conforme" | "Parcial" | "Em falta" | "Não avaliado" {
+  if (score === null) return "Não avaliado";
   if (score >= 80) return "Conforme";
   if (score >= 60) return "Parcial";
   return "Em falta";
@@ -626,11 +635,12 @@ export async function generateRelatorioGestao(orgId: number, scanId: number): Pr
   const classification     = assessment!.classification ?? "";
   const classificacaoLabel = (CLASSIFICACAO_LABELS[classification] ?? classification) || "—";
 
-  let conformes = 0, parciais = 0, falta = 0;
+  let conformes = 0, parciais = 0, falta = 0, naoAvaliadas = 0;
   const medidas = reportData.measureScores.map((m) => {
     const estado = measureStatusLabel(m.score);
     if (estado === "Conforme") conformes++;
     else if (estado === "Parcial") parciais++;
+    else if (estado === "Não avaliado") naoAvaliadas++;
     else falta++;
     return {
       slug_maiusc: m.slug.toUpperCase(),
@@ -638,7 +648,10 @@ export async function generateRelatorioGestao(orgId: number, scanId: number): Pr
       score_fmt:   m.score !== null ? `${m.score}/100` : "Sem dados",
       estado,
       controlos:   String(m.controlCount),
-      lacunas:     String(m.gapCount),
+      // "Não avaliado" (score null) não tem lacunas por definição — buildReportData já
+      // devolve gapCount=0 nesse caso, mas mostramos "—" para não sugerir "0 lacunas
+      // encontradas numa avaliação real" quando na verdade não houve avaliação nenhuma.
+      lacunas:     m.score === null ? "—" : String(m.gapCount),
     };
   });
 
@@ -669,6 +682,7 @@ export async function generateRelatorioGestao(orgId: number, scanId: number): Pr
     medidas_conformes: String(conformes),
     medidas_parciais:  String(parciais),
     medidas_falta:     String(falta),
+    medidas_nao_avaliadas: String(naoAvaliadas),
     leitura_sumario:   leituraSumario,
     medidas, // array — secção repetível {#medidas}...{/medidas} no template
     scan_data:         formatDate(scan!.completedAt),
@@ -733,7 +747,9 @@ export async function generateTracker10Medidas(orgId: number): Promise<Buffer> {
     row.getCell(3).value  = m.title;                                     // C: Medida — mesmo título do doc 4
     row.getCell(4).value  = estado;                                      // D: Estado
     row.getCell(5).value  = m.score !== null ? `${m.score}/100` : "Sem dados"; // E: Score
-    row.getCell(6).value  = String(m.gapCount);                          // F: Lacunas
+    // "Não avaliado" (score null) mostra "—" em vez de "0" — 0 poderia sugerir uma
+    // avaliação real sem lacunas, quando na verdade a medida não foi avaliada.
+    row.getCell(6).value  = m.score === null ? "—" : String(m.gapCount);  // F: Lacunas
     row.getCell(8).value  = "[A definir pela equipa]";                   // H: Responsável
     row.getCell(10).value = "[A definir pela equipa]";                   // J: Prazo
     row.getCell(11).value = "[A definir pela equipa]";                   // K: Evidência

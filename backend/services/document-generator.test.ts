@@ -1716,6 +1716,50 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     expect(medidaH.score_fmt).toBe("67/100");
   });
 
+  it("medida toda-N/A → 'Não avaliado' (não 'Em falta'), lacunas '—'; fronteiras exatas 80→Conforme e 60→Parcial", async () => {
+    const overrides: Record<string, "na" | "yes" | "partial"> = {};
+    for (const c of NIS2_CONTROLS.filter((c) => c.articleSlug === "f")) overrides[c.id] = "na";
+
+    const aControls = NIS2_CONTROLS.filter((c) => c.articleSlug === "a");
+    overrides[aControls[0].id] = "yes";
+    overrides[aControls[1].id] = "yes";
+    overrides[aControls[2].id] = "yes";
+    overrides[aControls[3].id] = "partial";
+    overrides[aControls[4].id] = "partial";
+    // a: (100*3 + 50*2)/5 = 400/5 = 80 → Conforme (fronteira exata, não Parcial)
+
+    const iControls = NIS2_CONTROLS.filter((c) => c.articleSlug === "i");
+    overrides[iControls[0].id] = "yes";
+    overrides[iControls[1].id] = "partial";
+    overrides[iControls[2].id] = "partial";
+    overrides[iControls[3].id] = "partial";
+    overrides[iControls[4].id] = "partial";
+    // i: (100*1 + 50*4)/5 = 300/5 = 60 → Parcial (fronteira exata, não Em falta)
+
+    GESTAO_SETUP_OK(1, 1, buildAnswers(overrides));
+    await generateRelatorioGestao(1, 1);
+
+    const medidas = _psiRenderArgs!.medidas as any[];
+    const medidaF = medidas.find((m) => m.slug_maiusc === "F");
+    const medidaA = medidas.find((m) => m.slug_maiusc === "A");
+    const medidaI = medidas.find((m) => m.slug_maiusc === "I");
+
+    expect(medidaF.estado).toBe("Não avaliado");
+    expect(medidaF.score_fmt).toBe("Sem dados");
+    expect(medidaF.lacunas).toBe("—");
+
+    expect(medidaA.estado).toBe("Conforme");
+    expect(medidaA.score_fmt).toBe("80/100");
+
+    expect(medidaI.estado).toBe("Parcial");
+    expect(medidaI.score_fmt).toBe("60/100");
+
+    expect(_psiRenderArgs!.medidas_nao_avaliadas).toBe("1");
+    expect(_psiRenderArgs!.medidas_conformes).toBe("8"); // a + b,c,d,e,g,h,j (todas "yes"=100)
+    expect(_psiRenderArgs!.medidas_parciais).toBe("1");  // i
+    expect(_psiRenderArgs!.medidas_falta).toBe("0");     // "Não avaliado" NÃO soma a "Em falta"
+  });
+
   it("referência auto-gerada no formato REL-GEST-{ano}-{orgId com 6 dígitos}", async () => {
     vi.setSystemTime(new Date("2026-07-31"));
     GESTAO_SETUP_OK(42, 1);
@@ -1954,6 +1998,44 @@ describe("generateTracker10Medidas — Tracker das 10 Medidas (.xlsx)", () => {
     expect(_cellWrites.get("15:4")).toBe("Parcial"); // h — 67
     expect(_cellWrites.get("15:5")).toBe("67/100");
     expect(_cellWrites.get("8:4")).toBe("Conforme"); // a — inalterado, 100
+  });
+
+  it("medida toda-N/A → estado 'Não avaliado' no Tracker (não 'Em falta'), lacunas '—'", async () => {
+    const overrides: Record<string, "na"> = {};
+    for (const c of NIS2_CONTROLS.filter((c) => c.articleSlug === "f")) overrides[c.id] = "na";
+
+    TRACKER_SETUP(buildAnswers(overrides));
+    await generateTracker10Medidas(1);
+
+    // f = linha 13 (a=8,b=9,c=10,d=11,e=12,f=13,...)
+    expect(_cellWrites.get("13:4")).toBe("Não avaliado");
+    expect(_cellWrites.get("13:5")).toBe("Sem dados");
+    expect(_cellWrites.get("13:6")).toBe("—");
+  });
+
+  it("coerência com o doc 4 — medida toda-N/A é 'Não avaliado' nos DOIS documentos", async () => {
+    const overrides: Record<string, "na"> = {};
+    for (const c of NIS2_CONTROLS.filter((c) => c.articleSlug === "f")) overrides[c.id] = "na";
+    const answers = buildAnswers(overrides);
+
+    TRACKER_SETUP(answers);
+    await generateTracker10Medidas(1);
+    const trackerEstadoF = _cellWrites.get("13:4"); // f = linha 13
+
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION, classification: "importante",
+      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
+    } as any);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      id: 1, organizationId: 1, status: "completed", completedAt: new Date("2026-07-15"),
+      results: { criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0 },
+    } as any);
+    await generateRelatorioGestao(1, 1);
+    const medidaF = (_psiRenderArgs!.medidas as any[]).find((m) => m.slug_maiusc === "F");
+
+    expect(trackerEstadoF).toBe("Não avaliado");
+    expect(medidaF.estado).toBe("Não avaliado");
+    expect(trackerEstadoF).toBe(medidaF.estado);
   });
 
   it("coerência com o doc 4 — a mesma medida tem o MESMO estado no Tracker e no Relatório de Gestão", async () => {
