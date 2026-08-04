@@ -2297,6 +2297,41 @@ describe("generatePatchTracker — Tracker de Patches e Vulnerabilidades (.xlsx)
     );
   });
 
+  it("REGRESSÃO DO CORTE EM 100 — 117 vulnerabilidades → as 117 aparecem, nenhuma omitida", async () => {
+    const vulns = Array.from({ length: 117 }, (_, i) =>
+      vuln(`CVE-2024-${String(i).padStart(4, "0")}`, "low", 3.0, `serviço${i}`, 1000 + i, `Patch ${i}`)
+    );
+    PATCH_SETUP(vulns);
+    await generatePatchTracker(1, 1);
+
+    // Todas as 117 linhas (13 a 129) têm o CVE correto — nenhuma linha "+N omitidas" no meio.
+    for (let i = 0; i < 117; i++) {
+      expect(_cellWrites.get(`${13 + i}:6`)).toBe(`CVE-2024-${String(i).padStart(4, "0")}`);
+    }
+    // A última (117ª, índice 116) está na linha 129 — prova direta de que não foi cortada em 100.
+    expect(_cellWrites.get("129:6")).toBe("CVE-2024-0116");
+    expect(_cellWrites.get("129:9")).toBe("[A definir pela equipa]"); // Estado editável até à última linha
+    // Não existe nenhuma linha extra de "omitidas" — a linha a seguir aos dados é já o rodapé.
+    expect(_cellWrites.get("130:6")).toBeUndefined();
+  });
+
+  it("5 vulnerabilidades → exatamente 5 linhas de dados, sem linhas vazias/extra a seguir", async () => {
+    PATCH_SETUP([
+      vuln("CVE-A", "critical", 9.8, "svcA", 1, "patchA"),
+      vuln("CVE-B", "high",     7.0, "svcB", 2, "patchB"),
+      vuln("CVE-C", "medium",   5.0, "svcC", 3, "patchC"),
+      vuln("CVE-D", "low",      3.0, "svcD", 4, "patchD"),
+      vuln("CVE-E", "low",      2.0, "svcE", 5, "patchE"),
+    ]);
+    await generatePatchTracker(1, 1);
+
+    for (let i = 0; i < 5; i++) {
+      expect(_cellWrites.get(`${13 + i}:6`)).toBeTruthy();
+    }
+    // A 6ª linha (13+5=18) não deve ter dados de vulnerabilidade nenhuma.
+    expect(_cellWrites.get("18:6")).toBeUndefined();
+  });
+
   it("referência auto-gerada PATCH-{ano}-{orgId com 6 dígitos}", async () => {
     vi.setSystemTime(new Date("2026-08-04"));
     PATCH_SETUP([]);

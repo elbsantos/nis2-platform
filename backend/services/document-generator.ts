@@ -834,8 +834,25 @@ export async function generateDeclaracaoMfa(orgId: number): Promise<Buffer> {
 // Tracker de Patches e Vulnerabilidades (.xlsx) — D14, ferramenta de acompanhamento
 // ---------------------------------------------------------------------------
 
-const MAX_PATCH_ROWS      = 100; // linhas pré-estilizadas no template — além disto, linha de excedente
-const PATCH_FIRST_DATA_ROW = 13;
+const PATCH_FIRST_DATA_ROW = 13; // única linha pré-estilizada no template — modelo de estilo
+const PATCH_DATA_COLUMNS   = [2, 3, 4, 5, 6, 7, 8, 9]; // B..I
+
+const PATCH_FOOTER_TEXT =
+  "Documento gerado automaticamente pela CISPLAN — Art. 21.º/2/e) e f) do Decreto-Lei n.º 125/2025. " +
+  "O detalhe técnico completo consta do Relatório Técnico do scan; os planos de remediação detalhados " +
+  "estão disponíveis na secção de Remediação da plataforma.";
+
+/**
+ * Escreve o rodapé fixo numa linha fundida (B:I) logo a seguir ao conteúdo real — a posição
+ * depende do nº de vulnerabilidades (sem teto, não há uma linha fixa no template para isto).
+ */
+function writePatchFooter(sheet: ExcelJS.Worksheet, rowNum: number): void {
+  sheet.mergeCells(`B${rowNum}:I${rowNum}`);
+  const footCell = sheet.getCell(`B${rowNum}`);
+  footCell.value = PATCH_FOOTER_TEXT;
+  footCell.font = { italic: true, color: { argb: "FF666666" }, size: 9 };
+  footCell.alignment = { wrapText: true, vertical: "top" };
+}
 
 export async function generatePatchTracker(scanId: number, orgId: number): Promise<Buffer> {
   requireTemplate(TEMPLATE_PATHS.patchTracker);
@@ -892,31 +909,36 @@ export async function generatePatchTracker(scanId: number, orgId: number): Promi
     const msgCell = sheet.getCell(`B${PATCH_FIRST_DATA_ROW}`);
     msgCell.value = "Nenhuma vulnerabilidade detetada neste scan — sem patches pendentes.";
     msgCell.font = { italic: true };
+    writePatchFooter(sheet, PATCH_FIRST_DATA_ROW + 2);
   } else {
-    const rowsToWrite = sorted.slice(0, MAX_PATCH_ROWS);
-    rowsToWrite.forEach((v, i) => {
+    // Modelo de estilo: só a primeira linha (PATCH_FIRST_DATA_ROW) já vem pré-estilizada no
+    // template. TODAS as vulnerabilidades são escritas — sem teto, sem linha "+N omitidas":
+    // para linhas além da modelo, o estilo é copiado célula a célula antes de escrever o valor.
+    const modelRow    = sheet.getRow(PATCH_FIRST_DATA_ROW);
+    const modelStyles = PATCH_DATA_COLUMNS.map((col) => modelRow.getCell(col).style);
+    const modelHeight = modelRow.height;
+
+    sorted.forEach((v, i) => {
       const rowNum = PATCH_FIRST_DATA_ROW + i;
       const row = sheet.getRow(rowNum);
-      row.getCell(2).value  = i + 1;                                                  // B: #
-      row.getCell(3).value  = SEVERITY_PT[v.severity] ?? v.severity;                   // C: Severidade
-      row.getCell(4).value  = cell(v.affectedComponent, "[A PREENCHER]");              // D: Serviço/Componente
-      row.getCell(5).value  = v.port ?? "—";                                          // E: Porta
-      row.getCell(6).value  = cell(v.cveId, "[A PREENCHER]");                          // F: CVE
+      if (i > 0) {
+        PATCH_DATA_COLUMNS.forEach((col, idx) => { row.getCell(col).style = modelStyles[idx]; });
+        row.height = modelHeight;
+      }
+      row.getCell(2).value  = i + 1;                                                   // B: #
+      row.getCell(3).value  = SEVERITY_PT[v.severity] ?? v.severity;                    // C: Severidade
+      row.getCell(4).value  = cell(v.affectedComponent, "[A PREENCHER]");               // D: Serviço/Componente
+      row.getCell(5).value  = v.port ?? "—";                                           // E: Porta
+      row.getCell(6).value  = cell(v.cveId, "[A PREENCHER]");                           // F: CVE
       // Patch Recomendado — o resumo de 1 linha já gravado pelo scanner (sem chamada a IA),
       // não o plano completo (esse fica na secção de Remediação da plataforma).
-      row.getCell(7).value  = cell(v.remediation, "[A PREENCHER: patch recomendado]");  // G: Patch Recomendado
-      row.getCell(8).value  = DEADLINE_BY_SEVERITY[v.severity] ?? "—";                  // H: Prazo
-      row.getCell(9).value  = "[A definir pela equipa]";                                // I: Estado
+      row.getCell(7).value  = cell(v.remediation, "[A PREENCHER: patch recomendado]");   // G: Patch Recomendado
+      row.getCell(8).value  = DEADLINE_BY_SEVERITY[v.severity] ?? "—";                   // H: Prazo
+      row.getCell(9).value  = "[A definir pela equipa]";                                 // I: Estado
       row.commit();
     });
 
-    const overflow = sorted.length - rowsToWrite.length;
-    if (overflow > 0) {
-      const overRow = sheet.getRow(PATCH_FIRST_DATA_ROW + MAX_PATCH_ROWS);
-      overRow.getCell(3).value =
-        `(+ ${overflow} ${overflow === 1 ? "vulnerabilidade adicional" : "vulnerabilidades adicionais"} omitidas — consulte o Relatório Técnico)`;
-      overRow.commit();
-    }
+    writePatchFooter(sheet, PATCH_FIRST_DATA_ROW + sorted.length + 1);
   }
 
   clearFormulaCache(wb);
