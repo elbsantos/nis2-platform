@@ -62,6 +62,7 @@ vi.mock("exceljs", () => {
       return cell;
     }),
     getRow: vi.fn((rowNum: number) => makeRow(rowNum)),
+    mergeCells: vi.fn(),
   });
   const makePainelSheet = () => ({
     getCell: vi.fn((addr: string) => {
@@ -138,6 +139,7 @@ import {
   generateRelatorioGestao,
   generateTracker10Medidas,
   generateDeclaracaoMfa,
+  generatePatchTracker,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
@@ -2209,6 +2211,121 @@ describe("generateDeclaracaoMfa — Declaração de MFA (Autoavaliação)", () =
     expect(xml).toContain("NÃO constitui verificação técnica independente");
     expect(xml).toContain("a plataforma não acede aos sistemas da organização");
     expect(xml).toContain("A responsabilidade pela veracidade das respostas é inteiramente da organização");
+  });
+});
+
+// ===========================================================================
+// Tracker de Patches e Vulnerabilidades — generatePatchTracker (D14)
+// ===========================================================================
+
+describe("generatePatchTracker — Tracker de Patches e Vulnerabilidades (.xlsx)", () => {
+  const FAKE_SCAN_PATCH = {
+    id: 1, organizationId: 1, target: "exemplo.pt", status: "completed",
+    createdAt: new Date("2026-07-29"), completedAt: new Date("2026-07-29"),
+    results: {},
+  } as any;
+
+  function vuln(
+    cveId: string, severity: string, cvssScore: number, affectedComponent: string,
+    port: number | null, remediation: string | null
+  ) {
+    return {
+      id: Math.floor(Math.random() * 100000), scanId: 1, organizationId: 1,
+      cveId, severity, cvssScore: String(cvssScore), description: "desc",
+      affectedComponent, port, remediation, createdAt: new Date(),
+    } as any;
+  }
+
+  const PATCH_SETUP = (vulns: any[]) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getScanById).mockResolvedValue(FAKE_SCAN_PATCH);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, legalName: "Empresa Teste, Lda." } as any);
+    vi.mocked(db.getVulnerabilitiesByScanId).mockResolvedValue(vulns);
+  };
+
+  it("uma linha por vulnerabilidade, ordenadas por severidade (críticas primeiro), com remediation e prazo corretos", async () => {
+    PATCH_SETUP([
+      vuln("CVE-2024-0001", "low",      3.1, "ssh",   22,   "Atualiza o OpenSSH para a versão mais recente."),
+      vuln("CVE-2024-0002", "critical", 9.8, "apache", 443, "Atualiza o Apache para a versão corrente."),
+      vuln("CVE-2024-0003", "medium",   5.4, "nginx", 8080, null),
+      vuln("CVE-2024-0004", "high",     7.5, "mysql", 3306, "Aplica o patch de segurança do MySQL."),
+    ]);
+
+    await generatePatchTracker(1, 1);
+
+    // Ordem esperada: critical(0002) → high(0004) → medium(0003) → low(0001) — linhas 13-16
+    expect(_cellWrites.get("13:6")).toBe("CVE-2024-0002"); // F: CVE
+    expect(_cellWrites.get("13:3")).toBe("Crítica");       // C: Severidade
+    expect(_cellWrites.get("13:8")).toBe("24–72 horas");   // H: Prazo
+
+    expect(_cellWrites.get("14:6")).toBe("CVE-2024-0004");
+    expect(_cellWrites.get("14:3")).toBe("Alta");
+    expect(_cellWrites.get("14:8")).toBe("7 dias");
+
+    expect(_cellWrites.get("15:6")).toBe("CVE-2024-0003");
+    expect(_cellWrites.get("15:3")).toBe("Média");
+    expect(_cellWrites.get("15:7")).toBe("[A PREENCHER: patch recomendado]"); // remediation null → fallback
+    expect(_cellWrites.get("15:8")).toBe("30 dias");
+
+    expect(_cellWrites.get("16:6")).toBe("CVE-2024-0001");
+    expect(_cellWrites.get("16:3")).toBe("Baixa");
+    expect(_cellWrites.get("16:8")).toBe("90 dias");
+
+    // Estado sempre editável, sempre "[A definir pela equipa]"
+    expect(_cellWrites.get("13:9")).toBe("[A definir pela equipa]");
+
+    // Mini-resumo por severidade
+    expect(_headerWrites.get("B10")).toBe("1"); // críticas
+    expect(_headerWrites.get("C10")).toBe("1"); // altas
+    expect(_headerWrites.get("D10")).toBe("1"); // médias
+    expect(_headerWrites.get("E10")).toBe("1"); // baixas
+    expect(_headerWrites.get("F10")).toBe("4"); // total
+  });
+
+  it("Patch Recomendado usa o campo remediation real — resumo já gravado pelo scanner, sem IA", async () => {
+    PATCH_SETUP([vuln("CVE-2024-0002", "critical", 9.8, "apache", 443, "Atualiza o Apache para a versão corrente.")]);
+    await generatePatchTracker(1, 1);
+    expect(_cellWrites.get("13:7")).toBe("Atualiza o Apache para a versão corrente.");
+  });
+
+  it("0 vulnerabilidades → mensagem clara de 'sem patches pendentes', NÃO um erro", async () => {
+    PATCH_SETUP([]);
+    const buf = await generatePatchTracker(1, 1);
+    expect(buf).toBeInstanceOf(Buffer);
+    expect(_headerWrites.get("B13")).toBe(
+      "Nenhuma vulnerabilidade detetada neste scan — sem patches pendentes."
+    );
+  });
+
+  it("referência auto-gerada PATCH-{ano}-{orgId com 6 dígitos}", async () => {
+    vi.setSystemTime(new Date("2026-08-04"));
+    PATCH_SETUP([]);
+    await generatePatchTracker(1, 42);
+    expect(_headerWrites.get("F3")).toBe("Referência: PATCH-2026-000042");
+  });
+
+  it("cabeçalho: empresa, alvo do scan, data do scan", async () => {
+    PATCH_SETUP([]);
+    await generatePatchTracker(1, 1);
+    expect(_headerWrites.get("B3")).toBe("Empresa: Empresa Teste, Lda.");
+    expect(_headerWrites.get("B4")).toBe("Alvo do scan: exemplo.pt");
+    expect(_headerWrites.get("F4")).toBe("Data do scan: 29/07/2026");
+  });
+
+  it("isolamento — getScanById/getOrganizationById/getVulnerabilitiesByScanId chamados com os IDs certos, nunca outros", async () => {
+    PATCH_SETUP([]);
+    await generatePatchTracker(55, 7);
+    expect(vi.mocked(db.getScanById)).toHaveBeenCalledWith(55);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getVulnerabilitiesByScanId)).toHaveBeenCalledWith(55);
+    expect(vi.mocked(db.getScanById)).not.toHaveBeenCalledWith(1);
+  });
+
+  it("guard de template em falta lança erro claro com nome do ficheiro xlsx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generatePatchTracker(1, 1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: tracker-patches-template.xlsx"
+    );
   });
 });
 

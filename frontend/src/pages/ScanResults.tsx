@@ -425,6 +425,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     undefined,
     { enabled: false, retry: false }
   );
+  const patchTracker = trpc.documents.patchTracker.useQuery(
+    { scanId },
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -453,6 +457,16 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
             />
           </>
         )}
+        <DocButton
+          label="Tracker de Patches e Vulnerabilidades (.xlsx)"
+          onDownload={async () => {
+            const r = await patchTracker.refetch();
+            // Gera sempre, mesmo com 0 vulnerabilidades (scan limpo) — por isso fica fora
+            // do gate eligibleCount>0 dos outros 2 documentos deste scan.
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+            return r.data;
+          }}
+        />
         <DocButton
           label="Carta de Nomeação do CISO (.docx)"
           onDownload={async () => {

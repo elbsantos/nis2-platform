@@ -69,6 +69,23 @@ export const documentsRouter = router({
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.xlsx };
     }),
 
+  patchTracker: freeProcedure
+    .input(z.object({ scanId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const scan = await getScanById(input.scanId);
+      if (!scan)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Scan não encontrado" });
+      if (scan.organizationId !== ctx.org.id)
+        throw new TRPCError({ code: "FORBIDDEN" });
+      if (scan.status !== "completed")
+        throw new TRPCError({ code: "BAD_REQUEST", message: "O scan ainda não está concluído" });
+
+      const { generatePatchTracker } = await import("../services/document-generator");
+      const buffer   = await generatePatchTracker(input.scanId, ctx.org.id);
+      const filename = `Tracker_Patches_${slugify(ctx.org.name)}_${isoDate(scan.createdAt)}.xlsx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.xlsx };
+    }),
+
   psi: freeProcedure
     .query(async ({ ctx }) => {
       const { generatePsi } = await import("../services/document-generator");

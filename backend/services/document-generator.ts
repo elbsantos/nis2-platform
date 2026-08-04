@@ -27,6 +27,7 @@ import {
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
 import { NIS2_CONTROLS } from "./ai-questionnaire";
+import { DEADLINE_BY_SEVERITY } from "./pdf-report-generator";
 import {
   evaluateTree,
   NIS2_PT_TREE,
@@ -54,6 +55,7 @@ export const TEMPLATE_PATHS = {
   relatorioGestao:  path.join(TEMPLATE_DIR, "registo-gestao-template.docx"),
   tracker10Medidas: path.join(TEMPLATE_DIR, "tracker-10-medidas-template.xlsx"),
   declaracaoMfa:    path.join(TEMPLATE_DIR, "declaracao-mfa-template.docx"),
+  patchTracker:     path.join(TEMPLATE_DIR, "tracker-patches-template.xlsx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -826,6 +828,99 @@ export async function generateDeclaracaoMfa(orgId: number): Promise<Buffer> {
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);
   return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// Tracker de Patches e Vulnerabilidades (.xlsx) — D14, ferramenta de acompanhamento
+// ---------------------------------------------------------------------------
+
+const MAX_PATCH_ROWS      = 100; // linhas pré-estilizadas no template — além disto, linha de excedente
+const PATCH_FIRST_DATA_ROW = 13;
+
+export async function generatePatchTracker(scanId: number, orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.patchTracker);
+
+  const [scan, org, vulns] = await Promise.all([
+    getScanById(scanId),
+    getOrganizationById(orgId),
+    getVulnerabilitiesByScanId(scanId),
+  ]);
+  if (!scan || !org) throw new Error("[Documentos] Scan ou organização não encontrados");
+
+  // Ordenado por severidade (críticas primeiro) e, dentro da mesma severidade, por CVSS
+  // decrescente — mesma lógica de ordenação de aggregateRiskGroups.
+  const sorted = [...vulns].sort((a, b) => {
+    const diff = (SEVERITY_ORDER[a.severity] ?? 4) - (SEVERITY_ORDER[b.severity] ?? 4);
+    if (diff !== 0) return diff;
+    return Number(b.cvssScore ?? 0) - Number(a.cvssScore ?? 0);
+  });
+
+  const counts = {
+    critical: sorted.filter((v) => v.severity === "critical").length,
+    high:     sorted.filter((v) => v.severity === "high").length,
+    medium:   sorted.filter((v) => v.severity === "medium").length,
+    low:      sorted.filter((v) => v.severity === "low").length,
+  };
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão dos outros documentos).
+  const referencia = `PATCH-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(TEMPLATE_PATHS.patchTracker);
+  wb.calcProperties.fullCalcOnLoad = true;
+  const sheet = wb.getWorksheet("🔧 TRACKER DE PATCHES");
+  if (!sheet) throw new Error('[Documentos] Folha "🔧 TRACKER DE PATCHES" não encontrada no template');
+
+  sheet.getCell("B3").value = `Empresa: ${org.legalName ?? org.name}`;
+  sheet.getCell("F3").value = `Referência: ${referencia}`;
+  sheet.getCell("B4").value = `Alvo do scan: ${cell(scan.target, "[A PREENCHER]")}`;
+  sheet.getCell("F4").value = `Data do scan: ${formatDate(scan.completedAt ?? scan.createdAt)}`;
+  sheet.getCell("B5").value =
+    `Data do documento: ${hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`;
+
+  sheet.getCell("B10").value = String(counts.critical);
+  sheet.getCell("C10").value = String(counts.high);
+  sheet.getCell("D10").value = String(counts.medium);
+  sheet.getCell("E10").value = String(counts.low);
+  sheet.getCell("F10").value = String(sorted.length);
+
+  if (sorted.length === 0) {
+    // Um scan limpo é um bom resultado, não uma falha — mensagem clara, sem gerar erro nem
+    // deixar a tabela visualmente vazia/confusa.
+    sheet.mergeCells(`B${PATCH_FIRST_DATA_ROW}:I${PATCH_FIRST_DATA_ROW}`);
+    const msgCell = sheet.getCell(`B${PATCH_FIRST_DATA_ROW}`);
+    msgCell.value = "Nenhuma vulnerabilidade detetada neste scan — sem patches pendentes.";
+    msgCell.font = { italic: true };
+  } else {
+    const rowsToWrite = sorted.slice(0, MAX_PATCH_ROWS);
+    rowsToWrite.forEach((v, i) => {
+      const rowNum = PATCH_FIRST_DATA_ROW + i;
+      const row = sheet.getRow(rowNum);
+      row.getCell(2).value  = i + 1;                                                  // B: #
+      row.getCell(3).value  = SEVERITY_PT[v.severity] ?? v.severity;                   // C: Severidade
+      row.getCell(4).value  = cell(v.affectedComponent, "[A PREENCHER]");              // D: Serviço/Componente
+      row.getCell(5).value  = v.port ?? "—";                                          // E: Porta
+      row.getCell(6).value  = cell(v.cveId, "[A PREENCHER]");                          // F: CVE
+      // Patch Recomendado — o resumo de 1 linha já gravado pelo scanner (sem chamada a IA),
+      // não o plano completo (esse fica na secção de Remediação da plataforma).
+      row.getCell(7).value  = cell(v.remediation, "[A PREENCHER: patch recomendado]");  // G: Patch Recomendado
+      row.getCell(8).value  = DEADLINE_BY_SEVERITY[v.severity] ?? "—";                  // H: Prazo
+      row.getCell(9).value  = "[A definir pela equipa]";                                // I: Estado
+      row.commit();
+    });
+
+    const overflow = sorted.length - rowsToWrite.length;
+    if (overflow > 0) {
+      const overRow = sheet.getRow(PATCH_FIRST_DATA_ROW + MAX_PATCH_ROWS);
+      overRow.getCell(3).value =
+        `(+ ${overflow} ${overflow === 1 ? "vulnerabilidade adicional" : "vulnerabilidades adicionais"} omitidas — consulte o Relatório Técnico)`;
+      overRow.commit();
+    }
+  }
+
+  clearFormulaCache(wb);
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 // ---------------------------------------------------------------------------

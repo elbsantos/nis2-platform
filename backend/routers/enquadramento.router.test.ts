@@ -20,6 +20,7 @@ vi.mock("../db", () => ({
   getFrameworkAssessmentById:     vi.fn(),
   getFrameworkAssessmentsByOrgId: vi.fn(),
   createCompletedFrameworkAssessment: vi.fn(),
+  getScanById:                    vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,13 @@ const USER_B = {
   deletedAt:            null,
   createdAt:            new Date(),
   updatedAt:            new Date(),
+};
+
+// Scan pertencente a Org A
+const SCAN_A = {
+  id: 55, organizationId: ORG_A.id, target: "example.com", mode: "sme" as const,
+  status: "completed" as const, batchId: null, startedAt: new Date(), completedAt: new Date(),
+  results: { vulnerabilities: [] }, createdAt: new Date(), updatedAt: new Date(),
 };
 
 // Assessment pertencente a Org A
@@ -113,6 +121,28 @@ describe("documents.relatorioEnquadramento — isolamento multi-tenant", () => {
 
     expect(err).toBeInstanceOf(TRPCError);
     expect((err as TRPCError).code).toBe("FORBIDDEN");
+  });
+});
+
+describe("documents.patchTracker — isolamento multi-tenant (Estilo B)", () => {
+  it("Org B recebe FORBIDDEN ao tentar gerar o Tracker de Patches de um scan de Org A", async () => {
+    vi.mocked(db.getScanById).mockResolvedValue(SCAN_A as any);
+
+    const caller = documentsRouter.createCaller(makeCtx(USER_B));
+    const err = await caller.patchTracker({ scanId: SCAN_A.id }).catch(e => e);
+
+    expect(err).toBeInstanceOf(TRPCError);
+    expect((err as TRPCError).code).toBe("FORBIDDEN");
+  });
+
+  it("scan inexistente → NOT_FOUND", async () => {
+    vi.mocked(db.getScanById).mockResolvedValue(null as any);
+
+    const caller = documentsRouter.createCaller(makeCtx(USER_B));
+    const err = await caller.patchTracker({ scanId: 9999 }).catch(e => e);
+
+    expect(err).toBeInstanceOf(TRPCError);
+    expect((err as TRPCError).code).toBe("NOT_FOUND");
   });
 });
 
