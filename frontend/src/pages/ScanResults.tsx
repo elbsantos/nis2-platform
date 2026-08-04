@@ -421,6 +421,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     undefined,
     { enabled: false, retry: false }
   );
+  const declaracaoMfa = trpc.documents.declaracaoMfa.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -491,6 +495,14 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
             const r = await tracker10Medidas.refetch();
             // Precondição exige só o questionário — a mensagem real do servidor
             // pede para o completar primeiro.
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Declaração de MFA — Autoavaliação (.docx)"
+          onDownload={async () => {
+            const r = await declaracaoMfa.refetch();
             if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}

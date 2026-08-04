@@ -137,6 +137,7 @@ import {
   generateIrp,
   generateRelatorioGestao,
   generateTracker10Medidas,
+  generateDeclaracaoMfa,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
@@ -2097,6 +2098,117 @@ describe("generateTracker10Medidas — Tracker das 10 Medidas (.xlsx)", () => {
     await expect(generateTracker10Medidas(1)).rejects.toThrow(
       "[Documentos] Template não encontrado: tracker-10-medidas-template.xlsx"
     );
+  });
+});
+
+// ===========================================================================
+// Declaração de MFA — generateDeclaracaoMfa
+// ===========================================================================
+
+describe("generateDeclaracaoMfa — Declaração de MFA (Autoavaliação)", () => {
+  const MFA_ORG_COMPLETA = { legalName: "Empresa Teste, Lda.", securityOfficerName: "João Silva" };
+
+  function mockQuestionnaireMfa(j1: string, j2: string, j3: string) {
+    const answers = [
+      { controlId: "j-1", answer: j1, score: j1 === "yes" ? 100 : j1 === "partial" ? 50 : 0 },
+      { controlId: "j-2", answer: j2, score: j2 === "yes" ? 100 : j2 === "partial" ? 50 : 0 },
+      { controlId: "j-3", answer: j3, score: j3 === "yes" ? 100 : j3 === "partial" ? 50 : 0 },
+    ];
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: {}, completedAt: new Date("2026-07-01"),
+    } as any);
+    vi.mocked(db.getQuestionnaireSessionById).mockResolvedValue({
+      id: 1, organizationId: 1, userId: 1, sector: null, status: "completed",
+      score: "80", articleScores: {}, answers,
+      completedAt: new Date("2026-07-01"), createdAt: new Date(), updatedAt: new Date(),
+    } as any);
+  }
+
+  const MFA_SETUP_OK = (j1 = "yes", j2 = "partial", j3 = "no") => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("DUMMY_DOCX") as any);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...MFA_ORG_COMPLETA } as any);
+    mockQuestionnaireMfa(j1, j2, j3);
+  };
+
+  it("3 respostas de MFA com estado correto; zero chavetas por substituir", async () => {
+    MFA_SETUP_OK("yes", "partial", "no");
+    await generateDeclaracaoMfa(1);
+
+    expect(_psiRenderArgs).not.toBeNull();
+    expect(_psiRenderArgs!.q1_estado).toBe("Sim");
+    expect(_psiRenderArgs!.q2_estado).toBe("Parcial");
+    expect(_psiRenderArgs!.q3_estado).toBe("Não");
+    expect(_psiRenderArgs!.q1_pergunta).toContain("email corporativo");
+    expect(_psiRenderArgs!.q2_pergunta).toContain("acesso remoto e VPN");
+    expect(_psiRenderArgs!.q3_pergunta).toContain("contas de administrador");
+
+    const TAGS = [
+      "empresa", "referencia", "data_extenso",
+      "q1_pergunta", "q1_estado", "q2_pergunta", "q2_estado", "q3_pergunta", "q3_estado",
+      "responsavel_nome",
+    ];
+    for (const tag of TAGS) {
+      const v = (_psiRenderArgs as any)[tag];
+      expect(v, `tag "${tag}" não deve ser undefined`).toBeDefined();
+      expect(String(v), `tag "${tag}" não deve conter "{"`).not.toContain("{");
+    }
+  });
+
+  it("resposta N/A é traduzida para 'N-A' (vocabulário do formulário, sem reinterpretação)", async () => {
+    MFA_SETUP_OK("na", "yes", "yes");
+    await generateDeclaracaoMfa(1);
+    expect(_psiRenderArgs!.q1_estado).toBe("N-A");
+  });
+
+  it("referência auto-gerada MFA-{ano}-{orgId com 6 dígitos} + data por extenso", async () => {
+    vi.setSystemTime(new Date("2026-08-04"));
+    MFA_SETUP_OK();
+    await generateDeclaracaoMfa(42);
+    expect(_psiRenderArgs!.referencia).toBe("MFA-2026-000042");
+    expect(_psiRenderArgs!.data_extenso).toBe("4 de agosto de 2026");
+  });
+
+  it("precondição: sem questionário completo → erro claro", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, ...MFA_ORG_COMPLETA } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
+
+    await expect(generateDeclaracaoMfa(1)).rejects.toThrow(
+      "[Documentos] Não é possível gerar a Declaração de MFA. Complete primeiro o questionário de autoavaliação."
+    );
+  });
+
+  it("isolamento — getOrganizationById/getLatestCompletedQuestionnaireForOrg chamados com o MESMO orgId, nunca outro", async () => {
+    MFA_SETUP_OK();
+    await generateDeclaracaoMfa(7);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestCompletedQuestionnaireForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
+  });
+
+  it("guard de template em falta lança erro claro com nome do ficheiro docx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateDeclaracaoMfa(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: declaracao-mfa-template.docx"
+    );
+  });
+
+  it("documento NÃO contém 'Evidência' nem afirma verificação técnica; contém a nota de autoavaliação", async () => {
+    // Bypassa o mock global do pizzip só aqui, para ler o TEXTO FIXO real do template
+    // (mesma técnica usada para verificar a declaração de supervisão do doc 4).
+    const { default: RealPizZip } = await vi.importActual<typeof import("pizzip")>("pizzip");
+    const content = fs.readFileSync(TEMPLATE_PATHS.declaracaoMfa);
+    const zip = new RealPizZip(content);
+    const xml = zip.file("word/document.xml")!.asText();
+
+    expect(xml, "não deveria conter a palavra 'Evidência'").not.toContain("Evidência");
+    expect(xml, "não deveria afirmar 'evidência técnica'").not.toContain("evidência técnica");
+
+    expect(xml).toContain("AUTOAVALIAÇÃO");
+    expect(xml).toContain("NÃO constitui verificação técnica independente");
+    expect(xml).toContain("a plataforma não acede aos sistemas da organização");
+    expect(xml).toContain("A responsabilidade pela veracidade das respostas é inteiramente da organização");
   });
 });
 

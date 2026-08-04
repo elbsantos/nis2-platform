@@ -118,6 +118,14 @@ export const documentsRouter = router({
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.xlsx };
     }),
 
+  declaracaoMfa: freeProcedure
+    .query(async ({ ctx }) => {
+      const { generateDeclaracaoMfa } = await import("../services/document-generator");
+      const buffer   = await generateDeclaracaoMfa(ctx.org.id);
+      const filename = `Declaracao_MFA_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
+    }),
+
   relatorioEnquadramento: freeProcedure
     .input(z.object({ assessmentId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {

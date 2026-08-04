@@ -26,6 +26,7 @@ import {
   getQuestionnaireSessionById,
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
+import { NIS2_CONTROLS } from "./ai-questionnaire";
 import {
   evaluateTree,
   NIS2_PT_TREE,
@@ -52,6 +53,7 @@ export const TEMPLATE_PATHS = {
   irp:              path.join(TEMPLATE_DIR, "irp-template.docx"),
   relatorioGestao:  path.join(TEMPLATE_DIR, "registo-gestao-template.docx"),
   tracker10Medidas: path.join(TEMPLATE_DIR, "tracker-10-medidas-template.xlsx"),
+  declaracaoMfa:    path.join(TEMPLATE_DIR, "declaracao-mfa-template.docx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -762,6 +764,68 @@ export async function generateTracker10Medidas(orgId: number): Promise<Buffer> {
 
   clearFormulaCache(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+// ---------------------------------------------------------------------------
+// Declaração de MFA — Autoavaliação (.docx) — 6º dos 6 documentos do Dossier
+// ---------------------------------------------------------------------------
+
+/** As 3 perguntas de MFA do questionário (Art. 21.º/2/j) — j-4/j-5 são outros temas da medida j. */
+const MFA_CONTROL_IDS = ["j-1", "j-2", "j-3"] as const;
+
+/** Sim/Parcial/Não/N-A — mesmo vocabulário do formulário do questionário, sem reinterpretação. */
+const MFA_ANSWER_LABEL: Record<string, string> = { yes: "Sim", partial: "Parcial", no: "Não", na: "N-A" };
+
+export async function generateDeclaracaoMfa(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.declaracaoMfa);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const questionnaire = await getLatestCompletedQuestionnaireForOrg(orgId);
+  if (!questionnaire) {
+    throw new Error(
+      "[Documentos] Não é possível gerar a Declaração de MFA. Complete primeiro o questionário de autoavaliação."
+    );
+  }
+
+  const session  = await getQuestionnaireSessionById(questionnaire.id);
+  const answers  = (session?.answers ?? []) as Array<{ controlId: string; answer: string }>;
+  const answerMap = new Map(answers.map((a) => [a.controlId, a.answer]));
+
+  // Fallback [A PREENCHER] por consistência com os outros geradores — na prática não deve
+  // acontecer, pois as 42 perguntas são obrigatórias para concluir o questionário.
+  const [q1, q2, q3] = MFA_CONTROL_IDS.map((id) => {
+    const control = NIS2_CONTROLS.find((c) => c.id === id);
+    const ans      = answerMap.get(id);
+    return {
+      pergunta: cell(control?.question, "[A PREENCHER: pergunta não encontrada]"),
+      estado:   ans ? (MFA_ANSWER_LABEL[ans] ?? "[A PREENCHER]") : "[A PREENCHER]",
+    };
+  });
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão dos outros documentos).
+  const referencia = `MFA-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const data = {
+    empresa:          cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
+    referencia,
+    data_extenso:     hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }),
+    q1_pergunta:      q1.pergunta,
+    q1_estado:        q1.estado,
+    q2_pergunta:      q2.pergunta,
+    q2_estado:        q2.estado,
+    q3_pergunta:      q3.pergunta,
+    q3_estado:        q3.estado,
+    responsavel_nome: cell(org.securityOfficerName, "[A PREENCHER: nome do CISO]"),
+  };
+
+  const content = fs.readFileSync(TEMPLATE_PATHS.declaracaoMfa);
+  const zip     = new PizZip(content);
+  const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+  doc.render(data);
+  return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
 }
 
 // ---------------------------------------------------------------------------
