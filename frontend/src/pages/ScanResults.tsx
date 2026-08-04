@@ -417,6 +417,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     { scanId },
     { enabled: false, retry: false }
   );
+  const tracker10Medidas = trpc.documents.tracker10Medidas.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -477,6 +481,16 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
             const r = await relatorioGestao.refetch();
             // Precondição exige questionário + enquadramento + scan — a mensagem
             // real do servidor lista tudo o que falta de uma vez.
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Tracker das 10 Medidas (.xlsx)"
+          onDownload={async () => {
+            const r = await tracker10Medidas.refetch();
+            // Precondição exige só o questionário — a mensagem real do servidor
+            // pede para o completar primeiro.
             if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}

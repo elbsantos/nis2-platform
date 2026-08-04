@@ -51,6 +51,7 @@ export const TEMPLATE_PATHS = {
   registoCncs:      path.join(TEMPLATE_DIR, "registo-cncs-template.docx"),
   irp:              path.join(TEMPLATE_DIR, "irp-template.docx"),
   relatorioGestao:  path.join(TEMPLATE_DIR, "registo-gestao-template.docx"),
+  tracker10Medidas: path.join(TEMPLATE_DIR, "tracker-10-medidas-template.xlsx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -684,6 +685,67 @@ export async function generateRelatorioGestao(orgId: number, scanId: number): Pr
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);
   return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// Tracker das 10 Medidas (.xlsx) — 5º dos 6 documentos do Dossier
+// ---------------------------------------------------------------------------
+
+const TRACKER_ROW_BY_INDEX = 8; // primeira linha de dados na folha "📊 TRACKER 10 MEDIDAS"
+
+export async function generateTracker10Medidas(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.tracker10Medidas);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const questionnaire = await getLatestCompletedQuestionnaireForOrg(orgId);
+  if (!questionnaire) {
+    throw new Error(
+      "[Documentos] Não é possível gerar o Tracker das 10 Medidas. Complete primeiro o questionário de autoavaliação."
+    );
+  }
+
+  const session     = await getQuestionnaireSessionById(questionnaire.id);
+  const reportData  = await buildReportData(session, org.name);
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão dos outros documentos).
+  const referencia = `TRACKER-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(TEMPLATE_PATHS.tracker10Medidas);
+  wb.calcProperties.fullCalcOnLoad = true;
+
+  const sheet = wb.getWorksheet("📊 TRACKER 10 MEDIDAS");
+  if (!sheet) throw new Error('[Documentos] Folha "📊 TRACKER 10 MEDIDAS" não encontrada no template');
+
+  sheet.getCell("B3").value = `Empresa: ${org.legalName ?? org.name}`;
+  sheet.getCell("G3").value = `Referência: ${referencia}   |   Gerado em: ${formatDate(hoje)}`;
+
+  // measureScores já vem ordenado a-j de buildReportData — mesma ordem das linhas do template.
+  reportData.measureScores.forEach((m, i) => {
+    const rowNum = TRACKER_ROW_BY_INDEX + i;
+    const row = sheet.getRow(rowNum);
+    // Mesmos limiares 80/60 do Relatório Executivo para a Gestão — coerência obrigatória
+    // entre documentos: a mesma medida nunca pode ter estado diferente de um doc para o outro.
+    const estado = measureStatusLabel(m.score);
+    row.getCell(3).value  = m.title;                                     // C: Medida — mesmo título do doc 4
+    row.getCell(4).value  = estado;                                      // D: Estado
+    row.getCell(5).value  = m.score !== null ? `${m.score}/100` : "Sem dados"; // E: Score
+    row.getCell(6).value  = String(m.gapCount);                          // F: Lacunas
+    row.getCell(8).value  = "[A definir pela equipa]";                   // H: Responsável
+    row.getCell(10).value = "[A definir pela equipa]";                   // J: Prazo
+    row.getCell(11).value = "[A definir pela equipa]";                   // K: Evidência
+    row.commit();
+  });
+
+  const dashboard = wb.getWorksheet("📈 DASHBOARD");
+  if (!dashboard) throw new Error('[Documentos] Folha "📈 DASHBOARD" não encontrada no template');
+  dashboard.getCell("C4").value = `${reportData.overallScore}/100`;
+
+  clearFormulaCache(wb);
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 // ---------------------------------------------------------------------------

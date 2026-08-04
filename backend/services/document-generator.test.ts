@@ -136,6 +136,7 @@ import {
   generateRegistoCncs,
   generateIrp,
   generateRelatorioGestao,
+  generateTracker10Medidas,
   generateRelatorioEnquadramento,
   aggregateRiskGroups,
   preFillPainel,
@@ -1877,6 +1878,143 @@ describe("generateRelatorioGestao — Relatório Executivo para a Gestão", () =
     expect(xml).toContain("assume a responsabilidade de supervisão");
     expect(xml).toContain("não constitui");
     expect(xml).toContain("declaração de conformidade integral");
+  });
+});
+
+// ===========================================================================
+// Tracker das 10 Medidas — generateTracker10Medidas
+// ===========================================================================
+
+describe("generateTracker10Medidas — Tracker das 10 Medidas (.xlsx)", () => {
+  function buildAnswers(overrides: Record<string, "yes" | "partial" | "no" | "na"> = {}) {
+    return NIS2_CONTROLS.map((c) => {
+      const answer = overrides[c.id] ?? "yes";
+      const score  = answer === "yes" ? 100 : answer === "partial" ? 50 : 0;
+      return { controlId: c.id, answer, score };
+    });
+  }
+
+  function mockQuestionnaire(answers: ReturnType<typeof buildAnswers>) {
+    const scores = calculateScores(answers);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: scores.byArticle, completedAt: new Date("2026-07-01"),
+    } as any);
+    vi.mocked(db.getQuestionnaireSessionById).mockResolvedValue({
+      id: 1, organizationId: 1, userId: 1, sector: null, status: "completed",
+      score: String(scores.overall), articleScores: scores.byArticle, answers,
+      completedAt: new Date("2026-07-01"), createdAt: new Date(), updatedAt: new Date(),
+    } as any);
+    return scores;
+  }
+
+  const TRACKER_SETUP = (answers = buildAnswers()) => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, legalName: "Empresa Teste, Lda." } as any);
+    mockQuestionnaire(answers);
+  };
+
+  it("gera as 10 medidas com estado/score/lacunas corretos, campos operacionais '[A definir pela equipa]'", async () => {
+    TRACKER_SETUP();
+    await generateTracker10Medidas(1);
+
+    // Linhas 8-17 = medidas a-j na ordem de buildReportData; colunas: C=3 (medida),
+    // D=4 (estado), E=5 (score), F=6 (lacunas), H=8 (responsável), J=10 (prazo), K=11 (evidência).
+    for (let i = 0; i < 10; i++) {
+      const row = 8 + i;
+      expect(_cellWrites.get(`${row}:3`)).toBeTruthy();
+      expect(_cellWrites.get(`${row}:4`)).toBe("Conforme"); // todas "yes" → 100 → Conforme
+      expect(_cellWrites.get(`${row}:5`)).toBe("100/100");
+      expect(_cellWrites.get(`${row}:6`)).toBe("0");
+      expect(_cellWrites.get(`${row}:8`)).toBe("[A definir pela equipa]");
+      expect(_cellWrites.get(`${row}:10`)).toBe("[A definir pela equipa]");
+      expect(_cellWrites.get(`${row}:11`)).toBe("[A definir pela equipa]");
+    }
+  });
+
+  it("dashboard — score global = overallScore/100", async () => {
+    TRACKER_SETUP();
+    await generateTracker10Medidas(1);
+    expect(_headerWrites.get("C4")).toBe("100/100");
+  });
+
+  it("mistura de respostas → estados corretos por medida (mesmos limiares 80/60 do doc 4)", async () => {
+    const overrides: Record<string, "no" | "partial"> = {};
+    for (const c of NIS2_CONTROLS.filter((c) => c.articleSlug === "b")) overrides[c.id] = "no";
+    const hControls = NIS2_CONTROLS.filter((c) => c.articleSlug === "h");
+    overrides[hControls[0].id] = "partial";
+    overrides[hControls[1].id] = "partial";
+    // hControls[2] fica "yes" — (100+50+50)/3 = 66.7 → round 67 → Parcial (60-79)
+
+    TRACKER_SETUP(buildAnswers(overrides));
+    await generateTracker10Medidas(1);
+
+    // ordem a-j: a=8, b=9, c=10, d=11, e=12, f=13, g=14, h=15, i=16, j=17
+    expect(_cellWrites.get("9:4")).toBe("Em falta"); // b — todo "no" → 0
+    expect(_cellWrites.get("9:5")).toBe("0/100");
+    expect(_cellWrites.get("15:4")).toBe("Parcial"); // h — 67
+    expect(_cellWrites.get("15:5")).toBe("67/100");
+    expect(_cellWrites.get("8:4")).toBe("Conforme"); // a — inalterado, 100
+  });
+
+  it("coerência com o doc 4 — a mesma medida tem o MESMO estado no Tracker e no Relatório de Gestão", async () => {
+    const overrides: Record<string, "no" | "partial"> = {};
+    const hControls = NIS2_CONTROLS.filter((c) => c.articleSlug === "h");
+    overrides[hControls[0].id] = "partial";
+    overrides[hControls[1].id] = "partial";
+    const answers = buildAnswers(overrides);
+
+    TRACKER_SETUP(answers);
+    await generateTracker10Medidas(1);
+    const trackerEstadoH = _cellWrites.get("15:4"); // h = linha 15
+
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION, classification: "importante",
+      answers: { "A.setor": "industria", "C.estrutura": "autonoma", "D.n": "80", "D.vn": "12000000", "D.b": "5000000" },
+    } as any);
+    vi.mocked(db.getScanById).mockResolvedValue({
+      id: 1, organizationId: 1, status: "completed", completedAt: new Date("2026-07-15"),
+      results: { criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0 },
+    } as any);
+    await generateRelatorioGestao(1, 1);
+    const medidaH = (_psiRenderArgs!.medidas as any[]).find((m) => m.slug_maiusc === "H");
+
+    expect(trackerEstadoH).toBe("Parcial");
+    expect(medidaH.estado).toBe("Parcial");
+    expect(trackerEstadoH).toBe(medidaH.estado);
+  });
+
+  it("precondição: sem questionário completo → erro claro", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...FAKE_ORG, legalName: "Empresa Teste, Lda." } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
+
+    await expect(generateTracker10Medidas(1)).rejects.toThrow(
+      "[Documentos] Não é possível gerar o Tracker das 10 Medidas. Complete primeiro o questionário de autoavaliação."
+    );
+  });
+
+  it("referência auto-gerada TRACKER-{ano}-{orgId com 6 dígitos} + data no cabeçalho", async () => {
+    vi.setSystemTime(new Date("2026-08-04"));
+    TRACKER_SETUP();
+    await generateTracker10Medidas(42);
+    const g3 = _headerWrites.get("G3") as string;
+    expect(g3).toContain("TRACKER-2026-000042");
+    expect(g3).toContain("04/08/2026");
+  });
+
+  it("isolamento — getOrganizationById/getLatestCompletedQuestionnaireForOrg chamados com o MESMO orgId, nunca outro", async () => {
+    TRACKER_SETUP();
+    await generateTracker10Medidas(7);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestCompletedQuestionnaireForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
+  });
+
+  it("guard de template em falta lança erro claro com nome do ficheiro xlsx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateTracker10Medidas(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: tracker-10-medidas-template.xlsx"
+    );
   });
 });
 

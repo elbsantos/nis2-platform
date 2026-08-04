@@ -110,6 +110,14 @@ export const documentsRouter = router({
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
     }),
 
+  tracker10Medidas: freeProcedure
+    .query(async ({ ctx }) => {
+      const { generateTracker10Medidas } = await import("../services/document-generator");
+      const buffer   = await generateTracker10Medidas(ctx.org.id);
+      const filename = `Tracker_10_Medidas_${slugify(ctx.org.name)}_${isoDate(new Date())}.xlsx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.xlsx };
+    }),
+
   relatorioEnquadramento: freeProcedure
     .input(z.object({ assessmentId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
