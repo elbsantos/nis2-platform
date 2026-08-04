@@ -125,6 +125,10 @@ function severityColor(s: string): string {
 function severityLabel(s: string): string {
   return { critical: "Crítica", high: "Alta", medium: "Média", low: "Baixa" }[s] ?? s;
 }
+/** Prazo de resolução recomendado por severidade — fonte única, reutilizada pelo Tracker de Patches. */
+export const DEADLINE_BY_SEVERITY: Record<string, string> = {
+  critical: "24–72 horas", high: "7 dias", medium: "30 dias", low: "90 dias",
+};
 function cvssColor(v: number): string {
   if (v >= 9) return C.critical;
   if (v >= 7) return C.high;
@@ -348,9 +352,7 @@ export async function buildExecutiveReport(
     if (topGroups.length > 0) {
       execEnsure(40);
       y = drawSectionTitle(doc, "Prioridades Imediatas", y);
-      const deadlineMap: Record<string, string> = {
-        critical: "24–72 horas", high: "7 dias", medium: "30 dias", low: "90 dias",
-      };
+      const deadlineMap = DEADLINE_BY_SEVERITY;
       topGroups.forEach(g => {
         const sColor   = severityColor(g.topSeverity);
         const sshT     = g.service.match(/^SSH \(OpenSSH_(\S+)/i);
