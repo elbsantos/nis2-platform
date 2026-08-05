@@ -55,10 +55,13 @@ import { executeAgentlessScan, verifyOwnership } from "./scan-executor";
 import { lookupHost as shodanLookup } from "../integrations/shodan";
 import { lookupHost as censysLookup } from "../integrations/censys";
 import { checkHttpHeaders } from "../integrations/http-headers";
+import { checkEmailSecurity } from "../integrations/email-security";
+import { checkDarkWeb } from "../integrations/dark-web";
+import { checkDirectTls } from "../integrations/direct-tls";
 import { batchLookupCveVersionRanges, isVersionInNvdRanges } from "../integrations/nvd";
 import { checkSsh } from "../integrations/ssh-check";
 import { resolveTxt } from "dns/promises";
-import { updateScanStatus } from "../db";
+import { updateScanStatus, createVulnerability } from "../db";
 
 describe("verifyOwnership", () => {
   beforeEach(() => {
@@ -954,5 +957,188 @@ describe("executeAgentlessScan", () => {
     expect(indetLogs).toHaveLength(1);
     expect(indetLogs[0][0]).toContain("INDETERMINADO");
     consoleSpy.mockRestore();
+  });
+
+  // -------------------------------------------------------------------------
+  // Persistência dos 7 tipos de achados sintéticos (correção do corte 117 vs 110)
+  // -------------------------------------------------------------------------
+
+  it("PERSISTÊNCIA COMPLETA — NIS2-SVC-UNKNOWN, NIS2-TLS-001, CVE real e CVE SSH são todos persistidos com a severidade correta", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: ["example.com"], tags: [], cpes: [], vulns: [],
+      ports: [
+        // Porta 80: versão conhecida + CVE real confirmado pelo NVD — também dispara
+        // NIS2-TLS-001 (HTTP presente, 443 ausente).
+        { port: 80, transport: "tcp", product: "nginx", version: "1.20.0",
+          vulns: { "CVE-2021-1234": { cvss: 7.5, summary: "Buffer overflow", references: [] } } },
+        // Porta 8080: tem CVE mas SEM versão detetável em lado nenhum → NIS2-SVC-UNKNOWN.
+        { port: 8080, transport: "tcp",
+          vulns: { "CVE-2020-9999": { cvss: 6.0, summary: "desc", references: [] } } },
+        // Porta 22: dispara o checkSsh (mockado abaixo) → CVE real de SSH.
+        { port: 22, transport: "tcp", product: "OpenSSH", version: "7.4" },
+      ],
+    } as any);
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "1.2.3.4", services: [], tlsIssues: [] });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [], score: 50, url: "http://example.com",
+    });
+    vi.mocked(checkEmailSecurity).mockResolvedValue({ checks: [], score: 100 });
+    vi.mocked(checkDarkWeb).mockResolvedValue({
+      breachesFound: 0, breaches: [], hasPasswordExposure: false, blacklists: [], score: 100, hibpEnabled: false,
+    });
+    vi.mocked(checkDirectTls).mockResolvedValue(null as any); // catch(()=>null) no scan-executor cobre isto
+
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(new Map([
+      ["CVE-2021-1234", {
+        cveId: "CVE-2021-1234", hasRangeData: true, affectedProducts: ["nginx:nginx"],
+        ranges: [{ versionStartIncluding: "1.0.0", versionEndExcluding: "2.0.0" }],
+      }],
+    ]) as any);
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    vi.mocked(checkSsh).mockResolvedValue({
+      port: 22, banner: "SSH-2.0-OpenSSH_7.4", software: "OpenSSH_7.4", version: "7.4",
+      vulns: [{
+        cveId: "CVE-2018-15473", cvssScore: 5.3, severity: "medium",
+        description: "Enumeração de utilizadores via timing attack",
+        nis2Articles: ["Art. 21(2)(h)"], cisControls: [], iso27001Controls: [], nistCsfControls: [],
+        remediationHint: "Atualiza o OpenSSH para a versão mais recente.",
+      }],
+    });
+
+    const result = await executeAgentlessScan({ scanId: 1, organizationId: 1, target: "example.com", mode: "sme" });
+    expect(result.success).toBe(true);
+
+    const persistCalls = vi.mocked(createVulnerability).mock.calls.map((c) => c[0] as any);
+    const persistedCveIds = persistCalls.map((p) => p.cveId);
+
+    // Não-regressão: os 2 tipos já persistidos antes desta correção continuam a persistir.
+    expect(persistedCveIds).toContain("CVE-2021-1234");
+    expect(persistedCveIds).toContain("CVE-2018-15473");
+    // Os 2 tipos novos verificados neste teste (os outros 5 estão no teste seguinte).
+    expect(persistedCveIds).toContain("NIS2-SVC-UNKNOWN");
+    expect(persistedCveIds).toContain("NIS2-TLS-001");
+
+    const svcUnknownCall = persistCalls.find((p) => p.cveId === "NIS2-SVC-UNKNOWN")!;
+    expect(svcUnknownCall.severity).toBe("medium");
+    expect(svcUnknownCall.cvssScore).toBe(5.0);
+    expect(svcUnknownCall.port).toBe(8080); // port incluído — pedido explícito desta correção
+    expect(svcUnknownCall.scanId).toBe(1);
+    expect(svcUnknownCall.organizationId).toBe(1);
+
+    const tls001Call = persistCalls.find((p) => p.cveId === "NIS2-TLS-001")!;
+    expect(tls001Call.severity).toBe("high");
+    expect(tls001Call.cvssScore).toBe(7.5);
+
+    // O nº de linhas persistidas bate com o nº de vulnerabilidades no array final (sem duplicados
+    // neste cenário) — prova direta de que a tabela deixa de estar incompleta face ao ecrã.
+    expect(persistCalls.length).toBe(result.vulnerabilities.length);
+    expect(result.vulnerabilities.map((v) => v.cveId).sort()).toEqual(
+      ["CVE-2018-15473", "CVE-2021-1234", "NIS2-SVC-UNKNOWN", "NIS2-TLS-001"].sort()
+    );
+  });
+
+  it("PERSISTÊNCIA COMPLETA — NIS2-EMAIL, NIS2-HEADER, NIS2-BREACH, NIS2-BLACKLIST e certificado TLS são todos persistidos com a severidade correta", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: ["example.com"], tags: [], cpes: [], vulns: [],
+      // Porta 443 com versão conhecida e sem CVEs — não dispara SVC-UNKNOWN nem TLS-001,
+      // mantém este teste focado nos outros 5 tipos.
+      ports: [{ port: 443, transport: "tcp", product: "nginx", version: "1.20.0" }],
+    } as any);
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "1.2.3.4", services: [], tlsIssues: [] });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({
+      checks: [{ name: "HSTS", status: "fail", detail: "HSTS ausente", nis2Article: "Art. 21(2)(h)" }],
+      score: 50, url: "https://example.com",
+    });
+    vi.mocked(checkEmailSecurity).mockResolvedValue({
+      checks: [{ name: "DMARC", status: "fail", detail: "DMARC ausente", nis2Article: "Art. 21(2)(b)" }],
+      score: 50,
+    });
+    vi.mocked(checkDarkWeb).mockResolvedValue({
+      breachesFound: 1,
+      breaches: [{ name: "ExampleBreach", dataClasses: ["emails", "passwords"], hasPasswords: true }],
+      hasPasswordExposure: true,
+      blacklists: [{ name: "Spamhaus", listed: true, detail: "Listado em Spamhaus DBL" }],
+      score: 40, hibpEnabled: true,
+    });
+    vi.mocked(checkDirectTls).mockResolvedValue({
+      accessible: true, certificate: null,
+      tlsIssues: [{
+        issue: "Certificado TLS expirado há 5 dias", cvssScore: 8.0, severity: "high",
+        nis2Article: "Art. 21(2)(h)",
+      }],
+      ports: [], cdn: { detected: false, provider: null, isProtected: false },
+    });
+
+    vi.mocked(batchLookupCveVersionRanges).mockResolvedValue(new Map() as any);
+    vi.mocked(isVersionInNvdRanges).mockReturnValue(true);
+
+    const result = await executeAgentlessScan({ scanId: 1, organizationId: 1, target: "example.com", mode: "sme" });
+    expect(result.success).toBe(true);
+
+    const persistCalls = vi.mocked(createVulnerability).mock.calls.map((c) => c[0] as any);
+    const persistedCveIds = persistCalls.map((p) => p.cveId);
+
+    expect(persistedCveIds).toContain("NIS2-EMAIL-DMARC");
+    expect(persistedCveIds).toContain("NIS2-HEADER-HSTS");
+    expect(persistedCveIds).toContain("NIS2-BREACH-EXAMPLEBREACH");
+    expect(persistedCveIds).toContain("NIS2-BLACKLIST-SPAMHAUS");
+    expect(persistedCveIds).toContain("NIS2-TLS-443-CERT-EXPIRED");
+
+    const emailCall = persistCalls.find((p) => p.cveId === "NIS2-EMAIL-DMARC")!;
+    expect(emailCall.severity).toBe("high");
+    expect(emailCall.cvssScore).toBe(7.0);
+
+    const headerCall = persistCalls.find((p) => p.cveId === "NIS2-HEADER-HSTS")!;
+    expect(headerCall.severity).toBe("medium");
+    expect(headerCall.cvssScore).toBe(6.5);
+
+    const breachCall = persistCalls.find((p) => p.cveId === "NIS2-BREACH-EXAMPLEBREACH")!;
+    expect(breachCall.severity).toBe("high"); // hasPasswords=true
+    expect(breachCall.cvssScore).toBe(8.5);
+
+    const blacklistCall = persistCalls.find((p) => p.cveId === "NIS2-BLACKLIST-SPAMHAUS")!;
+    expect(blacklistCall.severity).toBe("high");
+    expect(blacklistCall.cvssScore).toBe(7.0);
+
+    const tlsCertCall = persistCalls.find((p) => p.cveId === "NIS2-TLS-443-CERT-EXPIRED")!;
+    expect(tlsCertCall.severity).toBe("high");
+    expect(tlsCertCall.cvssScore).toBe(8.0);
+    expect(tlsCertCall.port).toBe(443);
+
+    expect(persistCalls.length).toBe(result.vulnerabilities.length);
+  });
+
+  it("falha ao persistir UM achado não aborta o scan — .catch não-fatal preservado; scan.results inalterado", async () => {
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: ["example.com"], tags: [], cpes: [], vulns: [],
+      ports: [
+        { port: 80, transport: "tcp",
+          vulns: { "CVE-2020-9999": { cvss: 6.0, summary: "desc", references: [] } } }, // SVC-UNKNOWN
+      ],
+    } as any);
+    vi.mocked(censysLookup).mockResolvedValue({ ip: "1.2.3.4", services: [], tlsIssues: [] });
+    vi.mocked(checkHttpHeaders).mockResolvedValue({ checks: [], score: 50, url: "http://example.com" });
+    vi.mocked(checkEmailSecurity).mockResolvedValue({ checks: [], score: 100 });
+    vi.mocked(checkDarkWeb).mockResolvedValue({
+      breachesFound: 0, breaches: [], hasPasswordExposure: false, blacklists: [], score: 100, hibpEnabled: false,
+    });
+    vi.mocked(checkDirectTls).mockResolvedValue(null as any); // catch(()=>null) no scan-executor cobre isto
+
+    // A PRIMEIRA chamada a createVulnerability falha — simula uma persistência que rejeita.
+    vi.mocked(createVulnerability).mockRejectedValueOnce(new Error("DB indisponível"));
+
+    const result = await executeAgentlessScan({ scanId: 1, organizationId: 1, target: "example.com", mode: "sme" });
+
+    // O scan continua e completa, apesar da falha de UMA persistência.
+    expect(result.success).toBe(true);
+    const completedCall = vi.mocked(updateScanStatus).mock.calls.find((c) => c[1] === "completed");
+    expect(completedCall).toBeDefined();
+    // O achado continua no array em memória / scan.results mesmo que a sua persistência
+    // específica na tabela tenha falhado — scan.results não depende da persistência ter sucesso.
+    expect(result.vulnerabilities.some((v) => v.cveId === "NIS2-SVC-UNKNOWN")).toBe(true);
   });
 });

@@ -691,18 +691,33 @@ export async function executeAgentlessScan(
         const svcName = portFinding.service !== "unknown" ? portFinding.service : `serviço na porta ${portFinding.port}`;
         console.log(`[CVE filter] Porto ${portFinding.port}: versão desconhecida com ${portFinding.cves.length} CVEs → NIS2-SVC-UNKNOWN`);
         const nis2Unknown = ["Art. 21(2)(e)"];
-        vulns.push({
-          cveId: "NIS2-SVC-UNKNOWN",
-          cvssScore: 5.0,
-          severity: cvssToSeverity(5.0),
-          description: `${svcName} (porto ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`,
-          affectedService: portFinding.service,
-          nis2Articles: nis2Unknown,
-          cisControls:      getCisControls("NIS2-SVC-UNKNOWN", nis2Unknown),
-          iso27001Controls: getIso27001Controls("NIS2-SVC-UNKNOWN", nis2Unknown),
-          nistCsfControls:  getNistCsfControls("NIS2-SVC-UNKNOWN", nis2Unknown),
-          remediationHint: `Identifica a versão do ${svcName} e actualiza para eliminar as vulnerabilidades conhecidas.`,
-        });
+        {
+          const svcUnknownDescription = `${svcName} (porto ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`;
+          const svcUnknownRemediation = `Identifica a versão do ${svcName} e actualiza para eliminar as vulnerabilidades conhecidas.`;
+          vulns.push({
+            cveId: "NIS2-SVC-UNKNOWN",
+            cvssScore: 5.0,
+            severity: cvssToSeverity(5.0),
+            description: svcUnknownDescription,
+            affectedService: portFinding.service,
+            nis2Articles: nis2Unknown,
+            cisControls:      getCisControls("NIS2-SVC-UNKNOWN", nis2Unknown),
+            iso27001Controls: getIso27001Controls("NIS2-SVC-UNKNOWN", nis2Unknown),
+            nistCsfControls:  getNistCsfControls("NIS2-SVC-UNKNOWN", nis2Unknown),
+            remediationHint: svcUnknownRemediation,
+          });
+          await createVulnerability({
+            scanId: options.scanId,
+            organizationId: options.organizationId,
+            cveId: "NIS2-SVC-UNKNOWN",
+            severity: cvssToSeverity(5.0),
+            cvssScore: 5.0,
+            description: svcUnknownDescription,
+            affectedComponent: portFinding.service,
+            port: portFinding.port,
+            remediation: svcUnknownRemediation,
+          }).catch((e) => console.error("[Scanner] DB persist error for NIS2-SVC-UNKNOWN:", e));
+        }
         continue;
       }
 
@@ -836,6 +851,16 @@ export async function executeAgentlessScan(
         nistCsfControls:  getNistCsfControls("NIS2-TLS-001", tlsNis2),
         remediationHint: "Instala certificado TLS (Let's Encrypt gratuito) e redireciona HTTP → HTTPS.",
       });
+      await createVulnerability({
+        scanId: options.scanId,
+        organizationId: options.organizationId,
+        cveId: "NIS2-TLS-001",
+        severity: cvssToSeverity(7.5),
+        cvssScore: 7.5,
+        description: "Serviço HTTP sem HTTPS — dados transmitidos em claro",
+        affectedComponent: "http",
+        remediation: "Instala certificado TLS (Let's Encrypt gratuito) e redireciona HTTP → HTTPS.",
+      }).catch((e) => console.error("[Scanner] DB persist error for NIS2-TLS-001:", e));
     }
 
     // ── 5b. SSH version check — quando porto 22 está aberto ───────────────
@@ -923,6 +948,16 @@ export async function executeAgentlessScan(
             nistCsfControls:  check.nistCsfControls  ?? getNistCsfControls(cveId, [check.nis2Article]),
             remediationHint: `Configura ${check.name} no DNS do domínio ${options.target}.`,
           });
+          await createVulnerability({
+            scanId: options.scanId,
+            organizationId: options.organizationId,
+            cveId,
+            severity: cvssToSeverity(cvssScore),
+            cvssScore,
+            description: check.detail,
+            affectedComponent: "email",
+            remediation: `Configura ${check.name} no DNS do domínio ${options.target}.`,
+          }).catch((e) => console.error(`[Scanner] DB persist error for ${cveId}:`, e));
           // Não adicionar extraDeduction: a vuln já deduz pelo cvssScore — evita dupla contagem.
         } else if (check.status === "warn") {
           extraDeductions.push({ article: check.nis2Article, finding: `${check.name} (aviso): ${check.detail}`, deduction: 8 });
@@ -948,6 +983,16 @@ export async function executeAgentlessScan(
             nistCsfControls:  check.nistCsfControls  ?? getNistCsfControls(cveId, [check.nis2Article]),
             remediationHint: `Adiciona o header ${check.name} na configuração do servidor web.`,
           });
+          await createVulnerability({
+            scanId: options.scanId,
+            organizationId: options.organizationId,
+            cveId,
+            severity: cvssToSeverity(cvssScore),
+            cvssScore,
+            description: check.detail,
+            affectedComponent: "http",
+            remediation: `Adiciona o header ${check.name} na configuração do servidor web.`,
+          }).catch((e) => console.error(`[Scanner] DB persist error for ${cveId}:`, e));
           // Não adicionar extraDeduction: a vuln já deduz pelo cvssScore — evita dupla contagem.
         } else if (check.status === "warn") {
           extraDeductions.push({ article: check.nis2Article, finding: `${check.name} (aviso): ${check.detail}`, deduction: 4 });
@@ -967,18 +1012,30 @@ export async function executeAgentlessScan(
         // Um breach mapeia para (i) controlo de acessos.
         // Para passwords, extra warn em (j) autenticação — sem criar vuln duplicada.
         const breachNis2 = ["Art. 21(2)(i)"];
+        const breachDescription = `Credenciais da organização expostas no breach "${breach.name}" — dados: ${breach.dataClasses.join(", ")}.`;
+        const breachRemediation = `Força o reset de passwords afectadas pelo breach "${breach.name}" e activa MFA em todas as contas.`;
         vulns.push({
           cveId,
           cvssScore,
           severity: cvssToSeverity(cvssScore),
-          description: `Credenciais da organização expostas no breach "${breach.name}" — dados: ${breach.dataClasses.join(", ")}.`,
+          description: breachDescription,
           affectedService: "credentials",
           nis2Articles: breachNis2,
           cisControls:      getCisControls(cveId, breachNis2),
           iso27001Controls: getIso27001Controls(cveId, breachNis2),
           nistCsfControls:  getNistCsfControls(cveId, breachNis2),
-          remediationHint: `Força o reset de passwords afectadas pelo breach "${breach.name}" e activa MFA em todas as contas.`,
+          remediationHint: breachRemediation,
         });
+        await createVulnerability({
+          scanId: options.scanId,
+          organizationId: options.organizationId,
+          cveId,
+          severity: cvssToSeverity(cvssScore),
+          cvssScore,
+          description: breachDescription,
+          affectedComponent: "credentials",
+          remediation: breachRemediation,
+        }).catch((e) => console.error(`[Scanner] DB persist error for ${cveId}:`, e));
         // Não adicionar extraDeduction para (i): a vuln já deduz — evita dupla contagem.
         if (breach.hasPasswords) {
           extraDeductions.push({
@@ -991,20 +1048,32 @@ export async function executeAgentlessScan(
       for (const bl of darkWeb.blacklists) {
         if (bl.listed) {
           const cveId = `NIS2-BLACKLIST-${bl.name.replace(/[^A-Z0-9]/gi, "").toUpperCase()}`;
+          const blacklistAffected = isIpAddress(options.target) ? "network" : "domain";
+          const blacklistRemediation = `Investiga o compromisso que colocou o ${isIpAddress(options.target) ? "IP" : "domínio"} na lista negra ${bl.name} e solicita remoção após resolução.`;
           vulns.push({
             cveId,
             cvssScore: 7.0,
             severity: cvssToSeverity(7.0),
             description: bl.detail,
-            affectedService: isIpAddress(options.target) ? "network" : "domain",
+            affectedService: blacklistAffected,
             // Lista negra = indicador de comprometimento → (i) controlo de acessos.
             // (g) é não-scannável; não mapear para ela por scan externo.
             nis2Articles: ["Art. 21(2)(i)"],
             cisControls: getCisControls(cveId, ["Art. 21(2)(i)"]),
             iso27001Controls: getIso27001Controls(cveId, ["Art. 21(2)(i)"]),
             nistCsfControls: getNistCsfControls(cveId, ["Art. 21(2)(i)"]),
-            remediationHint: `Investiga o compromisso que colocou o ${isIpAddress(options.target) ? "IP" : "domínio"} na lista negra ${bl.name} e solicita remoção após resolução.`,
+            remediationHint: blacklistRemediation,
           });
+          await createVulnerability({
+            scanId: options.scanId,
+            organizationId: options.organizationId,
+            cveId,
+            severity: cvssToSeverity(7.0),
+            cvssScore: 7.0,
+            description: bl.detail,
+            affectedComponent: blacklistAffected,
+            remediation: blacklistRemediation,
+          }).catch((e) => console.error(`[Scanner] DB persist error for ${cveId}:`, e));
           // Vuln já deduz pelo cvssScore; sem extraDeduction extra para (i).
         }
       }
@@ -1016,7 +1085,19 @@ export async function executeAgentlessScan(
     // causa do score baixar. Os IDs são estáveis (porto+condição) — o dedup abaixo
     // elimina duplicados se Censys e direct-tls reportarem a mesma condição.
     for (const tls of tlsIssues) {
-      vulns.push(tlsIssueToVulnFinding(tls));
+      const tlsVuln = tlsIssueToVulnFinding(tls);
+      vulns.push(tlsVuln);
+      await createVulnerability({
+        scanId: options.scanId,
+        organizationId: options.organizationId,
+        cveId: tlsVuln.cveId,
+        severity: tlsVuln.severity,
+        cvssScore: tlsVuln.cvssScore,
+        description: tlsVuln.description,
+        affectedComponent: tlsVuln.affectedService,
+        port: tlsVuln.port,
+        remediation: tlsVuln.remediationHint,
+      }).catch((e) => console.error(`[Scanner] DB persist error for ${tlsVuln.cveId}:`, e));
     }
 
     // ── 8. Calculate NIS2 scores ───────────────────────────────────────────
