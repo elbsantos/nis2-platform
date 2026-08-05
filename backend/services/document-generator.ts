@@ -407,11 +407,14 @@ export async function generatePsi(orgId: number): Promise<Buffer> {
     empresa:          cell(org.legalName ?? org.name, "[A PREENCHER: nome da empresa]"),
     nif:              cell(org.taxId,                  "[A PREENCHER: NIF]"),
     versao:           "1.0",
-    data_aprovacao:   "[A PREENCHER]",
-    aprovado_por:     "[A PREENCHER]",
-    cargo:            "[A PREENCHER]",
+    // Datas/nomes de aprovação são ATOS FUTUROS da própria empresa (a gestão ainda não assinou
+    // nem aprovou este documento) — não dados em falta do perfil. Mesmo tratamento das colunas
+    // operacionais do Tracker das 10 Medidas/Tracker de Patches: "[A definir pela equipa]".
+    data_aprovacao:   "[A definir pela equipa]",
+    aprovado_por:     "[A definir pela equipa]",
+    cargo:            "[A definir pela equipa]",
     ciso_nome:        cell(org.securityOfficerName,    "[A PREENCHER: responsável de segurança]"),
-    data_revisao:     "[A PREENCHER]",
+    data_revisao:     "[A definir pela equipa]",
     proxima_revisao:  formatDate(proximaRevisao),
   };
 

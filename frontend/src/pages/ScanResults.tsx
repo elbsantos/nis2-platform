@@ -396,11 +396,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     { scanId },
     { enabled: false, retry: false }
   );
-  // "psi" (Política de Segurança) fica escondida na UI: generatePsi tem 4 campos
-  // hard-coded como "[A PREENCHER]" (data_aprovacao, aprovado_por, cargo,
-  // data_revisao) — sai sempre incompleta, independentemente do perfil. O gerador
-  // e o endpoint continuam intactos; reactivar o botão quando migrar para o
-  // modelo novo (fonte desses campos no perfil ou noutro sítio).
+  const psi = trpc.documents.psi.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
   const cartaCiso = trpc.documents.cartaCiso.useQuery(
     undefined,
     { enabled: false, retry: false }
@@ -463,6 +462,14 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
             const r = await patchTracker.refetch();
             // Gera sempre, mesmo com 0 vulnerabilidades (scan limpo) — por isso fica fora
             // do gate eligibleCount>0 dos outros 2 documentos deste scan.
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Política de Segurança da Informação (.docx)"
+          onDownload={async () => {
+            const r = await psi.refetch();
             if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}

@@ -1125,13 +1125,33 @@ describe("generatePsi — PSI auto-preenchida (C17)", () => {
     expect(_psiRenderArgs!.proxima_revisao).toBe("15/03/2026");
   });
 
-  it("campos manuais ficam com placeholder '[A PREENCHER]'", async () => {
+  it("campos de aprovação (atos futuros da empresa) ficam com '[A definir pela equipa]', NUNCA '[A PREENCHER]'", async () => {
     PSI_SETUP();
     await generatePsi(1);
-    expect(_psiRenderArgs!.data_aprovacao).toBe("[A PREENCHER]");
-    expect(_psiRenderArgs!.aprovado_por).toBe("[A PREENCHER]");
-    expect(_psiRenderArgs!.cargo).toBe("[A PREENCHER]");
-    expect(_psiRenderArgs!.data_revisao).toBe("[A PREENCHER]");
+    expect(_psiRenderArgs!.data_aprovacao).toBe("[A definir pela equipa]");
+    expect(_psiRenderArgs!.aprovado_por).toBe("[A definir pela equipa]");
+    expect(_psiRenderArgs!.cargo).toBe("[A definir pela equipa]");
+    expect(_psiRenderArgs!.data_revisao).toBe("[A definir pela equipa]");
+
+    // Nenhum destes 4 deve conter a string "A PREENCHER" — são atos futuros da
+    // empresa (aprovação/revisão), não dados em falta do perfil.
+    for (const tag of ["data_aprovacao", "aprovado_por", "cargo", "data_revisao"]) {
+      expect((_psiRenderArgs as any)[tag]).not.toContain("A PREENCHER");
+    }
+  });
+
+  it("perfil completo → PSI sai com ZERO '[A PREENCHER]' (só os 4 campos de aprovação, com '[A definir pela equipa]')", async () => {
+    PSI_SETUP({
+      legalName: "Empresa Teste, Lda.",
+      taxId: "PT509123456",
+      securityOfficerName: "Ana Costa",
+    });
+    await generatePsi(1);
+
+    for (const [tag, v] of Object.entries(_psiRenderArgs!)) {
+      expect(String(v), `tag "${tag}" não deveria conter "A PREENCHER" com perfil completo`)
+        .not.toContain("A PREENCHER");
+    }
   });
 
   it("nenhum valor é null, undefined, 'None' ou 'null'", async () => {
