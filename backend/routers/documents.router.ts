@@ -157,4 +157,12 @@ export const documentsRouter = router({
       const filename = `Enquadramento_NIS2_${slugify(ctx.org.name)}_${isoDate(new Date())}.docx`;
       return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.docx };
     }),
+
+  dossier: freeProcedure
+    .query(async ({ ctx }) => {
+      const { generateDossier } = await import("../services/document-generator");
+      const buffer   = await generateDossier(ctx.org.id);
+      const filename = `Dossier_Conformidade_NIS2_${slugify(ctx.org.name)}_${isoDate(new Date())}.xlsx`;
+      return { fileBase64: buffer.toString("base64"), filename, contentType: CONTENT_TYPES.xlsx };
+    }),
 });

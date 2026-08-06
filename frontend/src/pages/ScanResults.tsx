@@ -428,6 +428,10 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
     { scanId },
     { enabled: false, retry: false }
   );
+  const dossier = trpc.documents.dossier.useQuery(
+    undefined,
+    { enabled: false, retry: false }
+  );
 
   return (
     <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
@@ -524,6 +528,16 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
           label="Declaração de MFA — Autoavaliação (.docx)"
           onDownload={async () => {
             const r = await declaracaoMfa.refetch();
+            if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+            return r.data;
+          }}
+        />
+        <DocButton
+          label="Dossier de Conformidade — Índice Mestre (.xlsx)"
+          onDownload={async () => {
+            const r = await dossier.refetch();
+            // Trava exige perfil + enquadramento + questionário + scan — a mensagem
+            // real do servidor lista tudo o que falta de uma vez.
             if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}

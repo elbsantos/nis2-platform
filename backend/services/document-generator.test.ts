@@ -119,6 +119,7 @@ vi.mock("../db", () => ({
   getLatestFrameworkAssessmentByOrgId: vi.fn(),
   getLatestCompletedQuestionnaireForOrg: vi.fn(),
   getQuestionnaireSessionById:         vi.fn(),
+  getLatestCompletedScanForOrg:        vi.fn(),
 }));
 
 vi.mock("./ai-remediation", () => ({
@@ -141,6 +142,9 @@ import {
   generateDeclaracaoMfa,
   generatePatchTracker,
   generateRelatorioEnquadramento,
+  generateDossier,
+  isProfileComplete,
+  getMissingProfileFields,
   aggregateRiskGroups,
   preFillPainel,
   CONTENT_TYPES,
@@ -2699,5 +2703,193 @@ describe("generateRelatorioEnquadramento — textos por coverageState (C-EQ15)",
     expect(_psiRenderArgs!.isFora).toBe(true);
     expect(_psiRenderArgs!.provavel).toBe(false);
     expect(_psiRenderArgs!.emVigorTexto).toContain("não são exigíveis a esta organização");
+  });
+});
+
+// ===========================================================================
+// isProfileComplete / getMissingProfileFields — perfil completo (Opção A)
+// ===========================================================================
+
+describe("isProfileComplete / getMissingProfileFields — perfil completo (Opção A)", () => {
+  const COMPLETE_ORG_FIELDS = {
+    legalName: "Empresa Teste, Lda.",
+    taxId: "PT509123456",
+    address: "Rua Exemplo, 123",
+    caeCode: "62010",
+    legalRepresentative: "João Silva",
+    legalRepresentativeRole: "Gerente",
+    securityOfficerName: "Ana Costa",
+    securityOfficerTaxId: "123456789",
+    securityOfficerRole: "CISO",
+    securityOfficerStartDate: "2024-01-01",
+    securityOfficerEmail: "ana@empresa.pt",
+    securityOfficerPhone: "912345678",
+    city: "Lisboa",
+    ceoName: "Carlos Mendes",
+    ceoContact: "ceo@empresa.pt",
+  };
+
+  it("perfil com os 15 campos preenchidos → true, sem campos em falta", () => {
+    expect(isProfileComplete(COMPLETE_ORG_FIELDS)).toBe(true);
+    expect(getMissingProfileFields(COMPLETE_ORG_FIELDS)).toEqual([]);
+  });
+
+  it("perfil sem CISO (securityOfficerName) → incompleto, lista o campo", () => {
+    const org = { ...COMPLETE_ORG_FIELDS, securityOfficerName: null };
+    expect(isProfileComplete(org)).toBe(false);
+    expect(getMissingProfileFields(org)).toContain("nome do CISO");
+  });
+
+  it("perfil com vários campos em falta → lista TODOS de uma vez, não só o primeiro", () => {
+    const org = { ...COMPLETE_ORG_FIELDS, taxId: null, ceoName: "", city: undefined };
+    const missing = getMissingProfileFields(org);
+    expect(missing).toContain("NIF");
+    expect(missing).toContain("nome do CEO");
+    expect(missing).toContain("localidade");
+    expect(missing).toHaveLength(3);
+  });
+
+  it("campos opcionais (countriesOfOperation/employeeCount/annualTurnover) NÃO afetam a completude", () => {
+    const org = { ...COMPLETE_ORG_FIELDS, countriesOfOperation: [], employeeCount: null, annualTurnover: null };
+    expect(isProfileComplete(org)).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Dossier de Conformidade NIS2 — generateDossier (6º e último documento)
+// ===========================================================================
+
+describe("generateDossier — Dossier de Conformidade NIS2 (Índice Mestre)", () => {
+  const COMPLETE_ORG = {
+    ...FAKE_ORG,
+    legalName: "Empresa Teste, Lda.",
+    taxId: "PT509123456",
+    address: "Rua Exemplo, 123",
+    caeCode: "62010",
+    legalRepresentative: "João Silva",
+    legalRepresentativeRole: "Gerente",
+    securityOfficerName: "Ana Costa",
+    securityOfficerTaxId: "123456789",
+    securityOfficerRole: "CISO",
+    securityOfficerStartDate: "2024-01-01",
+    securityOfficerEmail: "ana@empresa.pt",
+    securityOfficerPhone: "912345678",
+    city: "Lisboa",
+    ceoName: "Carlos Mendes",
+    ceoContact: "ceo@empresa.pt",
+  };
+
+  const DOSSIER_SETUP_OK = () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(COMPLETE_ORG as any);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION, classification: "importante",
+    } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: {}, completedAt: new Date("2026-07-01"),
+    } as any);
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
+      id: 1, organizationId: 1, status: "completed", completedAt: new Date("2026-07-15"),
+    } as any);
+  };
+
+  it("as 4 fontes completas → os 28 estados corretos (11 disponível / 15 empresa / 2 N/A), zero chavetas", async () => {
+    DOSSIER_SETUP_OK();
+    await generateDossier(1);
+
+    // Amostra: D01 disponível, D04 empresa, D23 N/A, D28 disponível
+    expect(_cellWrites.get("10:5")).toBe("✅ Disponível na plataforma"); // D01
+    expect(_cellWrites.get("13:5")).toBe("🔴 A cargo da empresa");       // D04
+    expect(_cellWrites.get("37:5")).toBe("— N/A");                       // D23
+    expect(_cellWrites.get("43:5")).toBe("✅ Disponível na plataforma"); // D28
+
+    // Contagem completa dos 28 — tem de bater exatamente 11/15/2.
+    const allRows = [10,11,12,13,14, 16,17,18, 20,21,22,23, 25,26,27,28,29, 31,32,33, 35,36,37,38, 40,41,42,43];
+    expect(allRows).toHaveLength(28);
+    const estados = allRows.map((r) => _cellWrites.get(`${r}:5`));
+    expect(estados.filter((e) => e === "✅ Disponível na plataforma")).toHaveLength(11);
+    expect(estados.filter((e) => e === "🔴 A cargo da empresa")).toHaveLength(15);
+    expect(estados.filter((e) => e === "— N/A")).toHaveLength(2);
+    // Nenhum dos 28 fica por preencher.
+    expect(estados.every((e) => e !== undefined && e !== null)).toBe(true);
+  });
+
+  it("cabeçalho: empresa, referência DOSSIER-{ano}-{orgId com 6 dígitos}, data por extenso", async () => {
+    vi.setSystemTime(new Date("2026-08-06"));
+    DOSSIER_SETUP_OK();
+    await generateDossier(42);
+    expect(_headerWrites.get("B3")).toBe("Empresa: Empresa Teste, Lda.");
+    expect(_headerWrites.get("E3")).toBe("Referência: DOSSIER-2026-000042");
+    expect(_headerWrites.get("B4")).toBe("Data: 6 de agosto de 2026");
+  });
+
+  it("TRAVA: falta o questionário → erro menciona-o", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(COMPLETE_ORG as any);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION,
+    } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue(null as any);
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
+      id: 1, organizationId: 1, status: "completed", completedAt: new Date(),
+    } as any);
+
+    const err = await generateDossier(1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("Complete primeiro");
+    expect(err.message).toContain("questionário de autoavaliação");
+  });
+
+  it("TRAVA: faltam 2 fontes (perfil incompleto + scan) → lista as 2 de uma vez", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue({ ...COMPLETE_ORG, securityOfficerName: null } as any);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: ENGINE_VERSION,
+    } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: {}, completedAt: new Date(),
+    } as any);
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue(null as any);
+
+    const err = await generateDossier(1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("perfil da entidade");
+    expect(err.message).toContain("nome do CISO");
+    expect(err.message).toContain("scan de segurança");
+  });
+
+  it("TRAVA: enquadramento com motor desatualizado → erro específico (não 'em falta' genérico)", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.mocked(db.getOrganizationById).mockResolvedValue(COMPLETE_ORG as any);
+    vi.mocked(db.getLatestFrameworkAssessmentByOrgId).mockResolvedValue({
+      id: 1, organizationId: 1, engineVersion: "1",
+    } as any);
+    vi.mocked(db.getLatestCompletedQuestionnaireForOrg).mockResolvedValue({
+      id: 1, articleScores: {}, completedAt: new Date(),
+    } as any);
+    vi.mocked(db.getLatestCompletedScanForOrg).mockResolvedValue({
+      id: 1, organizationId: 1, status: "completed", completedAt: new Date(),
+    } as any);
+
+    const err = await generateDossier(1).catch((e) => e);
+    expect(err).toBeDefined();
+    expect(err.message).toContain("motor desatualizado");
+  });
+
+  it("isolamento — todas as fontes pedidas com o MESMO orgId, nunca outro", async () => {
+    DOSSIER_SETUP_OK();
+    await generateDossier(7);
+    expect(vi.mocked(db.getOrganizationById)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestFrameworkAssessmentByOrgId)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestCompletedQuestionnaireForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getLatestCompletedScanForOrg)).toHaveBeenCalledWith(7);
+    expect(vi.mocked(db.getOrganizationById)).not.toHaveBeenCalledWith(1);
+  });
+
+  it("guard de template em falta lança erro claro com nome do ficheiro xlsx", async () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+    await expect(generateDossier(1)).rejects.toThrow(
+      "[Documentos] Template não encontrado: dossier-conformidade-template.xlsx"
+    );
   });
 });

@@ -24,6 +24,7 @@ import {
   getLatestFrameworkAssessmentByOrgId,
   getLatestCompletedQuestionnaireForOrg,
   getQuestionnaireSessionById,
+  getLatestCompletedScanForOrg,
 } from "../db";
 import { lookupLibrary } from "./ai-remediation";
 import { NIS2_CONTROLS } from "./ai-questionnaire";
@@ -56,6 +57,7 @@ export const TEMPLATE_PATHS = {
   tracker10Medidas: path.join(TEMPLATE_DIR, "tracker-10-medidas-template.xlsx"),
   declaracaoMfa:    path.join(TEMPLATE_DIR, "declaracao-mfa-template.docx"),
   patchTracker:     path.join(TEMPLATE_DIR, "tracker-patches-template.xlsx"),
+  dossier:          path.join(TEMPLATE_DIR, "dossier-conformidade-template.xlsx"),
 } as const;
 
 export const CONTENT_TYPES = {
@@ -106,6 +108,49 @@ function cell(value: string | null | undefined, placeholder = ""): string {
   const s = String(value).trim();
   if (s === "" || s === "None" || s === "null" || s === "undefined") return placeholder;
   return s;
+}
+
+// ---------------------------------------------------------------------------
+// Perfil completo — Opção A: união dos campos que Carta CISO, IRP e PSI
+// realmente leem (confirmado por leitura direta dos 3 geradores). Garante que,
+// com estes 15 campos preenchidos, os 3 documentos que só dependem do perfil
+// saem sempre sem "[A PREENCHER]". Campos legitimamente opcionais
+// (countriesOfOperation, employeeCount, annualTurnover — usados só por
+// generateRegistoCncs, que já tem a sua própria precondição de enquadramento)
+// NÃO entram aqui de propósito.
+// ---------------------------------------------------------------------------
+
+const PROFILE_REQUIRED_FIELDS: Array<{ field: string; label: string }> = [
+  { field: "legalName",               label: "nome legal da empresa" },
+  { field: "taxId",                   label: "NIF" },
+  { field: "address",                 label: "sede social" },
+  { field: "caeCode",                 label: "código CAE" },
+  { field: "legalRepresentative",     label: "representante legal" },
+  { field: "legalRepresentativeRole", label: "cargo do representante legal" },
+  { field: "securityOfficerName",     label: "nome do CISO" },
+  { field: "securityOfficerTaxId",    label: "NIF do CISO" },
+  { field: "securityOfficerRole",     label: "cargo do CISO" },
+  { field: "securityOfficerStartDate", label: "data de início do CISO" },
+  { field: "securityOfficerEmail",    label: "email do CISO" },
+  { field: "securityOfficerPhone",    label: "telefone do CISO" },
+  { field: "city",                    label: "localidade" },
+  { field: "ceoName",                 label: "nome do CEO" },
+  { field: "ceoContact",              label: "contacto do CEO" },
+];
+
+/** Devolve os rótulos (em português) dos campos de perfil em falta — lista vazia = perfil completo. */
+export function getMissingProfileFields(org: Record<string, any>): string[] {
+  return PROFILE_REQUIRED_FIELDS
+    .filter(({ field }) => {
+      const v = org[field];
+      return v === null || v === undefined || String(v).trim() === "";
+    })
+    .map(({ label }) => label);
+}
+
+/** Perfil completo = os 15 campos essenciais preenchidos (ver PROFILE_REQUIRED_FIELDS). */
+export function isProfileComplete(org: Record<string, any>): boolean {
+  return getMissingProfileFields(org).length === 0;
 }
 
 /** Resumo legível de CVEs para o Inventário de Ativos (coluna H). */
@@ -1037,4 +1082,112 @@ export async function generateRelatorioEnquadramento(
   const doc     = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(data);
   return doc.getZip().generate({ type: "nodebuffer" }) as Buffer;
+}
+
+// ---------------------------------------------------------------------------
+// Dossier de Conformidade NIS2 — Índice Mestre (.xlsx) — 6º e último documento
+// ---------------------------------------------------------------------------
+
+type DossierDocState = "PLATAFORMA" | "EMPRESA" | "NA";
+
+// Linha de cada um dos 28 documentos no template — espelha exatamente
+// backend/assets/templates/dossier-conformidade-template.xlsx (aba "📁 ÍNDICE MESTRE").
+const DOSSIER_ROW_BY_CODE: Record<string, number> = {
+  D01: 10, D02: 11, D03: 12, D04: 13, D05: 14,
+  D06: 16, D07: 17, D08: 18,
+  D09: 20, D10: 21, D11: 22, D12: 23,
+  D13: 25, D14: 26, D15: 27, D16: 28, D17: 29,
+  D18: 31, D19: 32, D20: 33,
+  D21: 35, D22: 36, D23: 37, D24: 38,
+  D25: 40, D26: 41, D27: 42, D28: 43,
+};
+
+// Estado de cada um dos 28 — 11 disponíveis na plataforma (13 geradores, D14 e D28 cobrem 2
+// cada), 15 a cargo da empresa, 2 N/A (só aplicáveis perante um incidente/não conformidade).
+const DOSSIER_STATE_BY_CODE: Record<string, DossierDocState> = {
+  D01: "PLATAFORMA", D02: "PLATAFORMA", D03: "PLATAFORMA", D04: "EMPRESA",    D05: "EMPRESA",
+  D06: "PLATAFORMA", D07: "PLATAFORMA", D08: "PLATAFORMA",
+  D09: "EMPRESA",    D10: "EMPRESA",    D11: "EMPRESA",    D12: "EMPRESA",
+  D13: "PLATAFORMA", D14: "PLATAFORMA", D15: "EMPRESA",    D16: "PLATAFORMA", D17: "EMPRESA",
+  D18: "EMPRESA",    D19: "EMPRESA",    D20: "EMPRESA",
+  D21: "PLATAFORMA", D22: "EMPRESA",    D23: "NA",          D24: "EMPRESA",
+  D25: "EMPRESA",    D26: "NA",         D27: "EMPRESA",     D28: "PLATAFORMA",
+};
+
+const DOSSIER_STATE_TEXT: Record<DossierDocState, string> = {
+  PLATAFORMA: "✅ Disponível na plataforma",
+  EMPRESA:    "🔴 A cargo da empresa",
+  NA:         "— N/A",
+};
+
+/**
+ * Trava "tudo ou nada": o Dossier só existe quando as 4 fontes (perfil, enquadramento,
+ * questionário, scan) estão prontas — é só nesse momento que os 13 documentos gerados pela
+ * plataforma (11 linhas do índice, D14 e D28 cobrem 2 geradores cada) ficam garantidamente
+ * disponíveis. Devolve a lista COMPLETA do que falta, nunca só o primeiro problema.
+ */
+async function checkDossierPreconditions(orgId: number, org: Record<string, any>) {
+  const missing: string[] = [];
+
+  const missingProfileFields = getMissingProfileFields(org);
+  if (missingProfileFields.length > 0) {
+    missing.push(`perfil da entidade (falta: ${missingProfileFields.join(", ")})`);
+  }
+
+  const assessment = await getLatestFrameworkAssessmentByOrgId(orgId);
+  if (!assessment) {
+    missing.push("enquadramento NIS2");
+  } else if (String(assessment.engineVersion) !== String(ENGINE_VERSION)) {
+    missing.push("enquadramento NIS2 (motor desatualizado — repita a avaliação)");
+  }
+
+  const questionnaire = await getLatestCompletedQuestionnaireForOrg(orgId);
+  if (!questionnaire) missing.push("questionário de autoavaliação");
+
+  const scan = await getLatestCompletedScanForOrg(orgId);
+  if (!scan) missing.push("scan de segurança");
+
+  return { missing };
+}
+
+export async function generateDossier(orgId: number): Promise<Buffer> {
+  requireTemplate(TEMPLATE_PATHS.dossier);
+
+  const org = await getOrganizationById(orgId);
+  if (!org) throw new Error("[Documentos] Organização não encontrada");
+
+  const { missing } = await checkDossierPreconditions(orgId, org);
+  if (missing.length > 0) {
+    throw new Error(
+      `[Documentos] Não é possível gerar o Dossier de Conformidade. Complete primeiro: ${missing.join(", ")}.`
+    );
+  }
+
+  const hoje = new Date();
+  // Referência auto-gerada sem tabela de contador nova (mesmo padrão dos outros documentos).
+  const referencia = `DOSSIER-${hoje.getFullYear()}-${String(orgId).padStart(6, "0")}`;
+
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(TEMPLATE_PATHS.dossier);
+  wb.calcProperties.fullCalcOnLoad = true;
+  const sheet = wb.getWorksheet("📁 ÍNDICE MESTRE");
+  if (!sheet) throw new Error('[Documentos] Folha "📁 ÍNDICE MESTRE" não encontrada no template');
+
+  sheet.getCell("B3").value = `Empresa: ${org.legalName ?? org.name}`;
+  sheet.getCell("E3").value = `Referência: ${referencia}`;
+  sheet.getCell("B4").value =
+    `Data: ${hoje.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`;
+
+  // A trava acima já garante as 4 fontes — os 28 estados são, por isso, sempre os mesmos
+  // (11 disponíveis, 15 a cargo da empresa, 2 N/A). O Dashboard conta-os via fórmulas COUNTIF
+  // sobre esta coluna, não valores fixos — mantém-se correto se o mapeamento dos 28 mudar.
+  for (const [codigo, rowNum] of Object.entries(DOSSIER_ROW_BY_CODE)) {
+    const state = DOSSIER_STATE_BY_CODE[codigo];
+    const row = sheet.getRow(rowNum);
+    row.getCell(5).value = DOSSIER_STATE_TEXT[state]; // E: Estado
+    row.commit();
+  }
+
+  clearFormulaCache(wb);
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }
