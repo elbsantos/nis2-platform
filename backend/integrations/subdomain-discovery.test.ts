@@ -178,22 +178,47 @@ describe("discoverSubdomains — descoberta passiva via CT logs (crt.sh) + wordl
     expect(result).toHaveLength(2);
   });
 
-  it("SEGURANÇA — achado: a função NÃO filtra por isSafeTarget nem rejeita candidatos que resolvem para IP privado", async () => {
+  it("SEGURANÇA — classifica corretamente: IP público mantém {name, ip}; IP privado sai só com {name, isInternal:true}, sem ip", async () => {
     // Simula um subdomínio mal configurado a apontar para uma rede interna
     // (ex.: split-horizon DNS exposto publicamente por engano).
-    mockCrtShSuccess([{ name_value: "vpn.example.com", common_name: "vpn.example.com" }]);
+    mockCrtShSuccess([
+      { name_value: "app.example.com", common_name: "app.example.com" },
+      { name_value: "vpn.example.com", common_name: "vpn.example.com" },
+    ]);
     mockResolve4.mockImplementation(async (hostname: string) => {
-      if (hostname === "vpn.example.com") return ["10.0.0.5"]; // IP privado — RFC 1918
+      if (hostname === "app.example.com") return ["203.0.113.10"]; // IP público
+      if (hostname === "vpn.example.com") return ["10.0.0.5"];     // IP privado — RFC 1918
       const err: any = new Error("ENOTFOUND");
       throw err;
     });
 
     const result = await discoverSubdomains("example.com", 50);
+    const pub  = result.find((r) => r.name === "app.example.com");
+    const priv = result.find((r) => r.name === "vpn.example.com");
 
-    // Comportamento ATUAL (documentado, não é o desejável): o IP privado passa sem filtro.
-    expect(result).toEqual([{ name: "vpn.example.com", ip: "10.0.0.5" }]);
-    // Prova de que isSafeTarget REJEITARIA este IP se fosse aplicado aqui —
-    // confirma que a proteção existe no codebase mas não é usada nesta função.
+    expect(pub).toEqual({ name: "app.example.com", ip: "203.0.113.10" });
+    expect(priv).toEqual({ name: "vpn.example.com", isInternal: true });
+    expect(priv).not.toHaveProperty("ip");
+    // isSafeTarget confirma, de forma independente, que 10.0.0.5 é mesmo privado.
     expect(isSafeTarget("10.0.0.5")).toBe(false);
+  });
+
+  it.each([
+    ["172.16.0.1",  "RFC1918 classe B"],
+    ["192.168.1.1", "RFC1918 classe C"],
+    ["127.0.0.1",   "loopback"],
+    ["169.254.1.1", "link-local / AWS metadata"],
+  ])("também classifica como interno: %s (%s)", async (ip) => {
+    mockCrtShSuccess([{ name_value: "internal.example.com", common_name: "internal.example.com" }]);
+    mockResolve4.mockImplementation(async (hostname: string) => {
+      if (hostname === "internal.example.com") return [ip];
+      const err: any = new Error("ENOTFOUND");
+      throw err;
+    });
+
+    const result = await discoverSubdomains("example.com", 50);
+    const entry = result.find((r) => r.name === "internal.example.com");
+
+    expect(entry).toEqual({ name: "internal.example.com", isInternal: true });
   });
 });

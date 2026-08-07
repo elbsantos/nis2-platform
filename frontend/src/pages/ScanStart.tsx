@@ -296,7 +296,7 @@ function BulkScanTab() {
 // TAB 3 — Subdomínios
 // ---------------------------------------------------------------------------
 
-interface DiscoveredSub { name: string; ip?: string; }
+interface DiscoveredSub { name: string; ip?: string; isInternal?: boolean; }
 
 function SubdomainScanTab() {
   const navigate = useNavigate();
@@ -313,7 +313,11 @@ function SubdomainScanTab() {
 
   const verifyMut    = trpc.scan.verifyOwnership.useMutation();
   const discoverMut  = trpc.scan.discoverSubdomains.useMutation({
-    onSuccess: (data) => { setDiscovered(data.subdomains); setSelected(new Set(data.subdomains.map((s) => s.name))); },
+    onSuccess: (data) => {
+      setDiscovered(data.subdomains);
+      // Só os públicos são selecionáveis para scan — os internos não são alcançáveis.
+      setSelected(new Set(data.subdomains.filter((s) => !s.isInternal).map((s) => s.name)));
+    },
     onError:   (err)  => setError(err.message),
   });
   const startBulkMut = trpc.scan.startBulk.useMutation({
@@ -337,6 +341,8 @@ function SubdomainScanTab() {
   }
 
   const maxSubs = plan === "mssp" ? 200 : 50;
+  const publicSubs   = discovered.filter((s) => !s.isInternal);
+  const internalSubs = discovered.filter((s) => s.isInternal);
 
   const handleVerify = async () => {
     setError(""); setVerified(false); setDiscovered([]); setSelected(new Set());
@@ -396,17 +402,17 @@ function SubdomainScanTab() {
         </div>
       )}
 
-      {discovered.length > 0 && (
+      {publicSubs.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-semibold text-gray-700">{discovered.length} subdomínio{discovered.length !== 1 ? "s" : ""} descoberto{discovered.length !== 1 ? "s" : ""}</p>
+            <p className="text-sm font-semibold text-gray-700">{publicSubs.length} subdomínio{publicSubs.length !== 1 ? "s" : ""} acessível{publicSubs.length !== 1 ? "eis" : ""}</p>
             <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
-              <input type="checkbox" checked={selected.size === discovered.length} onChange={(e) => setSelected(e.target.checked ? new Set(discovered.map((d) => d.name)) : new Set())} className="rounded" />
+              <input type="checkbox" checked={selected.size === publicSubs.length} onChange={(e) => setSelected(e.target.checked ? new Set(publicSubs.map((d) => d.name)) : new Set())} className="rounded" />
               Todos
             </label>
           </div>
           <div className="border border-gray-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
-            {discovered.map((s) => (
+            {publicSubs.map((s) => (
               <label key={s.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors">
                 <input type="checkbox" checked={selected.has(s.name)} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(s.name) : n.delete(s.name); setSelected(n); }} className="rounded shrink-0" />
                 <span className="text-sm font-mono text-gray-800 flex-1 truncate">{s.name}</span>
@@ -421,6 +427,29 @@ function SubdomainScanTab() {
           >
             {startBulkMut.isPending ? <><Spinner />A iniciar scans…</> : `Iniciar scan para ${selected.size} subdomínio${selected.size !== 1 ? "s" : ""} →`}
           </button>
+        </div>
+      )}
+
+      {internalSubs.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            {internalSubs.length} subdomínio{internalSubs.length !== 1 ? "s" : ""} interno{internalSubs.length !== 1 ? "s" : ""} detetado{internalSubs.length !== 1 ? "s" : ""}
+          </p>
+          <div className="border border-amber-200 bg-amber-50 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+            {internalSubs.map((s) => (
+              <div key={s.name} className="px-4 py-2.5 border-b border-amber-100 last:border-0 text-sm font-mono text-gray-700">
+                {s.name}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+            Estes subdomínios apontam para a rede interna da organização e não são acessíveis a
+            partir da internet, pelo que não podem ser analisados por este scan externo. A sua
+            verificação de segurança requer uma análise interna dedicada.{" "}
+            <a href="mailto:hello@cisplan.pt?subject=Auditoria%20interna%20de%20rede" className="text-blue-600 hover:underline">
+              Fale connosco sobre uma auditoria interna →
+            </a>
+          </p>
         </div>
       )}
 

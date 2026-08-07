@@ -9,10 +9,14 @@
 
 import https from "https";
 import { resolve4 } from "dns/promises";
+import { isValidPublicIpv4 } from "../middlewares/security";
 
 export interface DiscoveredSubdomain {
   name: string;
+  /** Só presente quando o IP resolvido é público — nunca coexiste com isInternal. */
   ip?: string;
+  /** true quando o subdomínio resolve para um IP privado/interno — nesse caso, sem `ip`. */
+  isInternal?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,9 +128,11 @@ export async function discoverSubdomains(
   for (let i = 0; i < candidates.length && alive.length < maxResults; i += BATCH) {
     const batch = candidates.slice(i, i + BATCH);
     const resolved = await Promise.all(
-      batch.map(async (name) => {
+      batch.map(async (name): Promise<DiscoveredSubdomain | null> => {
         const ip = await resolveAlive(name);
-        return ip ? { name, ip } : null;
+        if (!ip) return null;
+        // IP privado — nunca expor o endereço interno, só o nome (A2).
+        return isValidPublicIpv4(ip) ? { name, ip } : { name, isInternal: true };
       })
     );
     for (const r of resolved) {
