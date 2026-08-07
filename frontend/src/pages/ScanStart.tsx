@@ -21,7 +21,7 @@ function Spinner() {
 // Feature flags — colocar true para reactivar quando o tab estiver pronto
 // ---------------------------------------------------------------------------
 
-const ENABLE_BATCH_SCAN     = false;  // feat/batch-scan
+const ENABLE_BATCH_SCAN     = true;   // DEMO: limite de 3 alvos — ver DEMO_MAX_TARGETS em scan.router.ts
 const ENABLE_SUBDOMAIN_SCAN = true;   // feat/subdomain-scan — testado em backend/integrations/subdomain-discovery.test.ts
 
 // ---------------------------------------------------------------------------
@@ -226,9 +226,14 @@ function BulkScanTab() {
   const [error,   setError]   = useState("");
   const [warning, setWarning] = useState("");
 
+  // DEMO: limite global temporário, alinhado com DEMO_MAX_TARGETS em
+  // scan.router.ts. Pós-MVP, volta a refletir o limite por plano (Pro=15,
+  // MSSP=50) — não esquecer de reverter os dois lados juntos.
+  const DEMO_MAX_TARGETS = 3;
+
   const { data: sub } = trpc.billing.getSubscription.useQuery();
   const plan = sub?.plan ?? "free";
-  const maxTargets = plan === "mssp" ? 50 : plan === "pro" ? 15 : 0;
+  const maxTargets = plan === "free" ? 0 : DEMO_MAX_TARGETS;
 
   const startBulkMut = trpc.scan.startBulk.useMutation({
     onSuccess: (data) => {
@@ -248,7 +253,7 @@ function BulkScanTab() {
         <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">📋</div>
         <p className="font-bold text-gray-900 mb-2">Scan em lote — Plano Pro</p>
         <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
-          Scana múltiplos domínios em paralelo. Até 15 targets por batch no plano Pro.
+          Scana múltiplos domínios de uma vez. Até {DEMO_MAX_TARGETS} alvos por batch nesta fase.
         </p>
         <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
           Ver planos →
@@ -259,6 +264,9 @@ function BulkScanTab() {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-gray-400">
+        Os scans em lote podem demorar um pouco mais, devido a limites de APIs externas de análise.
+      </p>
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
           Targets <span className="font-normal text-gray-400">(um por linha)</span>
@@ -274,7 +282,7 @@ function BulkScanTab() {
           <div className="flex items-center justify-between mt-1.5">
             <p className="text-xs text-gray-400">{targets.length} target{targets.length !== 1 ? "s" : ""} detectado{targets.length !== 1 ? "s" : ""}</p>
             {targets.length > maxTargets && (
-              <p className="text-xs text-red-600 font-medium">Máximo {maxTargets} para o teu plano</p>
+              <p className="text-xs text-red-600 font-medium">Máximo {maxTargets} alvos nesta fase (demo)</p>
             )}
           </div>
         )}

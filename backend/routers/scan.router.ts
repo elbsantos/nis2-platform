@@ -16,6 +16,19 @@ import { isSafeTarget } from "../middlewares/security";
 
 const SCAN_CACHE_TTL_HOURS     = parseInt(process.env.SCAN_CACHE_TTL_HOURS     ?? "24", 10);
 const MAX_FORCE_RESCANS_PER_DAY = parseInt(process.env.MAX_FORCE_RESCANS_PER_DAY ?? "3",  10);
+
+// DEMO: limite global temporário do tab "Scan em lote" (alvos livres,
+// startBulk SEM rootDomain), independente do plano do utilizador. Pós-MVP,
+// restaurar os limites por plano (Pro=15, MSSP=50) — requer NVD_API_KEY
+// paga para suportar lotes maiores sem lentidão perceptível (o NVD tem
+// throttle GLOBAL de ~1 pedido/6s sem chave, partilhado por todo o
+// servidor — ver auditoria "Scan em lote", 2026-08-07).
+// NÃO se aplica ao fluxo de descoberta de subdomínios (startBulk COM
+// rootDomain) — esse fluxo já tem os seus próprios limites testados e
+// ativados (maxSubs: 50 Pro / 200 MSSP em discoverSubdomains; 15/50 aqui
+// em startBulk) e não deve ser limitado por uma decisão de demo pensada
+// para o tab de alvos livres.
+const DEMO_MAX_TARGETS = 3;
 // DEV ONLY — ignora TODAS as camadas de cache do scan (DB + Redis Shodan/Censys/NVD).
 // Nunca ligar em produção: cada scan consome créditos de API reais.
 // Leitura em runtime (não constante de módulo) para que alterações ao .env
@@ -271,25 +284,47 @@ export const scanRouter = {
     }),
 
   /**
-   * Start multiple scans in one batch (Pro: up to 10, MSSP: up to 50).
-   * If rootDomain is provided, all targets must be subdomains of it and
-   * ownership is verified on the root only.
+   * Start multiple scans in one batch.
+   * SEM rootDomain (tab "Scan em lote", alvos livres): limitado a
+   * DEMO_MAX_TARGETS (3), independente do plano — ver comentário na
+   * constante para o porquê e o que fazer pós-MVP.
+   * COM rootDomain (fluxo de descoberta de subdomínios): mantém os
+   * limites por plano de sempre (Pro=15, MSSP=50) — não afetado pelo
+   * limite de demo, que é especificamente do tab de alvos livres.
+   * Se rootDomain for fornecido, todos os targets têm de ser subdomínios
+   * dele e a ownership é herdada do raiz (verifyOwnershipWithRootFallback).
    */
   startBulk: freeProcedure
     .input(
       z.object({
+        // .max(50) fica no teto do fluxo de subdomínios (o mais alto dos
+        // dois), não no limite de demo (3) — o gate de 3 alvos para o tab
+        // de alvos livres é aplicado no handler, abaixo, condicionado à
+        // ausência de rootDomain. Reduzir isto para .max(3) partiria o
+        // fluxo de subdomínios já testado e ativado.
         targets:    z.array(safeTarget).min(1).max(50),
         mode:       z.enum(["sme", "supply"]).default("sme"),
         rootDomain: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const maxTargets = ctx.plan === "mssp" ? 50 : 15;
-      if (input.targets.length > maxTargets) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `O teu plano suporta até ${maxTargets} targets por batch.`,
-        });
+      if (!input.rootDomain) {
+        // Tab "Scan em lote" — alvos livres, limite de demo.
+        if (input.targets.length > DEMO_MAX_TARGETS) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `O scan em lote está limitado a ${DEMO_MAX_TARGETS} alvos nesta fase.`,
+          });
+        }
+      } else {
+        // Fluxo de subdomínios — limite por plano, inalterado pela demo.
+        const maxTargets = ctx.plan === "mssp" ? 50 : 15;
+        if (input.targets.length > maxTargets) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `O teu plano suporta até ${maxTargets} targets por batch.`,
+          });
+        }
       }
 
       const batchId = crypto.randomUUID();
