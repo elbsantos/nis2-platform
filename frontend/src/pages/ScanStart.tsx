@@ -22,7 +22,7 @@ function Spinner() {
 // ---------------------------------------------------------------------------
 
 const ENABLE_BATCH_SCAN     = false;  // feat/batch-scan
-const ENABLE_SUBDOMAIN_SCAN = false;  // feat/subdomain-scan
+const ENABLE_SUBDOMAIN_SCAN = true;   // feat/subdomain-scan — testado em backend/integrations/subdomain-discovery.test.ts
 
 // ---------------------------------------------------------------------------
 // Tab selector — oculta tabs desactivados; omite o bar quando só há um tab
