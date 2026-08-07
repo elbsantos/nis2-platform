@@ -127,6 +127,11 @@ export default function ScanResults() {
   const eligibleCount = (results?.vulnerabilities as Array<{ cveId?: string; description?: string }> | undefined)
     ?.filter((v) => v.cveId?.trim() && v.description?.trim())
     .length ?? 0;
+  // Portos/serviços detetados — é a fonte real de generateInventarioAtivos
+  // (lê results.openPorts, não results.vulnerabilities). Um scan "limpo"
+  // (eligibleCount=0) pode ter portos abertos sem CVEs conhecidos — o
+  // Inventário de Ativos continua a ter conteúdo válido nesse caso.
+  const portsCount = (results?.openPorts as unknown[] | undefined)?.length ?? 0;
   const critical  = results?.criticalCount ?? 0;
   const high      = results?.highCount ?? 0;
   const medium    = results?.mediumCount ?? 0;
@@ -242,7 +247,7 @@ export default function ScanResults() {
         </section>
 
         {/* Documentos NIS2 */}
-        <DocumentsSection scanId={scan.id} eligibleCount={eligibleCount} />
+        <DocumentsSection scanId={scan.id} eligibleCount={eligibleCount} portsCount={portsCount} />
 
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-2">
@@ -387,7 +392,7 @@ function DocButton({
   );
 }
 
-function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleCount: number }) {
+function DocumentsSection({ scanId, eligibleCount, portsCount }: { scanId: number; eligibleCount: number; portsCount: number }) {
   const registoRiscos = trpc.documents.registoRiscos.useQuery(
     { scanId },
     { enabled: false, retry: false }
@@ -441,31 +446,31 @@ function DocumentsSection({ scanId, eligibleCount }: { scanId: number; eligibleC
       </p>
       <div className="flex flex-wrap gap-3">
         {eligibleCount > 0 && (
-          <>
-            <DocButton
-              label="Registo de Riscos (.xlsx)"
-              onDownload={async () => {
-                const r = await registoRiscos.refetch();
-                if (!r.data) throw new Error("Sem dados");
-                return r.data;
-              }}
-            />
-            <DocButton
-              label="Inventário de Ativos (.xlsx)"
-              onDownload={async () => {
-                const r = await inventarioAtivos.refetch();
-                if (!r.data) throw new Error("Sem dados");
-                return r.data;
-              }}
-            />
-          </>
+          <DocButton
+            label="Registo de Riscos (.xlsx)"
+            onDownload={async () => {
+              const r = await registoRiscos.refetch();
+              if (!r.data) throw new Error("Sem dados");
+              return r.data;
+            }}
+          />
+        )}
+        {portsCount > 0 && (
+          <DocButton
+            label="Inventário de Ativos (.xlsx)"
+            onDownload={async () => {
+              const r = await inventarioAtivos.refetch();
+              if (!r.data) throw new Error("Sem dados");
+              return r.data;
+            }}
+          />
         )}
         <DocButton
           label="Tracker de Patches e Vulnerabilidades (.xlsx)"
           onDownload={async () => {
             const r = await patchTracker.refetch();
             // Gera sempre, mesmo com 0 vulnerabilidades (scan limpo) — por isso fica fora
-            // do gate eligibleCount>0 dos outros 2 documentos deste scan.
+            // do gate eligibleCount>0 do Registo de Riscos.
             if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
             return r.data;
           }}
