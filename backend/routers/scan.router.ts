@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { freeProcedure } from "../middlewares/planGuard";
-import { executeAgentlessScan, verifyOwnership, isIpAddress } from "../services/scan-executor";
+import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback, isIpAddress } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan, getLatestCompletedQuestionnaireForOrg } from "../db";
 import { combinedNis2Scores, overallCombinedScore } from "../utils/combined-score";
 import type { NIS2ArticleScore } from "../services/scan-executor";
@@ -296,12 +296,13 @@ export const scanRouter = {
       const started: Array<{ target: string; scanId: number }> = [];
       const failed:  Array<{ target: string; reason: string  }> = [];
 
-      // Verify root domain once for the subdomain-discovery flow
-      let rootVerified = false;
+      // Verifica o domínio raiz uma vez à entrada — falha rápido e com
+      // mensagem clara se nem o raiz estiver verificado, antes de percorrer
+      // os targets todos. A verificação por-target (com herança) usa a
+      // mesma fonte única de verdade logo a seguir.
       if (input.rootDomain) {
         const rootOk = await verifyOwnership(input.rootDomain, ctx.org.id);
-        rootVerified = rootOk.verified;
-        if (!rootVerified) {
+        if (!rootOk.verified) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: `Ownership do domínio raiz ${input.rootDomain} não verificado.`,
@@ -310,21 +311,13 @@ export const scanRouter = {
       }
 
       for (const target of input.targets) {
-        // Skip per-target verification only for confirmed subdomains of the verified root
-        const isSubOfRoot =
-          rootVerified &&
-          input.rootDomain &&
-          (target === input.rootDomain || target.endsWith(`.${input.rootDomain}`));
-
-        if (!isSubOfRoot) {
-          const ownership = await verifyOwnership(target, ctx.org.id);
-          if (!ownership.verified) {
-            failed.push({
-              target,
-              reason: `Ownership não verificado. Adiciona DNS TXT: nis2pt-verify=${ctx.org.id}`,
-            });
-            continue;
-          }
+        const ownership = await verifyOwnershipWithRootFallback(target, ctx.org.id, input.rootDomain);
+        if (!ownership.verified) {
+          failed.push({
+            target,
+            reason: `Ownership não verificado. Adiciona DNS TXT: nis2pt-verify=${ctx.org.id}`,
+          });
+          continue;
         }
 
         const scan = await createScan({
@@ -352,6 +345,9 @@ export const scanRouter = {
             organizationId: ctx.org.id,
             target,
             mode: input.mode,
+            // Propaga o raiz para o executor poder herdar a mesma ownership
+            // já validada aqui, em vez de re-exigir um TXT no subdomínio.
+            rootDomain: input.rootDomain,
           }).catch((err) => console.error(`[Bulk scan ${scanId}] Error:`, err));
         }, i * 3_000);
       });

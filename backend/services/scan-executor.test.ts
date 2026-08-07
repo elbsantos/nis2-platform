@@ -51,7 +51,7 @@ vi.mock("dns/promises", () => ({
   resolveTxt: vi.fn(),
 }));
 
-import { executeAgentlessScan, verifyOwnership } from "./scan-executor";
+import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback } from "./scan-executor";
 import { lookupHost as shodanLookup } from "../integrations/shodan";
 import { lookupHost as censysLookup } from "../integrations/censys";
 import { checkHttpHeaders } from "../integrations/http-headers";
@@ -95,6 +95,80 @@ describe("verifyOwnership", () => {
   });
 });
 
+describe("verifyOwnershipWithRootFallback — herança de domínio raiz (segurança)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const ORG_ID = 1;
+  const TOKEN = `nis2pt-verify=${ORG_ID}`;
+
+  /** Só os hostnames em `withToken` respondem com o token — os restantes falham (ENOTFOUND), como DNS real. */
+  function mockTxtFor(withToken: string[]) {
+    vi.mocked(resolveTxt).mockImplementation(async (hostname: string) => {
+      if (withToken.includes(hostname)) return [[TOKEN]];
+      throw new Error("ENOTFOUND");
+    });
+  }
+
+  it("subdomínio real de um raiz verificado → autorizado por herança (root-inherited), replica o caso real cisplan.com/www.cisplan.com", async () => {
+    mockTxtFor(["cisplan.com"]); // só a raiz tem o TXT — www.cisplan.com não tem nenhum
+    const result = await verifyOwnershipWithRootFallback("www.cisplan.com", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(true);
+    expect(result.method).toBe("root-inherited");
+  });
+
+  it("SEGURANÇA — 'cisplan.com.atacante.com' com rootDomain=cisplan.com → NEGADO (a raiz aparece como prefixo, não é sufixo real)", async () => {
+    mockTxtFor(["cisplan.com"]);
+    const result = await verifyOwnershipWithRootFallback("cisplan.com.atacante.com", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(false);
+  });
+
+  it("SEGURANÇA — 'evilcisplan.com' com rootDomain=cisplan.com → NEGADO (concatenação sem separador de subdomínio)", async () => {
+    mockTxtFor(["cisplan.com"]);
+    const result = await verifyOwnershipWithRootFallback("evilcisplan.com", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(false);
+  });
+
+  it("SEGURANÇA — 'cisplan.com.evil.com' com rootDomain=cisplan.com → NEGADO", async () => {
+    mockTxtFor(["cisplan.com"]);
+    const result = await verifyOwnershipWithRootFallback("cisplan.com.evil.com", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(false);
+  });
+
+  it("subdomínio com rootDomain NÃO verificado (raiz sem TXT) → NEGADO, cai para verificação individual (que também falha)", async () => {
+    mockTxtFor([]); // ninguém tem o TXT, nem a raiz
+    const result = await verifyOwnershipWithRootFallback("www.cisplan.com", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(false);
+  });
+
+  it("target === rootDomain exatamente → autorizado", async () => {
+    mockTxtFor(["cisplan.com"]);
+    const result = await verifyOwnershipWithRootFallback("cisplan.com", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(true);
+  });
+
+  it("rootDomain vazio ('') nunca autoriza por herança — cai para verificação individual", async () => {
+    mockTxtFor(["cisplan.com"]);
+    const result = await verifyOwnershipWithRootFallback("www.cisplan.com", ORG_ID, "");
+    expect(result.verified).toBe(false);
+  });
+
+  it("NÃO-REGRESSÃO — sem rootDomain (scan único) → verificação individual normal, como antes", async () => {
+    mockTxtFor(["www.cisplan.com"]); // desta vez é o PRÓPRIO subdomínio que tem o TXT
+    const result = await verifyOwnershipWithRootFallback("www.cisplan.com", ORG_ID, undefined);
+    expect(result.verified).toBe(true);
+    expect(result.method).toBe("dns-txt"); // não "root-inherited" — é o caminho normal
+  });
+
+  it("normaliza maiúsculas/minúsculas e ponto final (FQDN) antes de comparar target com rootDomain", async () => {
+    mockTxtFor(["cisplan.com"]);
+    const result = await verifyOwnershipWithRootFallback("WWW.CISPLAN.COM.", ORG_ID, "cisplan.com");
+    expect(result.verified).toBe(true);
+    expect(result.method).toBe("root-inherited");
+  });
+});
+
 describe("executeAgentlessScan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,6 +186,45 @@ describe("executeAgentlessScan", () => {
       organizationId: 1,
       target: "example.com",
       mode: "sme",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("ownership");
+  });
+
+  it("BUG REAL corrigido — scan de subdomínio com rootDomain herdado passa a ownership mesmo sem TXT próprio (caso real: cisplan.com/www.cisplan.com)", async () => {
+    vi.mocked(resolveTxt).mockImplementation(async (hostname: string) => {
+      if (hostname === "cisplan.com") return [["nis2pt-verify=1"]];
+      throw new Error("ENOTFOUND"); // www.cisplan.com não tem TXT próprio — é o caso real
+    });
+    vi.mocked(shodanLookup).mockResolvedValue({
+      ip: "1.2.3.4", hostnames: [], tags: [], cpes: [], vulns: [], ports: [],
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1,
+      organizationId: 1,
+      target: "www.cisplan.com",
+      mode: "sme",
+      rootDomain: "cisplan.com",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it("NÃO-REGRESSÃO — sem rootDomain, o mesmo subdomínio sem TXT próprio continua a falhar (era este o bug original)", async () => {
+    vi.mocked(resolveTxt).mockImplementation(async (hostname: string) => {
+      if (hostname === "cisplan.com") return [["nis2pt-verify=1"]];
+      throw new Error("ENOTFOUND");
+    });
+
+    const result = await executeAgentlessScan({
+      scanId: 1,
+      organizationId: 1,
+      target: "www.cisplan.com",
+      mode: "sme",
+      // sem rootDomain — comportamento de scan único, tem de continuar a exigir TXT próprio
     });
 
     expect(result.success).toBe(false);

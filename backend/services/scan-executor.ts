@@ -28,6 +28,11 @@ export interface AgentlessScanOptions {
   target: string;
   mode: "sme" | "supply";
   timeout?: number;
+  // Domínio raiz já verificado de que `target` é subdomínio (fluxo de
+  // descoberta de subdomínios via startBulk). Quando presente, a ownership
+  // é herdada via verifyOwnershipWithRootFallback em vez de exigir um TXT
+  // próprio no subdomínio.
+  rootDomain?: string;
 }
 
 export interface NIS2ArticleScore {
@@ -259,6 +264,55 @@ export async function verifyOwnership(
 }
 
 // ---------------------------------------------------------------------------
+// Verificação de ownership com herança de domínio raiz — fonte única desta
+// lógica, usada tanto pelo router (startBulk) como pelo executor
+// (executeAgentlessScan), para que a decisão "este subdomínio herda a
+// verificação do domínio raiz já verificado" nunca se perca entre os dois
+// (era essa desincronização que fazia o scan de subdomínios falhar sempre).
+// ---------------------------------------------------------------------------
+
+function normaliseHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\.$/, "");
+}
+
+/**
+ * true apenas se `target` for exatamente `rootDomain`, ou um subdomínio
+ * REAL dele — separado pelo ponto (".${root}"), nunca por coincidência de
+ * sufixo textual. Bloqueia deliberadamente:
+ *   - "cisplan.com.atacante.com" (o raiz aparece como prefixo, não é sufixo real)
+ *   - "evilcisplan.com" (concatenação sem separador — não termina em ".cisplan.com")
+ *   - rootDomain vazio/whitespace (nunca autoriza nada)
+ */
+function isSecureSubdomainOf(target: string, rootDomain: string): boolean {
+  const t = normaliseHost(target);
+  const r = normaliseHost(rootDomain);
+  if (!r) return false;
+  return t === r || t.endsWith(`.${r}`);
+}
+
+/**
+ * Verifica ownership de `target`, com herança de `rootDomain` quando
+ * fornecido: se `target` for um subdomínio seguro de `rootDomain` E o
+ * próprio `rootDomain` estiver verificado (consulta DNS real, nunca uma
+ * flag cega), autoriza sem exigir um TXT record próprio no subdomínio.
+ * Caso contrário, cai para a verificação individual normal.
+ */
+export async function verifyOwnershipWithRootFallback(
+  target: string,
+  orgId: number,
+  rootDomain?: string
+): Promise<{ verified: boolean; method?: string }> {
+  if (rootDomain && isSecureSubdomainOf(target, rootDomain)) {
+    const rootOwnership = await verifyOwnership(rootDomain, orgId);
+    if (rootOwnership.verified) {
+      return { verified: true, method: "root-inherited" };
+    }
+    // Raiz não verificado — não herda; cai para a verificação individual abaixo.
+  }
+  return verifyOwnership(target, orgId);
+}
+
+// ---------------------------------------------------------------------------
 // Map CVE to a single NIS2 article (one finding → one medida)
 //
 // Regra: cada achado pertence a UMA medida, a mais específica que corresponde.
@@ -483,7 +537,10 @@ export async function executeAgentlessScan(
     await updateScanStatus(options.scanId, "running", new Date());
 
     // ── 1. Verify ownership (DNS TXT for domains, HTTP .well-known for IPs) ─
-    const ownership = await verifyOwnership(options.target, options.organizationId);
+    // Herda do domínio raiz quando options.rootDomain vier preenchido
+    // (subdomínio descoberto e scaneado via startBulk) — mesma fonte de
+    // verdade usada no router, verificada de novo aqui (não é uma flag cega).
+    const ownership = await verifyOwnershipWithRootFallback(options.target, options.organizationId, options.rootDomain);
     if (!ownership.verified) {
       const hint = isIpAddress(options.target)
         ? `Cria http://${options.target}/.well-known/nis2pt.txt com o conteúdo: nis2pt-verify=${options.organizationId}`
