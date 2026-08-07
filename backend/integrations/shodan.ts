@@ -11,6 +11,7 @@
  */
 
 import { getRedisClient } from "../middlewares/rateLimit";
+import { isValidPublicIpv4 } from "../middlewares/security";
 
 const CACHE_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 const SHODAN_API_KEY  = process.env.SHODAN_API_KEY ?? "";
@@ -72,13 +73,20 @@ async function setCache(key: string, value: ShodanHostResult): Promise<void> {
 // Resolve domain → IP
 // ---------------------------------------------------------------------------
 
-async function resolveToIp(target: string): Promise<string> {
-  // If already an IP, return as-is
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(target)) return target;
+// Devolve null quando o alvo resolve para um IP privado/inválido — nunca
+// enviamos esse IP ao Shodan nem o guardamos em cache (A2 — não é o alvo
+// literal digitado pelo utilizador, é o IP que o Shodan usaria para consultar
+// a InternetDB, por isso a validação tem de ser feita aqui, não só à entrada).
+async function resolveToIp(target: string): Promise<string | null> {
+  // Se já é um IP, ainda assim validar — pode chegar aqui vindo de qualquer
+  // chamador futuro sem a validação de isSafeTarget à entrada do scan.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(target)) {
+    return isValidPublicIpv4(target) ? target : null;
+  }
 
   const { resolve4 } = await import("dns/promises");
   const [ip] = await resolve4(target);
-  return ip;
+  return isValidPublicIpv4(ip) ? ip : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +171,10 @@ export async function lookupHost(
 ): Promise<ShodanHostResult | null> {
   try {
     const ip = await resolveToIp(target);
+    if (ip === null) {
+      console.log(`[Shodan] ${target} resolve para IP privado/inválido — sem consulta ao Shodan, scan continua`);
+      return null;
+    }
     const cacheKey = `shodan:${ip}`;
 
     const cached = await getCached(cacheKey);
@@ -189,8 +201,9 @@ export async function lookupHost(
 
 export function invalidateCache(target: string): Promise<void> {
   return resolveToIp(target)
-    .then((ip) =>
-      getRedisClient().then((redis) => redis.del(`shodan:${ip}`)).then(() => {})
-    )
+    .then((ip) => {
+      if (ip === null) return; // IP privado — nunca houve cache a apagar
+      return getRedisClient().then((redis) => redis.del(`shodan:${ip}`)).then(() => {});
+    })
     .catch(() => {});
 }

@@ -115,7 +115,7 @@ const BLOCKED_HOSTNAMES = new Set([
   "169.254.169.254", // AWS IMDS
 ]);
 
-function isValidPublicIpv4(target: string): boolean {
+export function isValidPublicIpv4(target: string): boolean {
   const m = IPV4_RE.exec(target);
   if (!m) return false;
   if ([m[1], m[2], m[3], m[4]].some((o) => parseInt(o) > 255)) return false;
