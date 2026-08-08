@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { ExplainerPanel } from "../components/ExplainerPanel";
 
 type AnswerValue = "yes" | "partial" | "no" | "na";
 
@@ -47,6 +48,13 @@ function SessionList() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      <ExplainerPanel resourceKey="questionario">
+        <p><strong className="text-white">O que é.</strong> Um conjunto de perguntas sobre como a sua empresa gere a segurança da informação — desde cópias de segurança e controlo de acessos até formação e resposta a incidentes. Cobre as medidas que a NIS2 exige.</p>
+        <p><strong className="text-white">Porque existe.</strong> A NIS2 exige que as empresas apliquem um conjunto de medidas de segurança. O questionário mede, medida a medida, onde está a sua empresa — o que já cumpre e o que falta. É a base do seu grau de conformidade.</p>
+        <p><strong className="text-white">Quando fazer.</strong> Depois do enquadramento. As respostas alimentam o seu score e vários documentos.</p>
+        <p><strong className="text-white">Uma nota:</strong> responda com honestidade. Se uma medida não se aplica à sua empresa, pode indicá-lo. O objetivo é um retrato verdadeiro, não uma pontuação alta artificial.</p>
+      </ExplainerPanel>
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Questionário NIS2</h1>

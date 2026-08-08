@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { DocButton } from "../components/DocButton";
+import { ExplainerPanel } from "../components/ExplainerPanel";
 
 const CARD = "bg-[#152744] border border-[#1e3a5f] rounded-xl";
 
@@ -288,6 +289,20 @@ export default function Documentos() {
             Todos os documentos de conformidade gerados automaticamente, num único sítio.
           </p>
         </div>
+
+        <ExplainerPanel resourceKey="documentos">
+          <p><strong className="text-white">O que é.</strong> O centro dos seus documentos de conformidade. A plataforma gera aqui os documentos técnicos e de governança que a NIS2 exige — preenchidos com os seus dados reais.</p>
+          <p><strong className="text-white">Porque existe.</strong> A conformidade NIS2 exige um conjunto de documentos (políticas, planos, registos). Muitos são técnicos ou jurídicos e difíceis de produzir sozinho. A plataforma gera-os por si, a partir do que já preencheu.</p>
+          <div>
+            <p className="font-semibold text-white mb-1">Como está organizado:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong className="text-white">Documentos gerais</strong> — gerados a partir do seu perfil, enquadramento e questionário. Aparecem sempre.</li>
+              <li><strong className="text-white">Documentos do scan</strong> — analisam um scan específico (escolha qual acima). Precisam de um scan feito.</li>
+              <li><strong className="text-white">Documento do enquadramento</strong> — o relatório da sua classificação NIS2.</li>
+            </ul>
+          </div>
+          <p><strong className="text-white">O que a plataforma não gera.</strong> Alguns documentos dependem de atos da sua empresa — uma ata de reunião, um registo de formação, um contrato com um fornecedor. A plataforma não os inventa (isso seria falsificar evidência), mas o Dossier de Conformidade indica-lhe quais são, a obrigação legal de cada um, e como os deve produzir.</p>
+        </ExplainerPanel>
 
         <SeccaoGeral />
         <SeccaoScan />

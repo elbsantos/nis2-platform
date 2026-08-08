@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { ExplainerPanel } from "../components/ExplainerPanel";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -628,6 +629,12 @@ export default function ScanStart() {
 
       {/* ── Main content — two columns ── */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 pb-14">
+        <ExplainerPanel resourceKey="scanner">
+          <p><strong className="text-white">O que é.</strong> Uma análise da presença digital da sua empresa — o seu site, os seus domínios e subdomínios — feita a partir da internet, sem instalar nada e sem aceder à sua rede interna. Vê o que qualquer pessoa (ou atacante) consegue ver da sua empresa de fora.</p>
+          <p><strong className="text-white">Porque existe.</strong> Muitas vulnerabilidades estão à vista de quem sabe procurar: um certificado de segurança expirado, um serviço desatualizado, a falta de proteção contra falsificação de email. O scanner encontra estes problemas antes que um atacante o faça.</p>
+          <p><strong className="text-white">Quando fazer.</strong> Depois do questionário, para que o seu score combine as duas fontes (o que declarou no questionário e o que a análise técnica encontrou).</p>
+          <p><strong className="text-white">O que NÃO faz.</strong> O scanner é externo — analisa o que está exposto na internet. Não vê o interior da sua rede (os computadores internos, servidores privados). Para isso seria necessária uma análise interna dedicada.</p>
+        </ExplainerPanel>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
           {/* Left — form panel */}

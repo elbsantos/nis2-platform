@@ -7,6 +7,7 @@ import {
 } from "../../../backend/utils/org-options";
 import { toIntegerDigits } from "../lib/formatMilhares";
 import { MoneyInput } from "../components/MoneyInput";
+import { ExplainerPanel } from "../components/ExplainerPanel";
 
 // ---------------------------------------------------------------------------
 // Campos essenciais para geração de documentos
@@ -228,6 +229,12 @@ export default function OrgProfile() {
           {toast}
         </div>
       )}
+
+      <ExplainerPanel resourceKey="perfil">
+        <p><strong className="text-white">O que é.</strong> Os dados de identificação da sua empresa: nome legal, NIF, morada, e os responsáveis (o gestor de topo e o responsável de segurança).</p>
+        <p><strong className="text-white">Porque existe.</strong> Os documentos de conformidade que a plataforma gera — a Carta de Nomeação do responsável de segurança, o Plano de Resposta a Incidentes, e outros — precisam destes dados para saírem completos e prontos a assinar. Sem o perfil preenchido, os documentos saem com espaços por completar.</p>
+        <p><strong className="text-white">Quando fazer.</strong> Primeiro. É a base de tudo o resto.</p>
+      </ExplainerPanel>
 
       {/* Header */}
       <div className="mb-6">

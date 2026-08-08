@@ -7,6 +7,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { ExplainerPanel } from "../components/ExplainerPanel";
 
 const CLASS_BADGE: Record<string, string> = {
   essencial:              "bg-green-900/40 text-green-300 border-green-700",
@@ -32,6 +33,12 @@ export default function Enquadramento() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      <ExplainerPanel resourceKey="enquadramento">
+        <p><strong className="text-white">O que é.</strong> Um questionário curto que determina se a sua empresa é abrangida pela NIS2 e como se classifica. A lei portuguesa (DL 125/2025) prevê várias situações — desde empresas claramente abrangidas (como Entidade Essencial ou Importante), a casos que dependem de confirmação do CNCS ou de relações contratuais, até empresas fora do âmbito. O enquadramento diz-lhe exatamente onde a sua se encaixa.</p>
+        <p><strong className="text-white">Porque existe.</strong> A NIS2 não se aplica a todas as empresas da mesma forma. Depende do setor, da dimensão e do tipo de atividade. O enquadramento diz-lhe, com base na lei, qual é a sua situação — para não fazer nem a mais nem a menos do que a lei exige.</p>
+        <p><strong className="text-white">Quando fazer.</strong> Logo a seguir ao perfil. Determina as suas obrigações antes de avançar.</p>
+      </ExplainerPanel>
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Enquadramento NIS2</h1>

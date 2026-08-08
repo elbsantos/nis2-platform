@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DataTable, type ColumnDef } from "../components/ui/DataTable";
+import { ExplainerPanel } from "../components/ExplainerPanel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -453,6 +454,12 @@ export default function Remediation() {
         subtitle="Gerados por IA com base nos resultados dos scans NIS2"
         actions={filterToolbar}
       />
+
+      <ExplainerPanel resourceKey="remediacao">
+        <p><strong className="text-white">O que é.</strong> Para cada vulnerabilidade que o scanner encontra, a plataforma gera um plano de correção — o que fazer, por que ordem, e com que prioridade.</p>
+        <p><strong className="text-white">Porque existe.</strong> Encontrar problemas não basta — é preciso saber como os resolver. A remediação traduz cada achado técnico numa ação concreta, priorizada por risco, para que saiba por onde começar.</p>
+        <p><strong className="text-white">Quando fazer.</strong> Depois de um scan que tenha encontrado vulnerabilidades. Se o scan estiver limpo, não há nada a remediar.</p>
+      </ExplainerPanel>
 
       {/* Alerts */}
       {genMsg && (
