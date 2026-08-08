@@ -200,15 +200,16 @@ export default function Landing() {
           {/* LEFT */}
           <div className="hero-left fade-in">
             <div className="hero-badge">URGÊNCIA LEGAL · DL 125/2025</div>
-            <h1>A sua empresa<br />está em conformidade<br />com a <em>NIS2</em>?</h1>
+            <h1>A sua empresa tem de cumprir a NIS2.<br />Nós mostramos-lhe exatamente onde está<br />— e <em>geramos os documentos</em>.</h1>
             <p className="hero-subtitle">
-              A plataforma completa para PMEs portuguesas cumprirem o Decreto-Lei 125/2025 —
-              scanner automático, curso certificado e remediação guiada por IA.
+              A plataforma portuguesa que diagnostica a sua exposição digital, mapeia a sua
+              conformidade aos 42 controlos da NIS2, e gera automaticamente os documentos técnicos
+              e de governança — a partir dos seus próprios dados. Sem consultores, sem adivinhar.
             </p>
             <div className="hero-stats">
-              <div><strong>7</strong><span>Aulas</span></div>
-              <div><strong>35</strong><span>Documentos</span></div>
               <div><strong>42</strong><span>Controlos NIS2</span></div>
+              <div><strong>13</strong><span>Documentos gerados</span></div>
+              <div><strong>Scanner</strong><span>Passivo</span></div>
               <div><strong>0</strong><span>Consultores</span></div>
             </div>
             <div className="hero-cta-group">
@@ -225,6 +226,7 @@ export default function Landing() {
 
           {/* RIGHT — dashboard mockup */}
           <div className="hero-right fade-in">
+            <div className="mockup-disclaimer">Exemplo ilustrativo</div>
             <div className="dashboard-frame">
               <div className="browser-chrome">
                 <span className="dot red"></span>
@@ -301,17 +303,18 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* VIDEO TRAILER */}
+      {/* VIDEO TRAILER — estado honesto: em produção, não finge que existe */}
       <section className="trailer-section">
         <div className="trailer-wrap fade-in">
           <div className="trailer-label">Vídeo de Apresentação da Plataforma</div>
-          <VideoPlayer
-            id="trailer-player"
-            videoId="SEU_VIDEO_ID_AQUI"
-            caption="Ver apresentação da plataforma — 4 minutos"
-            subCaption="Scanner, curso e remediação IA — como funciona na prática"
-            duration="4:12"
-          />
+          <div className="trailer-inprod">
+            <div className="trailer-inprod-icon">🎬</div>
+            <div className="trailer-inprod-title">Apresentação da plataforma — Em produção</div>
+            <p className="trailer-inprod-text">
+              O vídeo de demonstração está a ser preparado. Entretanto, explore a plataforma com o plano gratuito.
+            </p>
+            <Link to="/register" className="btn-secondary">Começar Gratuitamente →</Link>
+          </div>
         </div>
       </section>
 
@@ -323,8 +326,8 @@ export default function Landing() {
             <h2>Porque é que a maioria das PMEs não está preparada</h2>
             <p className="subtitle">
               A NIS2 é uma diretiva europeia complexa traduzida em 125 artigos de legislação portuguesa.
-              Os consultores cobram entre €15.000 e €50.000 por projecto de conformidade. A maioria das PMEs
-              fica paralisada — sem saber por onde começar.
+              Os consultores cobram tipicamente entre €15.000 e €50.000 por projecto de conformidade.
+              A maioria das PMEs fica paralisada — sem saber por onde começar.
             </p>
           </div>
           <div className="problem-grid">
@@ -342,7 +345,7 @@ export default function Landing() {
               <h3>Consultores demasiado caros</h3>
               <p>Para uma PME com 50 colaboradores, um projecto de conformidade típico custa mais do que um colaborador a tempo inteiro durante um ano.</p>
               <div className="card-data">
-                <span className="data-label">Custo médio anual</span>
+                <span className="data-label">Custo típico anual</span>
                 <span className="data-value">€15K–€50K</span>
               </div>
             </div>
@@ -359,10 +362,6 @@ export default function Landing() {
               <div className="card-num">04</div>
               <h3>Sem ponto de partida claro</h3>
               <p>A maioria das PMEs sabe que tem de fazer "algo" mas não sabe por onde começar nem em que ordem, nem o que o CNCS irá pedir.</p>
-              <div className="card-data">
-                <span className="data-label">PMEs em incumprimento</span>
-                <span className="data-value">~70%</span>
-              </div>
             </div>
           </div>
         </div>
@@ -373,23 +372,31 @@ export default function Landing() {
         <div className="solution-inner">
           <div className="solution-left fade-in">
             <div className="section-label">A Solução</div>
-            <h2>Conformidade NIS2 que qualquer PME consegue implementar</h2>
+            <h2>Como a CISPLAN funciona</h2>
             <p>
-              Desenvolvemos a única plataforma NIS2 em Portugal que combina scanner automático,
-              formação jurídica e remediação guiada por IA. Em vez de aprender teoria, a sua equipa
-              sai com os documentos assinados, os processos definidos e as evidências que o CNCS pede.
+              A CISPLAN combina duas coisas que, sozinhas, não bastam. Primeiro, uma plataforma que
+              diagnostica e gera: o scanner analisa a sua exposição digital, o questionário mapeia a
+              sua postura aos 42 controlos da NIS2, e a plataforma gera automaticamente os documentos
+              técnicos e de governança — a Carta de Nomeação do CISO, o Plano de Resposta a Incidentes,
+              o Relatório para a Gestão, o Tracker das Medidas, o Dossier de Conformidade, e mais. Tudo
+              a partir dos seus dados, sem partir de uma folha em branco.
             </p>
             <p>
-              Cada aula tem materiais de apoio específicos — Excel, Word e PDF editáveis — que ficam
-              permanentemente disponíveis. Uma empresa que conclua o curso terá o dossier de
-              conformidade completo.
+              Segundo, uma formação que o capacita no que a plataforma não pode fazer por si. Porque há
+              documentos que exigem atos da sua empresa — uma reunião de gestão, um teste de backup, um
+              contrato com um fornecedor — e que nenhuma ferramenta honesta pode inventar. Para esses, o
+              curso ensina-o a produzi-los correctamente.
+            </p>
+            <p>
+              <strong>A plataforma faz o técnico. A formação capacita-o no resto. Juntos, cobrem o que
+              a NIS2 exige — sem nunca falsificar evidência.</strong>
             </p>
             <div className="solution-features">
               <div className="sf-item">Scanner agentless — portos, CVEs, TLS, email e headers HTTP</div>
               <div className="sf-item">Score NIS2 0–100 por artigo, com lacunas identificadas</div>
               <div className="sf-item">Scan em lote — múltiplos domínios e IPs em simultâneo</div>
               <div className="sf-item">Descoberta automática de subdomínios via CT logs + DNS</div>
-              <div className="sf-item">35 documentos editáveis prontos a implementar</div>
+              <div className="sf-item">13 documentos de conformidade gerados automaticamente dos seus dados</div>
               <div className="sf-item">Remediação guiada por IA com plano personalizado</div>
             </div>
           </div>
@@ -415,8 +422,14 @@ export default function Landing() {
               </div>
             </div>
             <div className="module-card full-width" style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}>
-              <div className="module-tag" style={{ color: "#d4a017" }}>Incluído · 35 Documentos</div>
-              <h3 style={{ color: "#ffffff" }}>Dossier de Conformidade Completo</h3>
+              <div className="module-tag" style={{ color: "#d4a017" }}>Incluído no Curso · 35 Templates</div>
+              <h3 style={{ color: "#ffffff" }}>Biblioteca de Templates do Curso</h3>
+              <p style={{ color: "#94a3b8", fontSize: "0.95rem", lineHeight: 1.6, margin: "8px 0 14px" }}>
+                O curso de formação inclui 35 templates editáveis (Excel, Word, PDF) que cobrem todos
+                os documentos NIS2 — incluindo os que dependem de atos da sua empresa. A plataforma
+                gera 13 automaticamente dos seus dados; o curso fornece os templates e ensina-o a
+                completar os restantes.
+              </p>
               <div className="module-lessons">
                 <span className="lesson-pill">12 ficheiros Excel</span>
                 <span className="lesson-pill">6 documentos Word</span>
@@ -540,10 +553,13 @@ export default function Landing() {
         <div className="container">
           <div className="section-header" style={{ textAlign: "left", maxWidth: "var(--container-max)", marginLeft: 0 }}>
             <span className="section-tag blue">CONTEÚDO DO CURSO</span>
-            <h2>O que aprende em cada aula</h2>
+            <h2>Formação para gestores — conteúdo disponível, vídeos em produção</h2>
             <p className="subtitle" style={{ maxWidth: 700 }}>
-              Cada aula inclui um vídeo de explicação, uma demonstração prática dos materiais de apoio
-              e os documentos prontos a usar.
+              A conformidade NIS2 é, antes de mais, uma responsabilidade da gestão de topo. O curso da
+              CISPLAN traduz a diretiva em linguagem de gestor, ao longo de 7 aulas organizadas em 2
+              módulos — do âmbito e classificação da sua entidade, às responsabilidades da administração,
+              à gestão de riscos e cadeia de fornecedores, às medidas técnicas, à gestão de incidentes, e
+              à supervisão do CNCS. O material escrito de cada aula está disponível. Os vídeos estão em produção.
             </p>
           </div>
 
@@ -571,7 +587,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">O que mudou com o DL 125/2025 · Porque é urgente · Panorama de ameaças</p>
                     </div>
                     <div className="lesson-meta">
-                      <span className="badge-preview">PREVIEW</span>
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">18 min</span>
                     </div>
                   </div>
@@ -582,6 +598,7 @@ export default function Landing() {
                     <span className="doc-tag pdf">PDF · Resumo Executivo Gestão</span>
                     <span className="doc-tag pdf">PDF · Guia 4 Semanas</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
                 <div className="lesson-item">
                   <div className="lesson-header">
@@ -591,6 +608,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">EE vs EI · CAEs abrangidos · Regra de dimensão · Registo CNCS</p>
                     </div>
                     <div className="lesson-meta">
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">22 min</span>
                     </div>
                   </div>
@@ -601,6 +619,7 @@ export default function Landing() {
                     <span className="doc-tag pdf">PDF · Matriz Setor·Dimensão</span>
                     <span className="doc-tag pdf">PDF · Checklist Registo CNCS</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
                 <div className="lesson-item">
                   <div className="lesson-header">
@@ -610,6 +629,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">Art. 20.º NIS2 · CISO · Responsabilidade pessoal · KPIs de gestão</p>
                     </div>
                     <div className="lesson-meta">
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">25 min</span>
                     </div>
                   </div>
@@ -620,6 +640,7 @@ export default function Landing() {
                     <span className="doc-tag xlsx">XLSX · Registo de Riscos</span>
                     <span className="doc-tag xlsx">XLSX · Dashboard KPIs</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
                 <div className="lesson-item">
                   <div className="lesson-header">
@@ -629,6 +650,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">TPRM · Due Diligence fornecedores · Cláusulas contratuais NIS2</p>
                     </div>
                     <div className="lesson-meta">
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">28 min</span>
                     </div>
                   </div>
@@ -639,6 +661,7 @@ export default function Landing() {
                     <span className="doc-tag pdf">PDF · Matriz Cloud</span>
                     <span className="doc-tag docx">DOCX · Cláusulas Contratos</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
               </div>
             </div>
@@ -665,6 +688,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">PSI · MFA · Backups · Encriptação · Patch management</p>
                     </div>
                     <div className="lesson-meta">
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">32 min</span>
                     </div>
                   </div>
@@ -675,6 +699,7 @@ export default function Landing() {
                     <span className="doc-tag pdf">PDF · Guia MFA</span>
                     <span className="doc-tag pdf">PDF · Cartão Emergência A5</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
                 <div className="lesson-item">
                   <div className="lesson-header">
@@ -684,6 +709,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">IRP · Notificação CNCS 24h/72h/30d · Comunicação de crise · Forense</p>
                     </div>
                     <div className="lesson-meta">
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">26 min</span>
                     </div>
                   </div>
@@ -694,6 +720,7 @@ export default function Landing() {
                     <span className="doc-tag pdf">PDF · Guia Comunicação Crise</span>
                     <span className="doc-tag pdf">PDF · Checklist Forense</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
                 <div className="lesson-item">
                   <div className="lesson-header">
@@ -703,6 +730,7 @@ export default function Landing() {
                       <p className="lesson-subtitle">Auditoria CNCS · CAPA · Calendário PDCA · Dossier de conformidade</p>
                     </div>
                     <div className="lesson-meta">
+                      <span className="badge-inprod">🎬 Vídeo em produção</span>
                       <span className="duration">24 min</span>
                     </div>
                   </div>
@@ -713,6 +741,7 @@ export default function Landing() {
                     <span className="doc-tag xlsx">XLSX · Dossier Índice Mestre</span>
                     <span className="doc-tag pdf">PDF · Resumo Executivo Curso</span>
                   </div>
+                  <Link to="/register" className="lesson-material-link">Ver material (mediante registo) →</Link>
                 </div>
               </div>
             </div>
@@ -731,12 +760,20 @@ export default function Landing() {
 
       {/* MATERIALS */}
       <section className="materials" id="dossier">
-        <div className="section-label">Os 35 Documentos Incluídos</div>
-        <h2>Não é só formação. É o trabalho feito.</h2>
+        <div className="section-label">O Que a Plataforma Gera</div>
+        <h2>Os documentos que a plataforma gera por si</h2>
         <p className="materials-intro">
-          Cada aula inclui materiais de apoio específicos — desde ferramentas de diagnóstico a templates
-          legais prontos a assinar. Uma empresa que conclua o curso terá o dossier de conformidade que
-          qualquer auditor CNCS pediria.
+          A plataforma gera automaticamente os documentos de conformidade que resultam dos seus dados —
+          o scan, o questionário, o perfil da sua entidade. São documentos técnicos e jurídicos que uma
+          PME dificilmente produziria sozinha, e que saem prontos, com os seus dados reais.
+        </p>
+        <p className="materials-intro" style={{ marginTop: 16 }}>
+          Para os documentos que dependem de atos da sua empresa (atas, formação, contratos, testes), a
+          plataforma mostra-lhe exatamente o que precisa — com a obrigação legal de cada um — e a
+          formação ensina-o a produzi-los. Nunca geramos evidência de algo que não aconteceu.
+        </p>
+        <p className="materials-intro" style={{ marginTop: 16, color: "#d4a017", fontWeight: 700 }}>
+          Biblioteca de templates do curso · 35 documentos
         </p>
         <div className="materials-grid">
           <div className="mat-category">
@@ -758,7 +795,7 @@ export default function Landing() {
           <div className="mat-category red">
             <div className="mat-icon">📄</div>
             <h3>Word — Templates Legais Editáveis</h3>
-            <div className="mat-count">6 documentos · Prontos a assinar</div>
+            <div className="mat-count">6 documentos · Editáveis</div>
             <ul className="mat-list">
               <li>Carta de Nomeação do CISO</li>
               <li>Política de Segurança da Informação (PSI)</li>
@@ -782,13 +819,6 @@ export default function Landing() {
               <li>Checklist Auto-Auditoria CNCS (34 itens)</li>
               <li>Questionário Due Diligence Fornecedores</li>
             </ul>
-          </div>
-        </div>
-        <div className="materials-total fade-in">
-          <p>Valor estimado dos documentos se encomendados individualmente a um consultor jurídico</p>
-          <div>
-            <strong>€8.000–€15.000</strong>
-            <p className="mat-sub">incluídos no plano Pro e MSSP</p>
           </div>
         </div>
       </section>
@@ -845,44 +875,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section className="testimonials">
-        <div className="section-label">Quem Já Implementou</div>
-        <h2>O que dizem os primeiros utilizadores</h2>
-        <div className="testi-grid">
-          <div className="testi-card fade-in">
-            <div className="testi-stars">★★★★★</div>
-            <p className="testi-text">
-              "Tentei perceber a NIS2 durante meses através de artigos e webinars. Esta plataforma foi a primeira vez que saí com um plano concreto e os documentos para o executar. O scanner identificou logo 3 lacunas críticas que não sabia que existiam."
-            </p>
-            <div className="testi-author">
-              <strong>Ana Costa</strong>
-              <span>CEO · Empresa de Software · 60 colaboradores</span>
-            </div>
-          </div>
-          <div className="testi-card fade-in">
-            <div className="testi-stars">★★★★★</div>
-            <p className="testi-text">
-              "Como CISO de uma PME industrial, precisava de algo que traduzisse os requisitos NIS2 para a realidade de uma fábrica com OT/IT. O curso cobriu tudo e a remediação IA gerou um plano que implementei em 3 semanas."
-            </p>
-            <div className="testi-author">
-              <strong>Carlos Mendes</strong>
-              <span>CISO · Fabricante Metalúrgico · 180 colaboradores</span>
-            </div>
-          </div>
-          <div className="testi-card fade-in">
-            <div className="testi-stars">★★★★★</div>
-            <p className="testi-text">
-              "Usamos a plataforma para três clientes PME em simultâneo com o plano MSSP. Em vez de gastar €20.000 por cliente num consultor, gastámos €199/mês e os resultados foram equivalentes — com o dossier de conformidade completo."
-            </p>
-            <div className="testi-author">
-              <strong>Pedro Rodrigues</strong>
-              <span>Director · Consultora TI · MSP certificado</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* PRICING */}
       <section className="pricing" id="precos">
         <div className="pricing-header fade-in">
@@ -928,7 +920,7 @@ export default function Landing() {
               <li className="yes">Descoberta de subdomínios — até 50</li>
               <li className="yes">42 controlos NIS2 · 35 documentos editáveis</li>
               <li className="yes">Remediação guiada por IA — 75 000 tokens/mês</li>
-              <li className="yes">Módulos 1 e 2 · Certificado · Actualizações</li>
+              <li className="yes">Módulos 1 e 2 · Actualizações</li>
             </ul>
             <Link to="/register?plan=pro" className="price-btn solid">Começar Pro →</Link>
           </div>
@@ -999,12 +991,12 @@ export default function Landing() {
             <p>Não. O scanner é 100% agentless e analisa apenas dados públicos — o que qualquer atacante ou auditor consegue ver sobre a sua empresa a partir da internet. Não é necessário instalar nada nem dar acesso à rede interna.</p>
           </div>
           <div className="faq-item fade-in">
-            <h3>Os documentos são mesmo prontos a usar?</h3>
-            <p>Sim. Cada documento foi desenvolvido especificamente para a legislação portuguesa (DL 125/2025) com os campos correctos, referências legais exactas e estrutura adequada para auditorias CNCS. Basta preencher os dados da sua empresa e assinar.</p>
+            <h3>Os documentos são prontos a usar?</h3>
+            <p>Os documentos técnicos e de governança que a plataforma gera saem preenchidos com os seus dados reais — prontos para rever e assinar. Alguns têm campos que a sua equipa completa ao formalizar processos internos (ex.: quem aprovou, data da revisão). E há documentos de conformidade que dependem de atos da sua empresa — reuniões, formação, contratos — que a plataforma não gera, mas para os quais o guia e a formação o preparam.</p>
           </div>
           <div className="faq-item fade-in">
             <h3>Como funciona a remediação por IA?</h3>
-            <p>Após o scan, a IA (Claude da Anthropic) analisa as lacunas detectadas e gera um plano de remediação personalizado para a sua empresa — com priorização por risco, passos concretos e documentação necessária. Disponível no plano Pro e MSSP.</p>
+            <p>Após o scan, um agente de IA analisa as lacunas detectadas e gera um plano de remediação personalizado para a sua empresa — com priorização por risco, passos concretos e documentação necessária. Disponível no plano Pro e MSSP.</p>
           </div>
           <div className="faq-item fade-in">
             <h3>O plano inclui actualizações futuras?</h3>
@@ -1043,7 +1035,7 @@ export default function Landing() {
           <div className="footer-col">
             <h4>Plataforma</h4>
             <a href="#scanner">Scanner NIS2</a>
-            <a href="#curso">Curso Certificado</a>
+            <a href="#curso">Curso NIS2</a>
             <a href="#dossier">Dossier de Conformidade</a>
             <a href="#precos">Preços</a>
           </div>
