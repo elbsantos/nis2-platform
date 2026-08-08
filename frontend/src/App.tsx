@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Routes, Route, Navigate, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import Landing        from "./pages/Landing";
@@ -40,47 +41,131 @@ function RequireAuth() {
   return <Outlet />;
 }
 
-// ── App nav (authenticated) ───────────────────────────────────────────────────
-function AppNav() {
+// ── Sidebar (authenticated) ─────────────────────────────────────────────────
+// Ordem da jornada: Perfil → Enquadramento → Questionário → Scanner →
+// Remediação → Documentos. Secundários (Curso/Histórico/Planos) separados
+// visualmente por baixo, sem ordem de fluxo entre si.
+
+type NavItem = { to: string; label: string; icon: string };
+
+const MAIN_ITEMS: NavItem[] = [
+  { to: "/perfil",        label: "Perfil",        icon: "👤" },
+  { to: "/enquadramento", label: "Enquadramento", icon: "🧭" },
+  { to: "/questionnaire", label: "Questionário",  icon: "📋" },
+  { to: "/scan/start",    label: "Scanner",       icon: "🔍" },
+  { to: "/remediation",   label: "Remediação",    icon: "🛠️" },
+  { to: "/documentos",    label: "Documentos",    icon: "📄" },
+];
+
+const SECONDARY_ITEMS: NavItem[] = [
+  { to: "/course",       label: "Curso",     icon: "🎓" },
+  { to: "/scan/history",  label: "Histórico", icon: "🕓" },
+  { to: "/billing",       label: "Planos",    icon: "💳" },
+];
+
+function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = useAuth();
-  const base     = "px-3 py-2 text-sm font-medium rounded-md transition-colors";
+  const base     = "flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors";
   const active   = `${base} bg-[#1f3864] text-white`;
   const inactive = `${base} text-slate-300 hover:bg-[#152744] hover:text-white`;
 
   return (
-    <nav className="bg-[#0f1e38] border-b-2 border-[#b8860b] px-4">
-      <div className="max-w-5xl mx-auto flex items-center gap-1 h-12">
-        <NavLink to="/" className="font-bold text-white text-sm mr-4 hover:text-[#f0c040] transition-colors">
-          CISPLAN
-        </NavLink>
-        <NavLink to="/scan/start"    className={({ isActive }) => isActive ? active : inactive}>Novo scan</NavLink>
-        <NavLink to="/scan/history"  className={({ isActive }) => isActive ? active : inactive}>Histórico</NavLink>
-        <NavLink to="/questionnaire"   className={({ isActive }) => isActive ? active : inactive}>Questionário</NavLink>
-        <NavLink to="/enquadramento"   className={({ isActive }) => isActive ? active : inactive}>Enquadramento</NavLink>
-        <NavLink to="/remediation"     className={({ isActive }) => isActive ? active : inactive}>Remediação</NavLink>
-        <NavLink to="/course"        className={({ isActive }) => isActive ? active : inactive}>Curso</NavLink>
-        <NavLink to="/billing"       className={({ isActive }) => isActive ? active : inactive}>Planos</NavLink>
-        <NavLink to="/perfil"        className={({ isActive }) => isActive ? active : inactive}>Perfil</NavLink>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-slate-400 hidden sm:block">{user?.email}</span>
+    <>
+      {/* Overlay — só em ecrã pequeno, com a sidebar aberta */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-40 w-64 shrink-0 bg-[#0f1e38]
+          border-r border-[#1e3a5f] flex flex-col transform transition-transform duration-200
+          ${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+      >
+        <div className="h-14 flex items-center px-4 border-b border-[#1e3a5f] shrink-0">
+          <NavLink to="/" className="font-bold text-white text-lg hover:text-[#f0c040] transition-colors">
+            CISPLAN
+          </NavLink>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {MAIN_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onClose}
+              className={({ isActive }) => isActive ? active : inactive}
+            >
+              <span aria-hidden="true">{item.icon}</span>
+              {item.label}
+            </NavLink>
+          ))}
+
+          <div className="pt-4 mt-4 border-t border-[#1e3a5f] space-y-1">
+            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              Mais
+            </p>
+            {SECONDARY_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={onClose}
+                className={({ isActive }) => isActive ? active : inactive}
+              >
+                <span aria-hidden="true">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+
+        <div className="px-4 py-3 border-t border-[#1e3a5f] shrink-0">
+          <p className="text-xs text-slate-400 truncate mb-2">{user?.email}</p>
           <button
             onClick={() => logout().then(() => window.location.href = "/")}
-            className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-[#152744] transition-colors"
+            className="text-xs text-slate-400 hover:text-white px-2 py-1 -mx-2 rounded hover:bg-[#152744] transition-colors w-[calc(100%+16px)] text-left"
           >
             Sair
           </button>
         </div>
-      </div>
-    </nav>
+      </aside>
+    </>
+  );
+}
+
+// Topbar só visível em ecrã pequeno (< lg) — abre a sidebar como painel deslizante.
+function MobileTopBar({ onMenuClick }: { onMenuClick: () => void }) {
+  return (
+    <div className="lg:hidden h-14 flex items-center justify-between px-4 bg-[#0f1e38] border-b-2 border-[#b8860b] sticky top-0 z-20">
+      <button
+        onClick={onMenuClick}
+        className="text-white p-2 -ml-2"
+        aria-label="Abrir menu"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M3 12h18M3 6h18M3 18h18" />
+        </svg>
+      </button>
+      <NavLink to="/" className="font-bold text-white text-sm">CISPLAN</NavLink>
+      <div className="w-[26px]" aria-hidden="true" />
+    </div>
   );
 }
 
 // ── Authenticated layout ──────────────────────────────────────────────────────
 function AppLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-[#0b1526]">
-      <AppNav />
-      <Outlet />
+    <div className="min-h-screen bg-[#0b1526] lg:flex">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 min-w-0">
+        <MobileTopBar onMenuClick={() => setSidebarOpen(true)} />
+        <Outlet />
+      </div>
     </div>
   );
 }
