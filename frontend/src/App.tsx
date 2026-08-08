@@ -21,6 +21,7 @@ import Course        from "./pages/Course";
 import Lesson        from "./pages/Lesson";
 import OrgProfile    from "./pages/OrgProfile";
 import Documentos    from "./pages/Documentos";
+import BemVindo      from "./pages/BemVindo";
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function RequireAuth() {
@@ -184,6 +185,7 @@ export default function App() {
       {/* Protected routes */}
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
+          <Route path="/bem-vindo"                element={<BemVindo />} />
           <Route path="/scan/start"               element={<ScanStart />} />
           <Route path="/scan/results/:scanId"     element={<ScanResults />} />
           <Route path="/scan/bulk/:batchId"       element={<BulkScanResults />} />
@@ -200,7 +202,7 @@ export default function App() {
           <Route path="/perfil"                   element={<OrgProfile />} />
           <Route path="/course"                   element={<Course />} />
           <Route path="/course/:lessonId"         element={<Lesson />} />
-          <Route path="*"                         element={<Navigate to="/scan/start" replace />} />
+          <Route path="*"                         element={<Navigate to="/bem-vindo" replace />} />
         </Route>
       </Route>
     </Routes>

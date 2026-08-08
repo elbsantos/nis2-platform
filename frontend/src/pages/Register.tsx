@@ -43,7 +43,7 @@ export default function Register() {
       if (plan === "pro" || plan === "mssp") {
         navigate(`/billing?plan=${plan}`, { replace: true });
       } else {
-        navigate("/scan/start", { replace: true });
+        navigate("/bem-vindo", { replace: true });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao registar");

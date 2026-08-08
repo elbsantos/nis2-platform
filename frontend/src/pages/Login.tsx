@@ -14,7 +14,7 @@ export default function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
-  const from      = (location.state as { from?: string })?.from ?? "/scan/start";
+  const from      = (location.state as { from?: string })?.from ?? "/bem-vindo";
 
   const message   = (location.state as { message?: string })?.message ?? "";
 
