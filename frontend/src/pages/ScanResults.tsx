@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import Nis2ScoreChart from "../components/Nis2ScoreChart";
 import VulnerabilityList from "../components/VulnerabilityList";
+import { DocButton } from "../components/DocButton";
 
 const POLL_INTERVAL = 4_000;
 
@@ -344,53 +345,9 @@ function PdfButton({ scanId, type, label }: { scanId: number; type: "executive" 
 
 // ---------------------------------------------------------------------------
 // Documentos NIS2 — download de ficheiros gerados automaticamente
+// (DocButton/triggerDownload vivem em ../components/DocButton — partilhado
+// com a página /documentos)
 // ---------------------------------------------------------------------------
-
-function triggerDownload(base64: string, filename: string, contentType: string) {
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const blob  = new Blob([bytes], { type: contentType });
-  const url   = URL.createObjectURL(blob);
-  const a     = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function DocButton({
-  label,
-  onDownload,
-}: {
-  label: string;
-  onDownload: () => Promise<{ fileBase64: string; filename: string; contentType: string }>;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-
-  async function handleClick() {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await onDownload();
-      triggerDownload(result.fileBase64, result.filename, result.contentType);
-    } catch (err: any) {
-      setError(err?.message ?? "Erro ao gerar documento");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <button
-        onClick={handleClick}
-        disabled={loading}
-        className="px-4 py-2 bg-teal-700 text-white text-lg font-medium rounded-md hover:bg-teal-800 transition-colors disabled:opacity-50 whitespace-nowrap"
-      >
-        {loading ? "A gerar…" : `↓ ${label}`}
-      </button>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-    </div>
-  );
-}
 
 function DocumentsSection({ scanId, eligibleCount, portsCount }: { scanId: number; eligibleCount: number; portsCount: number }) {
   const registoRiscos = trpc.documents.registoRiscos.useQuery(

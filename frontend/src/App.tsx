@@ -19,6 +19,7 @@ import Billing       from "./pages/Billing";
 import Course        from "./pages/Course";
 import Lesson        from "./pages/Lesson";
 import OrgProfile    from "./pages/OrgProfile";
+import Documentos    from "./pages/Documentos";
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function RequireAuth() {
@@ -109,6 +110,7 @@ export default function App() {
           <Route path="/enquadramento/new"                  element={<EnquadramentoWizard />} />
           <Route path="/enquadramento/:id"                  element={<EnquadramentoResult />} />
           <Route path="/remediation"                        element={<Remediation />} />
+          <Route path="/documentos"               element={<Documentos />} />
           <Route path="/billing"                  element={<Billing />} />
           <Route path="/perfil"                   element={<OrgProfile />} />
           <Route path="/course"                   element={<Course />} />
