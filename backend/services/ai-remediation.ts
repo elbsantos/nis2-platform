@@ -18,7 +18,13 @@ import {
 
 // Increment when remediationPlanner system prompt changes significantly.
 // Library entries with an older version are regenerated via API and updated.
-const REMEDIATION_PROMPT_VERSION = 2;
+// v3 (2026-08-09): parseAIPlan() no longer drops a step's command when the AI puts
+// it on its own line (or inside a ```code``` block) — see parseAIPlan fallback branch.
+// Bumping this invalidates every cached v2 entry (which may contain steps truncated
+// at "executando:") without deleting anything: lookupLibrary() treats a stale
+// promptVersion as a cache miss, so the next request regenerates via the API and
+// upsertLibraryEntry() overwrites the same row in place.
+const REMEDIATION_PROMPT_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,6 +119,10 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
     // Skip any remaining markdown headers (e.g. "## Bloco 2")
     if (/^#+/.test(line)) continue;
 
+    // Markdown code fence delimiters (```bash, ```): drop the fence marker itself,
+    // the command line(s) inside fall through to the "append" branch below.
+    if (/^```/.test(line)) continue;
+
     // Numbered steps: "1. ...", "2. ..."
     const stepMatch = line.match(/^(\d+)\.\s+(.+)/);
     if (stepMatch) {
@@ -152,6 +162,16 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
     // First substantial non-step line = risk summary
     if (!riskSummary && line.length > 30) {
       riskSummary = stripMarkdown(line);
+      continue;
+    }
+
+    // Fallback (must stay last): the AI sometimes puts a step's command on its
+    // own line (or inside a ```code``` block) instead of on the numbered line.
+    // That line matches none of the branches above — append it to the current
+    // (last) step instead of silently dropping it, so the command survives.
+    if (steps.length > 0) {
+      const current = steps[steps.length - 1];
+      current.instruction = `${current.instruction}\n${stripMarkdown(line)}`;
     }
   }
 
@@ -269,7 +289,8 @@ Segue rigorosamente este formato:
 3. Indica "Esforço: Baixo/Médio/Alto"
 4. Indica os artigos NIS2 relevantes (ex.: Art. 21(2)(e))
 
-IMPORTANTE: Completa sempre cada frase. Não cortes passos a meio. O público-alvo são gestores de PME sem conhecimento técnico.`;
+IMPORTANTE: Completa sempre cada frase. Não cortes passos a meio. O público-alvo são gestores de PME sem conhecimento técnico.
+FORMATO DOS PASSOS: cada passo é UMA ÚNICA LINHA que começa por "N." (ex.: "3. Actualiza o pacote com apt-get upgrade openssl"). O comando ou valor a usar faz parte dessa MESMA linha — não o coloques numa linha à parte nem dentro de um bloco \`\`\`código\`\`\`.`;
 
   const { text: raw, stopReason } = await chat({
     system:      SYSTEM_PROMPTS.remediationPlanner,
