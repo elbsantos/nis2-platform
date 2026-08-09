@@ -35,9 +35,11 @@ function persistClosed(key: string, closed: boolean) {
  */
 export function ExplainerPanel({
   resourceKey,
+  title = "O que é isto?",
   children,
 }: {
   resourceKey: string;
+  title?: string;
   children: ReactNode;
 }) {
   const [closed, setClosed] = useState(() => readInitialClosed(resourceKey));
@@ -58,7 +60,7 @@ export function ExplainerPanel({
         aria-expanded={!closed}
       >
         <span className="text-sm font-semibold flex items-center gap-2">
-          <span className="text-[#f0c040]" aria-hidden="true">💡</span> O que é isto?
+          <span className="text-[#f0c040]" aria-hidden="true">💡</span> {title}
         </span>
         <span
           className={`text-slate-400 transition-transform duration-150 ${closed ? "" : "rotate-180"}`}

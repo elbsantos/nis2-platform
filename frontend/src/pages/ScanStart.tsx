@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { useAuth } from "../lib/auth";
 import { ExplainerPanel } from "../components/ExplainerPanel";
 import { ENABLE_PRICING } from "../lib/featureFlags";
 
@@ -16,6 +17,103 @@ function Spinner() {
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Copy-to-clipboard — primeiro uso desta funcionalidade no projeto.
+// navigator.clipboard exige contexto seguro (https/localhost); fora disso,
+// ou se a API falhar, cai para um <textarea> temporário + execCommand("copy").
+// ---------------------------------------------------------------------------
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    throw new Error("Clipboard API indisponível neste contexto");
+  } catch {
+    try {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(value);
+    setStatus(ok ? "copied" : "failed");
+    setTimeout(() => setStatus("idle"), 2000);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={`shrink-0 px-3 py-2.5 text-xs font-semibold rounded-lg border transition-colors ${
+        status === "copied"
+          ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+          : status === "failed"
+          ? "bg-amber-50 border-amber-300 text-amber-700"
+          : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+      }`}
+    >
+      {status === "copied" ? "✓ Copiado!" : status === "failed" ? "Selecione e copie" : "Copiar"}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bloco permanente do código de verificação — visível assim que se entra no
+// scanner, antes de escrever qualquer domínio (o orgId já está disponível
+// via useAuth, que só renderiza depois de RequireAuth confirmar a sessão).
+// ---------------------------------------------------------------------------
+
+function VerificationCodeCard() {
+  const { user } = useAuth();
+  const orgId = user?.org?.id;
+  if (!orgId) return null;
+
+  const token = `nis2pt-verify=${orgId}`;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/50 p-6 space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-1.5">O seu código de verificação de domínio</p>
+        <p className="text-xs text-gray-400 mb-3">
+          Vai precisar deste valor para confirmar que é dono do domínio antes de o analisar. Copie-o já — vai levá-lo ao painel de DNS do seu domínio.
+        </p>
+        <div className="flex items-stretch gap-2">
+          <code className="flex-1 block text-xs bg-gray-50 border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
+            {token}
+          </code>
+          <CopyButton value={token} />
+        </div>
+      </div>
+      <ExplainerPanel resourceKey="ownership-help" title="Como confirmo que este domínio é meu?">
+        <p>Antes de analisar um site, precisamos de confirmar que ele lhe pertence. É uma medida de segurança: impede que alguém use a CISPLAN para analisar sites de terceiros sem autorização. Faz-se uma vez por domínio, e demora poucos minutos.</p>
+        <p>Vai adicionar uma pequena "etiqueta de confirmação" ao registo do seu domínio — como carimbar um documento para provar que é seu. Essa etiqueta é um registo TXT, e o valor a colocar é o seu código de verificação (mostrado acima, com o botão Copiar).</p>
+        <p><strong className="text-white">Passo 1.</strong> Entre no painel onde gere o seu domínio. É o site onde comprou o domínio (onde paga a renovação anual). Se não sabe qual é, procure nos seus emails por "renovação de domínio".</p>
+        <p><strong className="text-white">Passo 2.</strong> Procure a secção de "DNS" ou "Registos DNS". Pode chamar-se "Gestão de DNS", "Zona DNS" ou "Advanced DNS".</p>
+        <p><strong className="text-white">Passo 3.</strong> Adicione um novo registo do tipo "TXT". No campo Nome (ou "Host"): deixe em branco ou coloque @. No campo Valor (ou "Content"): cole o seu código de verificação. Guarde.</p>
+        <p><strong className="text-white">Passo 4.</strong> Volte aqui e clique em Verificar. As alterações de DNS podem demorar alguns minutos a ficar ativas. Se não funcionar logo, aguarde um pouco e tente de novo.</p>
+        <p>Não consegue fazer isto? É normal — nem toda a gente gere o seu próprio domínio. Peça a quem trata do seu site (o seu informático ou a agência que o criou): envie-lhe o seu código de verificação e peça para adicionar um registo DNS TXT com esse valor. Ou fale connosco — podemos ajudá-lo.</p>
+      </ExplainerPanel>
+    </div>
   );
 }
 
@@ -88,9 +186,12 @@ function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
           </div>
           <div>
             <p className="text-xs text-gray-500 font-medium mb-1">Conteúdo:</p>
-            <code className="block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
-              {token}
-            </code>
+            <div className="flex items-stretch gap-2">
+              <code className="flex-1 block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
+                {token}
+              </code>
+              <CopyButton value={token} />
+            </div>
           </div>
           <p className="text-xs text-amber-600">O ficheiro deve ser acessível via HTTP.</p>
         </div>
@@ -105,9 +206,12 @@ function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
           </div>
           <div>
             <p className="text-xs text-gray-500 font-medium mb-1">Valor:</p>
-            <code className="block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
-              {token}
-            </code>
+            <div className="flex items-stretch gap-2">
+              <code className="flex-1 block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
+                {token}
+              </code>
+              <CopyButton value={token} />
+            </div>
           </div>
           <p className="text-xs text-amber-600">Propagação DNS pode demorar até 5 minutos.</p>
         </div>
@@ -644,6 +748,8 @@ export default function ScanStart() {
 
           {/* Left — form panel */}
           <div className="lg:col-span-2 space-y-4">
+            <VerificationCodeCard />
+
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/50 p-6">
               <TabBar active={tab} setTab={setTab} />
               {tab === "único"       && <SingleScanTab />}
