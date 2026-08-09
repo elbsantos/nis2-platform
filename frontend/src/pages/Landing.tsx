@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { ENABLE_PRICING } from "../lib/featureFlags";
 import "./Landing.css";
 
 // ── Video player ─────────────────────────────────────────────────────────────
@@ -187,7 +188,7 @@ export default function Landing() {
           <li><a href="#scanner">Scanner</a></li>
           <li><a href="#curso">Curso</a></li>
           <li><a href="#dossier">Dossier</a></li>
-          <li><a href="#precos">Preços</a></li>
+          {ENABLE_PRICING && <li><a href="#precos">Preços</a></li>}
           <li><Link to="/login" className="nav-link-ghost">Entrar</Link></li>
         </ul>
         <Link to="/register" className="nav-cta">Começar Grátis →</Link>
@@ -861,13 +862,15 @@ export default function Landing() {
               </div>
               <div className="amount">€1M</div>
             </div>
-            <div className="penalty-item green">
-              <div>
-                <div className="type">Plano Pro CISPLAN — por mês</div>
-                <div className="sub">Scanner + Curso + Remediação IA</div>
+            {ENABLE_PRICING && (
+              <div className="penalty-item green">
+                <div>
+                  <div className="type">Plano Pro CISPLAN — por mês</div>
+                  <div className="sub">Scanner + Curso + Remediação IA</div>
+                </div>
+                <div className="amount">€89</div>
               </div>
-              <div className="amount">€89</div>
-            </div>
+            )}
             <div className="penalty-note">
               * Valores conforme Arts. 31.º–35.º DL 125/2025. As coimas são calculadas sobre o volume de negócios anual total mundial do exercício anterior, o valor que for mais elevado.
             </div>
@@ -876,6 +879,7 @@ export default function Landing() {
       </section>
 
       {/* PRICING */}
+      {ENABLE_PRICING && (
       <section className="pricing" id="precos">
         <div className="pricing-header fade-in">
           <div className="section-label" style={{ color: "#f0c040" }}>Preços e Planos</div>
@@ -976,6 +980,7 @@ export default function Landing() {
           </p>
         </div>
       </section>
+      )}
 
       {/* FAQ */}
       <section className="faq">
@@ -1037,8 +1042,9 @@ export default function Landing() {
             <a href="#scanner">Scanner NIS2</a>
             <a href="#curso">Curso NIS2</a>
             <a href="#dossier">Dossier de Conformidade</a>
-            <a href="#precos">Preços</a>
+            {ENABLE_PRICING && <a href="#precos">Preços</a>}
           </div>
+          {ENABLE_PRICING && (
           <div className="footer-col">
             <h4>Planos</h4>
             <a href="#precos">Starter — Gratuito</a>
@@ -1046,6 +1052,7 @@ export default function Landing() {
             <a href="#precos">MSSP — €199/mês</a>
             <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN">Enterprise</a>
           </div>
+          )}
           <div className="footer-col">
             <h4>Conta</h4>
             <Link to="/login">Entrar</Link>

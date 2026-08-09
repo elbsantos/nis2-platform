@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { ExplainerPanel } from "../components/ExplainerPanel";
+import { ENABLE_PRICING } from "../lib/featureFlags";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -256,9 +257,11 @@ function BulkScanTab() {
         <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
           Scana múltiplos domínios de uma vez. Até {DEMO_MAX_TARGETS} alvos por batch nesta fase.
         </p>
-        <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
-          Ver planos →
-        </Link>
+        {ENABLE_PRICING && (
+          <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
+            Ver planos →
+          </Link>
+        )}
       </div>
     );
   }
@@ -342,9 +345,11 @@ function SubdomainScanTab() {
         <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
           Descobre automaticamente subdomínios via CT logs e DNS, e scana todos de uma vez.
         </p>
-        <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
-          Ver planos →
-        </Link>
+        {ENABLE_PRICING && (
+          <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
+            Ver planos →
+          </Link>
+        )}
       </div>
     );
   }

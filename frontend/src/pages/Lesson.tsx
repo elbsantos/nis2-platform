@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc";
+import { ENABLE_PRICING } from "../lib/featureFlags";
 
 // ---------------------------------------------------------------------------
 // Template type icons
@@ -160,7 +161,7 @@ function TemplatesSection({ templates }: { templates: any[] }) {
           </div>
         ))}
       </div>
-      {locked > 0 && (
+      {ENABLE_PRICING && locked > 0 && (
         <p className="text-xs text-gray-400 mt-2">
           {locked} documento(s) disponíveis no{" "}
           <a href="/billing" className="text-blue-600 hover:underline">plano Pro</a>.
@@ -350,12 +351,14 @@ export default function Lesson() {
             <p className="text-sm text-gray-500 mb-6">
               {error?.message}
             </p>
-            <a
-              href="/billing"
-              className="inline-block px-5 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-lg hover:bg-blue-800"
-            >
-              Ver planos →
-            </a>
+            {ENABLE_PRICING && (
+              <a
+                href="/billing"
+                className="inline-block px-5 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-lg hover:bg-blue-800"
+              >
+                Ver planos →
+              </a>
+            )}
           </>
         ) : (
           <>

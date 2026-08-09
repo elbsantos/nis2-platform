@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../lib/auth";
+import { ENABLE_PRICING } from "../lib/featureFlags";
 
 // ---------------------------------------------------------------------------
 // Plan definitions
@@ -526,14 +527,27 @@ export default function Billing() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header — mostra "Planos e Preços" (original) ou "Conta" (demo, sem preços), conforme a flag */}
       <div className="text-center mb-10">
-        <h1 className="text-2xl font-bold text-white">Planos e Preços</h1>
-        <p className="text-slate-400 mt-2 text-sm">
-          Conformidade NIS2 para PMEs portuguesas. Sem surpresas, sem contratos anuais.
-        </p>
+        {ENABLE_PRICING ? (
+          <>
+            <h1 className="text-2xl font-bold text-white">Planos e Preços</h1>
+            <p className="text-slate-400 mt-2 text-sm">
+              Conformidade NIS2 para PMEs portuguesas. Sem surpresas, sem contratos anuais.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold text-white">Conta</h1>
+            <p className="text-slate-400 mt-2 text-sm">
+              Gestão da tua conta CISPLAN.
+            </p>
+          </>
+        )}
       </div>
 
+      {ENABLE_PRICING && (
+      <>
       {/* Active subscription summary */}
       <SubscriptionCard />
 
@@ -606,8 +620,11 @@ export default function Billing() {
           Falar com a equipa →
         </a>
       </div>
+      </>
+      )}
 
-      {/* Danger zone */}
+      {/* Danger zone — NUNCA envolvida na flag: eliminação de conta (RGPD art. 17)
+          tem de continuar acessível mesmo com os planos escondidos */}
       <DangerZone />
     </div>
   );

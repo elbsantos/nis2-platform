@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "./lib/auth";
+import { ENABLE_PRICING } from "./lib/featureFlags";
 import Landing        from "./pages/Landing";
 import Login          from "./pages/Login";
 import Register       from "./pages/Register";
@@ -61,7 +62,7 @@ const MAIN_ITEMS: NavItem[] = [
 const SECONDARY_ITEMS: NavItem[] = [
   { to: "/course",       label: "Curso",     icon: "🎓" },
   { to: "/scan/history",  label: "Histórico", icon: "🕓" },
-  { to: "/billing",       label: "Planos",    icon: "💳" },
+  { to: "/billing",       label: ENABLE_PRICING ? "Planos" : "Conta",    icon: "💳" },
 ];
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {

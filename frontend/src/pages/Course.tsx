@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { ENABLE_PRICING } from "../lib/featureFlags";
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -212,7 +213,7 @@ export default function Course() {
       )}
 
       {/* Pro upsell (if free plan and module 2 locked) */}
-      {!isLoading && modules && modules.some((m: any) => m.lessons.some((l: any) => l.locked)) && (
+      {ENABLE_PRICING && !isLoading && modules && modules.some((m: any) => m.lessons.some((l: any) => l.locked)) && (
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
           <p className="text-sm font-semibold text-amber-800 mb-1">
             🔒 Módulo 2 disponível no plano Pro
