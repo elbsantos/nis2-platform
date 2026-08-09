@@ -57,3 +57,7 @@ test-*.ts
 RECON-*.md
 ARQUITETURA-SCAN.md
 findings-catalog.md
+
+# Backups de base de dados — contêm dados de produção, NUNCA commitar
+*.sql
+backups/
