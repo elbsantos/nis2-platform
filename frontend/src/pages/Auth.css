@@ -148,6 +148,51 @@
   color: #334155;
 }
 
+/* Password field with show/hide toggle */
+.auth-password-wrap {
+  position: relative;
+}
+
+.auth-field input.auth-password-input {
+  padding-right: 42px;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.auth-password-toggle:hover {
+  color: #94a3b8;
+}
+
+.auth-password-toggle:focus-visible {
+  outline: 2px solid #4a9eff;
+  outline-offset: 2px;
+}
+
+/* Secondary link inside a field (e.g. "Esqueceste-te da senha?") — same
+   gold accent as .auth-subtitle a, for legibility on the dark background. */
+.auth-hint {
+  color: #f0c040;
+  text-decoration: none;
+}
+
+.auth-hint:hover {
+  text-decoration: underline;
+}
+
 /* Error */
 .auth-error {
   background: rgba(155, 0, 0, 0.12);

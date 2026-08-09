@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { PasswordInput } from "../components/PasswordInput";
 import "./Auth.css";
 
 const ARTICLES = [
@@ -77,9 +78,8 @@ export default function Login() {
 
               <div className="auth-field">
                 <label htmlFor="login-password">Password</label>
-                <input
+                <PasswordInput
                   id="login-password"
-                  type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required

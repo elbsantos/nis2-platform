@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { PasswordInput } from "../components/PasswordInput";
 import "./Auth.css";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -117,9 +118,8 @@ export default function Register() {
 
               <div className="auth-field">
                 <label htmlFor="reg-password">Password</label>
-                <input
+                <PasswordInput
                   id="reg-password"
-                  type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
