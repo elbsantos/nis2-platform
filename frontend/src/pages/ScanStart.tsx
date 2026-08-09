@@ -51,7 +51,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function CopyButton({ value }: { value: string }) {
+export function CopyButton({ value }: { value: string }) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   const handleCopy = async () => {

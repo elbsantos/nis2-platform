@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "../lib/auth";
+import { CopyButton } from "./ScanStart";
 
 const CARD = "bg-[#152744] border border-[#1e3a5f] rounded-xl";
 
@@ -36,6 +38,11 @@ const STEPS: Array<{ n: number; title: string; text: string }> = [
 ];
 
 export default function BemVindo() {
+  const { user } = useAuth();
+  const orgName = user?.org?.name;
+  const orgId = user?.org?.id;
+  const token = orgId ? `nis2pt-verify=${orgId}` : "";
+
   return (
     <div className="min-h-screen bg-[#0f1e38]">
       <div className="max-w-4xl mx-auto px-8 py-12 space-y-8">
@@ -79,6 +86,43 @@ export default function BemVindo() {
             Nunca geramos evidência de algo que não aconteceu.
           </p>
         </div>
+
+        <section className={`${CARD} p-6`}>
+          <h2 className="text-2xl font-semibold text-white mb-1">O seu código de verificação de domínio</h2>
+          <p className="text-slate-400 text-lg mb-5">
+            Antes de analisar um domínio no{" "}
+            <Link to="/scan/start" className="text-[#f0c040] hover:underline">
+              Scanner
+            </Link>
+            , precisa de confirmar que ele lhe pertence, adicionando este valor como um registo DNS
+            TXT no seu domínio. Veja o passo a passo no Scanner, no painel "Como usar o scanner".
+          </p>
+
+          {orgId ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-x-10 gap-y-1 text-base">
+                <p>
+                  <span className="text-slate-500">Organização: </span>
+                  <span className="text-white font-medium">{orgName ?? "—"}</span>
+                </p>
+                <p>
+                  <span className="text-slate-500">ID: </span>
+                  <span className="text-white font-medium">{orgId}</span>
+                </p>
+              </div>
+              <div className="flex items-stretch gap-2">
+                <code className="flex-1 block text-sm bg-[#0f1e38] border border-[#1e3a5f] rounded-lg p-3 font-mono break-all text-[#f0c040]">
+                  {token}
+                </code>
+                <CopyButton value={token} />
+              </div>
+            </div>
+          ) : (
+            <p className="text-slate-400 text-base italic">
+              Complete o seu perfil para gerar o código.
+            </p>
+          )}
+        </section>
 
         <div className="flex items-center gap-6 pt-2 flex-wrap">
           <Link
