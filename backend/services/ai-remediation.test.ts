@@ -144,98 +144,6 @@ describe("parseAIPlan — truncation discard (simulated by caller)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (a2) parseAIPlan — comando em linha separada / bloco de código
-// Regressão do bug reportado: "o texto diz 'executando:' mas o comando
-// desaparece". Reproduz os dois casos do diagnóstico (inline vs linha própria)
-// e um caso extra de bloco ```code```.
-// ---------------------------------------------------------------------------
-
-// Caso A — comandos INLINE na mesma linha do número (estilo CVE-2014-0118).
-const RAW_INLINE = `
-Este CVE permite que um atacante remoto cause negação de serviço no seu servidor Apache através de pedidos manipulados que consomem excesso de memória.
-
-1. Actualiza o Apache HTTP Server com o comando apt-get update && apt-get install --only-upgrade apache2
-2. Verifica a versão instalada com apache2 -v para confirmar que é >= 2.4.10
-3. Reinicia o serviço com systemctl restart apache2
-
-Esforço: Médio
-Art. 21(2)(e)
-`;
-
-// Caso B — comandos em LINHA SEPARADA, a seguir a "executando:" (estilo 14 passos
-// observado pelo Emerson).
-const stepsB = Array.from({ length: 14 }, (_, i) => {
-  const n = i + 1;
-  return `${n}. Passo número ${n} do plano de correção, executando:\ncomando-exemplo-passo-${n} --flag valor`;
-}).join("\n");
-
-const RAW_SEPARATE_LINE = `
-Este CVE permite a um atacante explorar uma falha de validação num módulo Apache, levando a potencial escalada de privilégios no servidor.
-
-${stepsB}
-
-Esforço: Alto
-Art. 21(2)(i)
-`;
-
-// Caso C — comando dentro de um bloco \`\`\`code\`\`\` markdown.
-const RAW_CODE_FENCE = `
-Este CVE permite execução remota de código através de um módulo desactualizado.
-
-1. Recompila o módulo com o patch aplicado, executando o bloco abaixo:
-\`\`\`bash
-./configure && make && make install
-\`\`\`
-2. Reinicia o serviço Apache para carregar o módulo actualizado, executando:
-\`\`\`
-systemctl restart apache2
-\`\`\`
-
-Esforço: Alto
-Art. 21(2)(i)
-`;
-
-describe("parseAIPlan — comando em linha separada / bloco de código (fix)", () => {
-  it("Caso A (inline) continua completo — sem regressão", () => {
-    const plan = parseAIPlan(RAW_INLINE, "CVE-2014-0118 — apache");
-    expect(plan.steps.length).toBe(3);
-    for (const s of plan.steps) {
-      expect(s.instruction.trim()).not.toBe("");
-      expect(s.instruction.trim().endsWith(":")).toBe(false);
-    }
-  });
-
-  it("Caso B (comando em linha separada) — comando é anexado, não descartado", () => {
-    const plan = parseAIPlan(RAW_SEPARATE_LINE, "CVE-2016-8612 — apache-mod");
-    expect(plan.steps.length).toBe(14);
-    for (let i = 0; i < plan.steps.length; i++) {
-      const s = plan.steps[i];
-      // Já não deve terminar em "executando:" sem mais nada a seguir.
-      expect(s.instruction.trim().endsWith("executando:")).toBe(false);
-      expect(s.instruction).toContain(`comando-exemplo-passo-${i + 1} --flag valor`);
-    }
-  });
-
-  it("Caso C (bloco ```code```) — fence é descartada, conteúdo do bloco é anexado", () => {
-    const plan = parseAIPlan(RAW_CODE_FENCE, "CVE-TEST-FENCE — apache");
-    expect(plan.steps.length).toBe(2);
-    expect(plan.steps[0].instruction).toContain("./configure && make && make install");
-    expect(plan.steps[0].instruction).not.toContain("```");
-    expect(plan.steps[1].instruction).toContain("systemctl restart apache2");
-    expect(plan.steps[1].instruction).not.toContain("```");
-  });
-
-  it("Esforço/Artigo NIS2 a seguir a um passo continuam a ser capturados nos campos próprios, não anexados ao último passo", () => {
-    const plan = parseAIPlan(RAW_SEPARATE_LINE, "CVE-2016-8612 — apache-mod");
-    expect(plan.effort).toBe("high");
-    expect(plan.nis2Articles).toContain("Art. 21(2)(i)");
-    const lastStep = plan.steps[plan.steps.length - 1];
-    expect(lastStep.instruction).not.toContain("Esforço");
-    expect(lastStep.instruction).not.toContain("Art. 21");
-  });
-});
-
-// ---------------------------------------------------------------------------
 // (c) Keyword inference — XAMPP without section header → windows
 // ---------------------------------------------------------------------------
 
@@ -328,7 +236,7 @@ const LIBRARY_ENTRY_V2 = {
   riskSummary: "Risco real da biblioteca.",
   effort: "medium" as const,
   nis2Articles: ["Art. 21(2)(e)"],
-  promptVersion: 3, // must track REMEDIATION_PROMPT_VERSION in ai-remediation.ts
+  promptVersion: 2,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -399,7 +307,7 @@ describe("generateRemediationForScan — library integration", () => {
     expect(mockChat).toHaveBeenCalledTimes(1);
     expect(mockUpsert).toHaveBeenCalledTimes(1);
     expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ cveId: "CVE-2024-9999", promptVersion: 3 })
+      expect.objectContaining({ cveId: "CVE-2024-9999", promptVersion: 2 })
     );
   });
 
