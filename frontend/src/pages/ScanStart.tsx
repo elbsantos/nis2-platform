@@ -4,6 +4,7 @@ import { trpc } from "../lib/trpc";
 import { useAuth } from "../lib/auth";
 import { ExplainerPanel } from "../components/ExplainerPanel";
 import { ENABLE_PRICING } from "../lib/featureFlags";
+import { Card } from "../components/ui/Card";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -169,54 +170,48 @@ function TabBar({ active, setTab }: { active: Tab; setTab: (t: Tab) => void }) {
 function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
   token: string; isIp: boolean; domain: string; wellKnownUrl?: string | null;
 }) {
+  const nomeLabel = isIp ? "URL do ficheiro" : "Nome do registo";
+  const nomeValor = isIp ? (wellKnownUrl ?? "") : `@  (ou ${domain})`;
+  const propagacao = isIp
+    ? "O ficheiro deve ficar acessível via HTTP."
+    : "A propagação de DNS pode demorar até 5 minutos.";
+
   return (
-    <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+    <Card className="mt-4 p-4 space-y-4">
+      {/* estado */}
       <div className="flex items-center gap-2">
-        <span className="text-amber-600 text-lg">⚠️</span>
-        <p className="text-sm font-semibold text-amber-800">Propriedade não verificada</p>
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border text-warn border-warn/40 bg-warn/10">
+          Propriedade não verificada
+        </span>
       </div>
-      {isIp ? (
-        <div className="space-y-2">
-          <p className="text-xs text-amber-700">Crie o ficheiro abaixo no servidor e tente novamente:</p>
-          <div>
-            <p className="text-xs text-gray-500 font-medium mb-1">URL do ficheiro:</p>
-            <code className="block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-gray-800">
-              {wellKnownUrl}
-            </code>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium mb-1">Conteúdo:</p>
-            <div className="flex items-stretch gap-2">
-              <code className="flex-1 block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
-                {token}
-              </code>
-              <CopyButton value={token} />
-            </div>
-          </div>
-          <p className="text-xs text-amber-600">O ficheiro deve ser acessível via HTTP.</p>
+
+      <p className="text-sm text-dim">
+        {isIp
+          ? "Crie o ficheiro abaixo no servidor e verifique de novo."
+          : "Adicione este registo DNS ao seu domínio e verifique de novo."}
+      </p>
+
+      {/* registo: Nome/URL (contexto) */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider text-faint font-mono mb-1">{nomeLabel}</p>
+        <code className="block text-xs bg-field border border-line rounded-lg p-2.5 font-mono break-all text-text">
+          {nomeValor}
+        </code>
+      </div>
+
+      {/* VALOR — o herói: monospace, destacado, copiável */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider text-accent font-mono mb-1">Valor a colar</p>
+        <div className="flex items-stretch gap-2">
+          <code className="flex-1 block text-sm bg-field border border-accent/40 rounded-lg p-2.5 font-mono break-all text-text">
+            {token}
+          </code>
+          <CopyButton value={token} />
         </div>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-xs text-amber-700">Adicione este DNS TXT record e tente novamente:</p>
-          <div>
-            <p className="text-xs text-gray-500 font-medium mb-1">Nome do registo:</p>
-            <code className="block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono text-gray-800">
-              @ (ou {domain})
-            </code>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium mb-1">Valor:</p>
-            <div className="flex items-stretch gap-2">
-              <code className="flex-1 block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
-                {token}
-              </code>
-              <CopyButton value={token} />
-            </div>
-          </div>
-          <p className="text-xs text-amber-600">Propagação DNS pode demorar até 5 minutos.</p>
-        </div>
-      )}
-    </div>
+      </div>
+
+      <p className="text-xs text-faint">{propagacao}</p>
+    </Card>
   );
 }
 
