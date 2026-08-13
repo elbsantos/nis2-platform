@@ -68,13 +68,13 @@ export default function Register() {
           <div className="auth-content">
             <h1>Criar conta gratuita</h1>
             <p className="auth-subtitle">
-              Já tens conta?{" "}
+              Já tem conta?{" "}
               <Link to="/login">Entrar</Link>
             </p>
 
             {plan && PLAN_LABELS[plan] && (
               <div className="auth-plan-banner">
-                ✦ Seleccionaste o plano {PLAN_LABELS[plan]} — preenche os dados para continuar
+                ✦ Seleccionou o plano {PLAN_LABELS[plan]} — preencha os dados para continuar
               </div>
             )}
 
@@ -140,7 +140,7 @@ export default function Register() {
             </form>
 
             <p className="auth-legal">
-              Ao registar aceitas os{" "}
+              Ao registar aceita os{" "}
               <a href="#">termos de serviço</a>
               {" "}e a{" "}
               <a href="#">política de privacidade</a>.
@@ -169,7 +169,7 @@ export default function Register() {
           <div className="showcase-inner">
             <span className="showcase-eyebrow">Conformidade NIS2 simplificada</span>
             <div className="showcase-header">
-              <h2>O teu score NIS2 em menos de 5 minutos</h2>
+              <h2>O seu score NIS2 em menos de 5 minutos</h2>
               <p>
                 Scanner agentless, análise por artigo e remediação guiada por IA —
                 tudo em português, feito para PMEs portuguesas.
@@ -203,12 +203,12 @@ export default function Register() {
               <div className="benefit-card">
                 <span className="benefit-icon">🔍</span>
                 <h4>Scanner agentless</h4>
-                <p>Analisa a tua superfície de ataque sem instalar nada</p>
+                <p>Analise a sua superfície de ataque sem instalar nada</p>
               </div>
               <div className="benefit-card">
                 <span className="benefit-icon">🤖</span>
                 <h4>Remediação IA</h4>
-                <p>Claude sugere prioridades adaptadas ao teu sector</p>
+                <p>Claude sugere prioridades adaptadas ao seu sector</p>
               </div>
               <div className="benefit-card">
                 <span className="benefit-icon">📚</span>

@@ -51,9 +51,9 @@ export default function Login() {
           </Link>
 
           <div className="auth-content">
-            <h1>Entrar na tua conta</h1>
+            <h1>Entrar na sua conta</h1>
             <p className="auth-subtitle">
-              Não tens conta?{" "}
+              Não tem conta?{" "}
               <Link to="/register">Registar gratuitamente</Link>
             </p>
 
@@ -86,7 +86,7 @@ export default function Login() {
                   placeholder="••••••••"
                 />
                 <Link to="/forgot-password" className="auth-hint" style={{ fontSize: "13px", display: "block", marginTop: "4px", textAlign: "right" }}>
-                  Esqueceste-te da senha?
+                  Esqueceu-se da senha?
                 </Link>
               </div>
 
@@ -120,10 +120,10 @@ export default function Login() {
           <div className="showcase-inner">
             <span className="showcase-eyebrow">Plataforma NIS2 para PMEs</span>
             <div className="showcase-header">
-              <h2>Conformidade NIS2 ao alcance da tua empresa</h2>
+              <h2>Conformidade NIS2 ao alcance da sua empresa</h2>
               <p>
-                Avalia a tua postura de segurança, identifica lacunas por artigo NIS2
-                e obtém recomendações prioritizadas pela IA.
+                Avalie a sua postura de segurança, identifique lacunas por artigo NIS2
+                e obtenha recomendações prioritizadas pela IA.
               </p>
             </div>
 

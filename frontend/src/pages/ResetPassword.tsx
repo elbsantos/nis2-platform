@@ -60,14 +60,14 @@ export default function ResetPassword() {
 
       if (res.ok) {
         navigate("/login", {
-          state: { message: "Senha atualizada. Entra com a nova senha." },
+          state: { message: "Senha atualizada. Entre com a nova senha." },
           replace: true,
         });
       } else {
-        setError("Link inválido ou expirado. Pede um novo.");
+        setError("Link inválido ou expirado. Peça um novo.");
       }
     } catch {
-      setError("Ocorreu um erro. Tenta novamente.");
+      setError("Ocorreu um erro. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,7 @@ export default function ResetPassword() {
           <div className="auth-content">
             <h1>Definir nova senha</h1>
             <p className="auth-subtitle">
-              Escolhe uma senha segura com pelo menos 8 caracteres.
+              Escolha uma senha segura com pelo menos 8 caracteres.
             </p>
 
             <form className="auth-form" onSubmit={handleSubmit}>

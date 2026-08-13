@@ -156,7 +156,7 @@ function SubscriptionCard() {
           {!isCanceling && (
             cancelConfirm ? (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Tens a certeza?</span>
+                <span className="text-xs text-gray-500">Tem a certeza?</span>
                 <button
                   onClick={() => { cancelMut.mutate(); setCancelConfirm(false); }}
                   disabled={cancelMut.isPending}
@@ -308,15 +308,15 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: "Os dados ficam guardados se fizer downgrade?",
-    a: "Sim. Todos os scans, questionários e planos de remediação ficam guardados. No plano gratuito deixas de poder gerar novos relatórios AI e scans ilimitados.",
+    a: "Sim. Todos os scans, questionários e planos de remediação ficam guardados. No plano gratuito deixa de poder gerar novos relatórios AI e scans ilimitados.",
   },
   {
     q: "O plano MSSP inclui sub-contas para clientes?",
-    a: "Sim. Podes criar organizações separadas para cada cliente, com dashboards e relatórios independentes.",
+    a: "Sim. Pode criar organizações separadas para cada cliente, com dashboards e relatórios independentes.",
   },
   {
     q: "Existe desconto para pagamento anual?",
-    a: "Sim — 2 meses grátis no pagamento anual. Contacta hello@nis2pt.pt para activar.",
+    a: "Sim — 2 meses grátis no pagamento anual. Contacte hello@nis2pt.pt para activar.",
   },
   {
     q: "As faturas são emitidas com IVA português?",
@@ -385,10 +385,10 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
       await logout();
       navigate("/login", {
         replace: true,
-        state:   { message: "A tua conta foi eliminada. Os teus dados foram apagados conforme o RGPD, art. 17." },
+        state:   { message: "A sua conta foi eliminada. Os seus dados foram apagados conforme o RGPD, art. 17." },
       });
     } catch {
-      setError("Erro de ligação. Tenta novamente.");
+      setError("Erro de ligação. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -405,7 +405,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
           questionários, planos de remediação e organização. A conta não pode ser recuperada.
         </p>
         <p className="text-sm text-gray-600 mb-5">
-          Para confirmar, introduz a tua senha actual:
+          Para confirmar, introduza a sua senha actual:
         </p>
 
         <div className="mb-4">
@@ -462,9 +462,9 @@ function DangerZone() {
       <div className="mt-16 border border-red-800/60 bg-red-950/20 rounded-2xl p-6 max-w-2xl mx-auto">
         <h2 className="text-base font-bold text-red-400 mb-1">Zona de Perigo</h2>
         <p className="text-sm text-slate-400 mb-5">
-          A eliminação de conta apaga permanentemente todos os teus dados — scans, questionários,
-          organização e planos de remediação — e não pode ser revertida. Tens direito ao apagamento
-          dos teus dados pessoais nos termos do RGPD, art. 17.
+          A eliminação de conta apaga permanentemente todos os seus dados — scans, questionários,
+          organização e planos de remediação — e não pode ser revertida. Tem direito ao apagamento
+          dos seus dados pessoais nos termos do RGPD, art. 17.
         </p>
         <button
           onClick={() => setShowModal(true)}
@@ -501,7 +501,7 @@ export default function Billing() {
       setToast({ type: "success", msg: `Plano ${label} activado com sucesso! Bem-vindo.` });
       setSearchParams({}, { replace: true });
     } else if (canceled === "1") {
-      setToast({ type: "error", msg: "Checkout cancelado. Podes tentar novamente quando quiseres." });
+      setToast({ type: "error", msg: "Checkout cancelado. Pode tentar novamente quando quiser." });
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -540,7 +540,7 @@ export default function Billing() {
           <>
             <h1 className="text-2xl font-bold text-white">Conta</h1>
             <p className="text-slate-400 mt-2 text-sm">
-              Gestão da tua conta CISPLAN.
+              Gestão da sua conta CISPLAN.
             </p>
           </>
         )}
@@ -611,7 +611,7 @@ export default function Billing() {
           Precisas de uma proposta personalizada?
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          Para organismos públicos, contratos anuais ou volume de clientes, entra em contacto directo.
+          Para organismos públicos, contratos anuais ou volume de clientes, entre em contacto directo.
         </p>
         <a
           href="mailto:hello@nis2pt.pt?subject=Proposta CISPLAN"

@@ -21,10 +21,10 @@ export default function ForgotPassword() {
       if (res.ok) {
         setSent(true);
       } else {
-        setError("Ocorreu um erro. Tenta novamente.");
+        setError("Ocorreu um erro. Tente novamente.");
       }
     } catch {
-      setError("Ocorreu um erro. Tenta novamente.");
+      setError("Ocorreu um erro. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ export default function ForgotPassword() {
             {!sent ? (
               <>
                 <p className="auth-subtitle">
-                  Indica o teu email e enviamos um link para redefinires a senha.
+                  Indique o seu email e enviamos um link para redefinir a senha.
                 </p>
 
                 <form className="auth-form" onSubmit={handleSubmit}>
@@ -70,10 +70,10 @@ export default function ForgotPassword() {
             ) : (
               <div>
                 <p className="auth-subtitle">
-                  Se o email existir na plataforma, receberás um link de reset nos próximos minutos.
+                  Se o email existir na plataforma, receberá um link de reposição nos próximos minutos.
                 </p>
                 <p className="auth-subtitle">
-                  Verifica também a pasta de spam — é um domínio recente.
+                  Verifique também a pasta de spam — é um domínio recente.
                 </p>
               </div>
             )}

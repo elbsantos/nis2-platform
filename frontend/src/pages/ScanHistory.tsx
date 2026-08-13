@@ -35,7 +35,7 @@ export default function ScanHistory() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Histórico de Scans</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Todos os scans da tua organização</p>
+          <p className="text-sm text-slate-400 mt-0.5">Todos os scans da sua organização</p>
         </div>
         <Link
           to="/scan/start"
@@ -60,7 +60,7 @@ export default function ScanHistory() {
       {/* Empty */}
       {!isLoading && !error && scans?.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-slate-400 text-sm mb-4">Ainda não executaste nenhum scan.</p>
+          <p className="text-slate-400 text-sm mb-4">Ainda não executou nenhum scan.</p>
           <Link
             to="/scan/start"
             className="inline-block px-4 py-2 bg-blue-700 text-white text-sm rounded-md hover:bg-blue-800"

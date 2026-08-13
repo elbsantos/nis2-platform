@@ -177,7 +177,7 @@ function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
       </div>
       {isIp ? (
         <div className="space-y-2">
-          <p className="text-xs text-amber-700">Cria o ficheiro abaixo no servidor e tenta novamente:</p>
+          <p className="text-xs text-amber-700">Crie o ficheiro abaixo no servidor e tente novamente:</p>
           <div>
             <p className="text-xs text-gray-500 font-medium mb-1">URL do ficheiro:</p>
             <code className="block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono break-all text-gray-800">
@@ -197,7 +197,7 @@ function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-xs text-amber-700">Adiciona este DNS TXT record e tenta novamente:</p>
+          <p className="text-xs text-amber-700">Adicione este DNS TXT record e tente novamente:</p>
           <div>
             <p className="text-xs text-gray-500 font-medium mb-1">Nome do registo:</p>
             <code className="block text-xs bg-white border border-gray-200 rounded-lg p-2.5 font-mono text-gray-800">
@@ -712,7 +712,7 @@ export default function ScanStart() {
           </h1>
 
           <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
-            Analisa a superfície de ataque do teu domínio ou IP em 6 camadas —{" "}
+            Analise a superfície de ataque do seu domínio ou IP em 6 camadas —{" "}
             <span className="text-slate-300">sem instalar software</span>. Mapeamento automático ao Art.&nbsp;21.º da Directiva NIS2 (EU&nbsp;2022/2555).
           </p>
 
@@ -776,7 +776,7 @@ export default function ScanStart() {
               <div>
                 <p className="text-xs font-semibold text-blue-300 mb-0.5">Verificação de propriedade</p>
                 <p className="text-xs text-blue-400/80 leading-relaxed">
-                  Antes de iniciar o scan, verificamos que és o proprietário do target via DNS TXT record ou ficheiro HTTP. Isto protege terceiros de scans não autorizados.
+                  Antes de iniciar o scan, verificamos que é o proprietário do target via DNS TXT record ou ficheiro HTTP. Isto protege terceiros de scans não autorizados.
                 </p>
               </div>
             </div>
