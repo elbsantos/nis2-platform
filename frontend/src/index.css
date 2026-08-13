@@ -1,9 +1,43 @@
 @import "tailwindcss";
 
-/* NIS2 PT design tokens */
+/* ── CISPLAN · fundação de tokens (Commit 0: definidos, ainda não adotados) ── */
 @theme {
+  /* compat: variáveis antigas mantidas (mortas, mas sem custo) — remover em cleanup futuro */
   --color-brand:   #1d4ed8;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger:  #ef4444;
+
+  /* superfícies (navy já usada na app, agora com nome) */
+  --color-bg:        #0b1526;
+  --color-surface:   #0f1e38;
+  --color-surface-2: #152744;
+  --color-field:     #0b1a30;
+  --color-line:      #1e3a5f;
+  --color-line-soft: #16283f;
+
+  /* texto */
+  --color-text:  #e7edf6;
+  --color-dim:   #8a99b4;
+  --color-faint: #5c6b86;
+
+  /* acento único (ação + links, sobre fundo escuro) */
+  --color-accent:        #5b9cff;
+  --color-accent-strong: #1d4ed8;  /* fundos claros (landing) */
+  --color-accent-ink:    #081020;  /* texto sobre acento */
+
+  /* semânticas — só para ESTADO */
+  --color-ok:   #10b981;
+  --color-warn: #f59e0b;
+  --color-bad:  #ef4444;
+
+  /* severidade (uso semântico nas tabelas de CVE) */
+  --color-sev-baixa:   #5b9cff;
+  --color-sev-media:   #f59e0b;
+  --color-sev-alta:    #fb923c;
+  --color-sev-critica: #ef4444;
+
+  /* raios */
+  --radius-card: 12px;
+  --radius-ctrl: 8px;
 }
