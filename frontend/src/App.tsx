@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, NavLink, Outlet } from "react-router-dom";
+import {
+  User, Compass, ClipboardList, Search, Wrench, FileText,
+  GraduationCap, History, CreditCard, type LucideIcon,
+} from "lucide-react";
+import { Icon } from "./components/ui/Icon";
 import { useAuth } from "./lib/auth";
 import { ENABLE_PRICING } from "./lib/featureFlags";
 import Landing        from "./pages/Landing";
@@ -48,21 +53,21 @@ function RequireAuth() {
 // Remediação → Documentos. Secundários (Curso/Histórico/Planos) separados
 // visualmente por baixo, sem ordem de fluxo entre si.
 
-type NavItem = { to: string; label: string; icon: string };
+type NavItem = { to: string; label: string; icon: LucideIcon };
 
 const MAIN_ITEMS: NavItem[] = [
-  { to: "/perfil",        label: "Perfil",        icon: "👤" },
-  { to: "/enquadramento", label: "Enquadramento", icon: "🧭" },
-  { to: "/questionnaire", label: "Questionário",  icon: "📋" },
-  { to: "/scan/start",    label: "Scanner",       icon: "🔍" },
-  { to: "/remediation",   label: "Remediação",    icon: "🛠️" },
-  { to: "/documentos",    label: "Documentos",    icon: "📄" },
+  { to: "/perfil",        label: "Perfil",        icon: User },
+  { to: "/enquadramento", label: "Enquadramento", icon: Compass },
+  { to: "/questionnaire", label: "Questionário",  icon: ClipboardList },
+  { to: "/scan/start",    label: "Scanner",       icon: Search },
+  { to: "/remediation",   label: "Remediação",    icon: Wrench },
+  { to: "/documentos",    label: "Documentos",    icon: FileText },
 ];
 
 const SECONDARY_ITEMS: NavItem[] = [
-  { to: "/course",       label: "Curso",     icon: "🎓" },
-  { to: "/scan/history",  label: "Histórico", icon: "🕓" },
-  { to: "/billing",       label: ENABLE_PRICING ? "Planos" : "Conta",    icon: "💳" },
+  { to: "/course",        label: "Curso",     icon: GraduationCap },
+  { to: "/scan/history",  label: "Histórico", icon: History },
+  { to: "/billing",       label: ENABLE_PRICING ? "Planos" : "Conta", icon: CreditCard },
 ];
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -101,7 +106,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
               onClick={onClose}
               className={({ isActive }) => isActive ? active : inactive}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <Icon as={item.icon} />
               {item.label}
             </NavLink>
           ))}
@@ -117,7 +122,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                 onClick={onClose}
                 className={({ isActive }) => isActive ? active : inactive}
               >
-                <span aria-hidden="true">{item.icon}</span>
+                <Icon as={item.icon} />
                 {item.label}
               </NavLink>
             ))}
