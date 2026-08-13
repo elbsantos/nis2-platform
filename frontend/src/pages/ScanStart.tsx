@@ -173,7 +173,7 @@ function OwnershipBox({ token, isIp, domain, wellKnownUrl }: {
     <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
       <div className="flex items-center gap-2">
         <span className="text-amber-600 text-lg">⚠️</span>
-        <p className="text-sm font-semibold text-amber-800">Ownership não verificado</p>
+        <p className="text-sm font-semibold text-amber-800">Propriedade não verificada</p>
       </div>
       {isIp ? (
         <div className="space-y-2">
@@ -248,7 +248,7 @@ function SingleScanTab() {
       // Use normalized domain from backend (strips https://, path, port, etc.)
       setNormalizedDomain(r.dnsName ?? domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0]);
     } catch (err: any) {
-      setError(err.message ?? "Erro ao verificar ownership");
+      setError(err.message ?? "Erro ao verificar a propriedade");
     } finally { setVerifying(false); }
   };
 
@@ -297,7 +297,7 @@ function SingleScanTab() {
             disabled={!domain || verifying}
             className="w-full py-3 px-4 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-            {verifying ? <><Spinner />A verificar…</> : "Verificar ownership →"}
+            {verifying ? <><Spinner />A verificar…</> : "Verificar propriedade →"}
           </button>
           {token && !verified && (
             <OwnershipBox token={token} isIp={isIp} domain={normalizedDomain || domain} wellKnownUrl={wellKnownUrl} />
@@ -307,7 +307,7 @@ function SingleScanTab() {
         <>
           <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2.5 text-sm text-green-800">
             <span className="text-green-600 text-base">✓</span>
-            <span><strong>Ownership verificado</strong> via {isIp ? "ficheiro HTTP" : "DNS TXT"}.</span>
+            <span><strong>Propriedade verificada</strong> via {isIp ? "ficheiro HTTP" : "DNS TXT"}.</span>
           </div>
           <button
             onClick={handleStart}
@@ -344,7 +344,7 @@ function BulkScanTab() {
   const startBulkMut = trpc.scan.startBulk.useMutation({
     onSuccess: (data) => {
       if (data.failed.length > 0) {
-        setWarning(`${data.started.length} de ${data.started.length + data.failed.length} targets iniciados. ${data.failed.length} sem ownership verificado foram ignorados.`);
+        setWarning(`${data.started.length} de ${data.started.length + data.failed.length} targets iniciados. ${data.failed.length} sem propriedade verificada foram ignorados.`);
       }
       navigate(`/scan/bulk/${data.batchId}`);
     },
@@ -774,7 +774,7 @@ export default function ScanStart() {
             <div className="p-4 bg-blue-950/60 border border-blue-700/30 rounded-xl flex items-start gap-3">
               <span className="text-blue-400 text-sm shrink-0 mt-0.5 font-bold">ℹ</span>
               <div>
-                <p className="text-xs font-semibold text-blue-300 mb-0.5">Verificação de ownership</p>
+                <p className="text-xs font-semibold text-blue-300 mb-0.5">Verificação de propriedade</p>
                 <p className="text-xs text-blue-400/80 leading-relaxed">
                   Antes de iniciar o scan, verificamos que és o proprietário do target via DNS TXT record ou ficheiro HTTP. Isto protege terceiros de scans não autorizados.
                 </p>

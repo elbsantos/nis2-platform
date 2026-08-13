@@ -97,7 +97,7 @@ export default function ScanResults() {
           </p>
           <div className="mt-8 flex justify-center gap-4 flex-wrap">
             {[
-              "Verificação de ownership",
+              "Verificação de propriedade",
               "Análise Shodan",
               "Análise TLS Censys",
               "Segurança Email",
