@@ -5,6 +5,9 @@ import { useAuth } from "../lib/auth";
 import { ExplainerPanel } from "../components/ExplainerPanel";
 import { ENABLE_PRICING } from "../lib/featureFlags";
 import { Card } from "../components/ui/Card";
+import { Radar, Bug, Lock, Mail, ShieldCheck, EyeOff, Search, List, Network, type LucideIcon } from "lucide-react";
+import { Icon } from "../components/ui/Icon";
+import { Badge } from "../components/ui/Badge";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -131,10 +134,10 @@ const ENABLE_SUBDOMAIN_SCAN = true;   // feat/subdomain-scan — testado em back
 
 type Tab = "único" | "lote" | "subdomínios";
 
-const ALL_TABS: { id: Tab; label: string; icon: string; enabled: boolean }[] = [
-  { id: "único",       label: "Scan único",   icon: "🔍", enabled: true               },
-  { id: "lote",        label: "Scan em lote", icon: "📋", enabled: ENABLE_BATCH_SCAN  },
-  { id: "subdomínios", label: "Subdomínios",  icon: "🌐", enabled: ENABLE_SUBDOMAIN_SCAN },
+const ALL_TABS: { id: Tab; label: string; icon: LucideIcon; enabled: boolean }[] = [
+  { id: "único",       label: "Scan único",   icon: Search,  enabled: true },
+  { id: "lote",        label: "Scan em lote", icon: List,    enabled: ENABLE_BATCH_SCAN },
+  { id: "subdomínios", label: "Subdomínios",  icon: Network, enabled: ENABLE_SUBDOMAIN_SCAN },
 ];
 
 const VISIBLE_TABS = ALL_TABS.filter((t) => t.enabled);
@@ -144,18 +147,18 @@ function TabBar({ active, setTab }: { active: Tab; setTab: (t: Tab) => void }) {
   if (VISIBLE_TABS.length <= 1) return null;
 
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+    <div className="flex gap-1 bg-surface-2 rounded-xl p-1 mb-6">
       {VISIBLE_TABS.map((t) => (
         <button
           key={t.id}
           onClick={() => setTab(t.id)}
           className={`flex-1 py-2.5 px-3 text-sm font-medium rounded-lg transition-all ${
             active === t.id
-              ? "bg-white text-blue-700 shadow-sm border border-gray-200"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-surface text-accent border border-line"
+              : "text-dim hover:text-text"
           }`}
         >
-          <span className="mr-1.5">{t.icon}</span>
+          <Icon as={t.icon} className="mr-1.5 inline" />
           {t.label}
         </button>
       ))}
@@ -579,99 +582,59 @@ function SubdomainScanTab() {
 // Capabilities panel — right side
 // ---------------------------------------------------------------------------
 
-const CAPABILITIES = [
-  {
-    icon: "🔌",
-    title: "Portos & Serviços",
-    desc: "Portos TCP/UDP abertos, serviços expostos, banners de versão",
-    tag: "Shodan",
-    tagColor: "bg-red-900/50 text-red-300 border border-red-800/40",
-  },
-  {
-    icon: "🐛",
-    title: "Vulnerabilidades (CVE)",
-    desc: "CVEs públicos associados a versões de software detectadas",
-    tag: "NVD + Shodan",
-    tagColor: "bg-orange-900/50 text-orange-300 border border-orange-800/40",
-  },
-  {
-    icon: "🔒",
-    title: "TLS & Certificados",
-    desc: "Expiração, algoritmos fracos, self-signed, protocolos obsoletos (SSLv3, TLS 1.0)",
-    tag: "Censys",
-    tagColor: "bg-blue-900/50 text-blue-300 border border-blue-800/40",
-  },
-  {
-    icon: "📧",
-    title: "Segurança de Email",
-    desc: "SPF, DKIM (10 selectores), DMARC — conformidade Art. 21(2)(j)",
-    tag: "DNS",
-    tagColor: "bg-purple-900/50 text-purple-300 border border-purple-800/40",
-  },
-  {
-    icon: "🛡️",
-    title: "Headers de Segurança HTTP",
-    desc: "HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy",
-    tag: "HTTP",
-    tagColor: "bg-indigo-900/50 text-indigo-300 border border-indigo-800/40",
-  },
-  {
-    icon: "🌑",
-    title: "Dark Web & Reputação",
-    desc: "Breaches de credenciais (HIBP), blacklists DNS (Spamhaus, SpamCop)",
-    tag: "HIBP + DNS",
-    tagColor: "bg-slate-700/60 text-slate-300 border border-slate-600/40",
-  },
+const CAPABILITIES: { icon: LucideIcon; title: string; desc: string; tag: string }[] = [
+  { icon: Radar,       title: "Portos & Serviços",         desc: "Portos TCP/UDP abertos, serviços expostos, banners de versão", tag: "Shodan" },
+  { icon: Bug,         title: "Vulnerabilidades (CVE)",     desc: "CVEs públicos associados a versões de software detectadas",     tag: "NVD + Shodan" },
+  { icon: Lock,        title: "TLS & Certificados",         desc: "Expiração, algoritmos fracos, self-signed, protocolos obsoletos (SSLv3, TLS 1.0)", tag: "Censys" },
+  { icon: Mail,        title: "Segurança de Email",         desc: "SPF, DKIM (10 selectores), DMARC — conformidade Art. 21(2)(j)", tag: "DNS" },
+  { icon: ShieldCheck, title: "Headers de Segurança HTTP",  desc: "HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy", tag: "HTTP" },
+  { icon: EyeOff,      title: "Dark Web & Reputação",       desc: "Breaches de credenciais (HIBP), blacklists DNS (Spamhaus, SpamCop)", tag: "HIBP + DNS" },
 ];
 
 function CapabilitiesPanel() {
   return (
-    <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700/60 h-full flex flex-col">
+    <Card className="p-6 h-full flex flex-col">
       <div className="mb-5">
-        <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1.5">O que o scanner analisa</p>
-        <h3 className="text-white text-xl font-bold mb-1">6 camadas de análise NIS2</h3>
-        <p className="text-slate-400 text-sm">Mapeadas ao Art. 21 da Directiva NIS2 (EU 2022/2555)</p>
+        <p className="text-xs font-semibold text-accent uppercase tracking-widest mb-1.5">O que o scanner analisa</p>
+        <h3 className="text-text text-xl font-bold mb-1">6 camadas de análise NIS2</h3>
+        <p className="text-dim text-sm">Mapeadas ao Art. 21 da Directiva NIS2 (EU 2022/2555)</p>
       </div>
 
       <div className="space-y-2.5 flex-1">
         {CAPABILITIES.map((c) => (
           <div
             key={c.title}
-            className="flex items-start gap-3.5 p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-800 transition-all"
+            className="flex items-start gap-3.5 p-3.5 bg-field rounded-xl border border-line hover:border-accent/50 transition-colors"
           >
-            <div className="text-xl shrink-0 mt-0.5">{c.icon}</div>
+            <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-surface-2 border border-line flex items-center justify-center">
+              <Icon as={c.icon} className="text-accent" />
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                <span className="text-sm font-semibold text-white">{c.title}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${c.tagColor}`}>{c.tag}</span>
+                <span className="text-sm font-semibold text-text">{c.title}</span>
+                <Badge tone="neutral" className="font-mono">{c.tag}</Badge>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">{c.desc}</p>
-            </div>
-            <div className="shrink-0 mt-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
+              <p className="text-xs text-dim leading-relaxed">{c.desc}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-5 pt-4 border-t border-slate-700/50">
+      <div className="mt-5 pt-4 border-t border-line">
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
             { value: "Art. 21", label: "NIS2 focus" },
             { value: "< 5min",  label: "Tempo médio" },
             { value: "100%",    label: "Agentless" },
           ].map((s) => (
-            <div key={s.label} className="bg-slate-800/50 rounded-lg py-2.5 px-2">
-              <p className="text-white font-bold text-sm">{s.value}</p>
-              <p className="text-slate-500 text-xs mt-0.5">{s.label}</p>
+            <div key={s.label} className="bg-field rounded-lg py-2.5 px-2 border border-line">
+              <p className="text-text font-bold text-sm">{s.value}</p>
+              <p className="text-faint text-xs mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
