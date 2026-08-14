@@ -47,6 +47,7 @@ export const organizations = mysqlTable("organizations", {
   city:                     varchar("city", { length: 120 }),
   ceoContact:               varchar("ceoContact", { length: 120 }),
   countriesOfOperation:     json("countriesOfOperation").$type<string[]>(),
+  verificationToken:        varchar("verificationToken", { length: 64 }),
   createdAt:            timestamp("createdAt").notNull().defaultNow(),
   updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
 });

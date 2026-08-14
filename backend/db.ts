@@ -5,6 +5,7 @@
  * Consolidates db-scans.ts and db-subscriptions.ts.
  */
 
+import { randomBytes } from "crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import * as schema from "../database/schema";
@@ -149,7 +150,7 @@ export async function getOrCreateOrgForOwner(
   const name = displayName?.trim() || `Org-${ownerId}`;
   const [row] = await getDb()
     .insert(organizations)
-    .values({ name, ownerId })
+    .values({ name, ownerId, verificationToken: randomBytes(16).toString("hex") })
     .$returningId();
 
   // Link user → org
@@ -183,7 +184,7 @@ export async function registerUserAtomically(data: {
 
     const [orgRow] = await tx
       .insert(organizations)
-      .values({ name: data.orgName, ownerId: userId })
+      .values({ name: data.orgName, ownerId: userId, verificationToken: randomBytes(16).toString("hex") })
       .$returningId();
     const orgId = orgRow.id;
 

@@ -6,6 +6,10 @@
  */
 
 import http from "http";
+import { randomBytes } from "crypto";
+import { eq } from "drizzle-orm";
+import { organizations } from "../../database/schema";
+import { getDb, getOrganizationById } from "../db";
 import { safeLookup } from "../middlewares/security";
 import type { ShodanHostResult } from "../integrations/shodan";
 import type { CensysHostResult } from "../integrations/censys";
@@ -233,10 +237,27 @@ const PUBLIC_TEST_TARGETS = new Set([
   "self-signed.badssl.com",
 ]);
 
+/** Sufixo aleatório de verificação de uma org. Gera e persiste no primeiro uso.
+ *  Fallback: se não houver coluna/valor, cai no esquema antigo (orgId) — nunca rebenta. */
+export async function getVerificationSuffix(orgId: number): Promise<string> {
+  try {
+    const org = await getOrganizationById(orgId);
+    if (org?.verificationToken) return org.verificationToken;
+    const suffix = randomBytes(16).toString("hex");
+    await getDb().update(organizations)
+      .set({ verificationToken: suffix })
+      .where(eq(organizations.id, orgId));
+    return suffix;
+  } catch {
+    return String(orgId);
+  }
+}
+
 /** Valor único de verificação de propriedade (DNS TXT / ficheiro HTTP).
  *  Fonte de verdade — não formatar "nis2pt-verify=" em mais lado nenhum. */
-export function buildVerificationToken(orgId: number): string {
-  return `nis2pt-verify=${orgId}`;
+export async function buildVerificationToken(orgId: number): Promise<string> {
+  const suffix = await getVerificationSuffix(orgId);
+  return `nis2pt-verify=${suffix}`;
 }
 
 export async function verifyOwnership(
@@ -248,7 +269,7 @@ export async function verifyOwnership(
     return { verified: true, method: "public-test-target" };
   }
 
-  const token = buildVerificationToken(orgId);
+  const token = await buildVerificationToken(orgId);
 
   if (isIpAddress(target)) {
     const found = await fetchWellKnownToken(target);
@@ -549,8 +570,8 @@ export async function executeAgentlessScan(
     const ownership = await verifyOwnershipWithRootFallback(options.target, options.organizationId, options.rootDomain);
     if (!ownership.verified) {
       const hint = isIpAddress(options.target)
-        ? `Cria http://${options.target}/.well-known/nis2pt.txt com o conteúdo: ${buildVerificationToken(options.organizationId)}`
-        : `Adiciona o DNS TXT record: ${buildVerificationToken(options.organizationId)}`;
+        ? `Cria http://${options.target}/.well-known/nis2pt.txt com o conteúdo: ${await buildVerificationToken(options.organizationId)}`
+        : `Adiciona o DNS TXT record: ${await buildVerificationToken(options.organizationId)}`;
       throw new Error(`Verificação de ownership falhou. ${hint}`);
     }
 
