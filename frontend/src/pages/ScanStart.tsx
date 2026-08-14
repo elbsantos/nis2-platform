@@ -647,12 +647,12 @@ export default function ScanStart() {
   const [tab, setTab] = useState<Tab>(VISIBLE_TABS[0]?.id ?? "único");
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #0f172a 0%, #0c1a3a 50%, #0f172a 100%)" }}>
+    <div className="min-h-screen flex flex-col bg-bg">
 
       {/* ── Hero ── */}
       <div className="relative overflow-hidden">
         {/* Decorative glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-6 pt-14 pb-10 text-center">
           {/* Title */}
@@ -713,7 +713,7 @@ export default function ScanStart() {
                 em produção. Reativar aqui quando a causa raiz estiver resolvida. */}
             {/* <VerificationCodeCard /> */}
 
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/50 p-6">
+            <div className="bg-surface border border-line rounded-2xl p-6">
               <TabBar active={tab} setTab={setTab} />
               {tab === "único"       && <SingleScanTab />}
               {tab === "lote"        && <BulkScanTab />}
