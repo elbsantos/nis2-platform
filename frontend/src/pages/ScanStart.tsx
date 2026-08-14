@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../lib/auth";
-import { ENABLE_PRICING } from "../lib/featureFlags";
+import { ENABLE_PRICING, ENABLE_BATCH_SCAN } from "../lib/featureFlags";
 import { Card } from "../components/ui/Card";
 import { Radar, Bug, Lock, Mail, ShieldCheck, EyeOff, Search, List, Network, CheckCircle2, XCircle, AlertTriangle, type LucideIcon } from "lucide-react";
 import { Icon } from "../components/ui/Icon";
@@ -88,7 +88,6 @@ export function CopyButton({ value }: { value: string }) {
 // Feature flags — colocar true para reactivar quando o tab estiver pronto
 // ---------------------------------------------------------------------------
 
-const ENABLE_BATCH_SCAN     = true;   // DEMO: limite de 3 alvos — ver DEMO_MAX_TARGETS em scan.router.ts
 const ENABLE_SUBDOMAIN_SCAN = true;   // feat/subdomain-scan — testado em backend/integrations/subdomain-discovery.test.ts
 
 // ---------------------------------------------------------------------------
