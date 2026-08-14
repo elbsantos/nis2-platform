@@ -8,6 +8,7 @@ import { Card } from "../components/ui/Card";
 import { Radar, Bug, Lock, Mail, ShieldCheck, EyeOff, Search, List, Network, type LucideIcon } from "lucide-react";
 import { Icon } from "../components/ui/Icon";
 import { Badge } from "../components/ui/Badge";
+import { InfoNote } from "../components/ui/InfoNote";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -654,24 +655,15 @@ export default function ScanStart() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-6 pt-14 pb-10 text-center">
-          {/* Status badge */}
-          <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold px-4 py-1.5 rounded-full mb-8 tracking-wide">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            Sistema online · Análise em tempo real
-          </div>
-
           {/* Title */}
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-5 leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-text mb-5 leading-tight tracking-tight">
             Scanner de Conformidade{" "}
-            <span className="text-blue-400">NIS2</span>
+            <span className="text-accent">NIS2</span>
           </h1>
 
-          <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-dim text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
             Analise a superfície de ataque do seu domínio ou IP em 6 camadas —{" "}
-            <span className="text-slate-300">sem instalar software</span>. Mapeamento automático ao Art.&nbsp;21.º da Directiva NIS2 (EU&nbsp;2022/2555).
+            <span className="text-dim">sem instalar software</span>. Mapeamento automático ao Art.&nbsp;21.º da Directiva NIS2 (EU&nbsp;2022/2555).
           </p>
 
           {/* Stats row */}
@@ -683,8 +675,8 @@ export default function ScanStart() {
               { value: "100%",    label: "Agentless" },
             ].map((s) => (
               <div key={s.label} className="text-center">
-                <p className="text-2xl font-bold text-white">{s.value}</p>
-                <p className="text-slate-500 text-xs mt-1">{s.label}</p>
+                <p className="text-2xl font-bold text-text">{s.value}</p>
+                <p className="text-faint text-xs mt-1">{s.label}</p>
               </div>
             ))}
           </div>
@@ -696,21 +688,21 @@ export default function ScanStart() {
 
       {/* ── Main content — two columns ── */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 pb-14">
-        <ExplainerPanel resourceKey="scanner">
-          <p><strong className="text-white">O que é.</strong> Uma análise da presença digital da sua empresa — o seu site, os seus domínios e subdomínios — feita a partir da internet, sem instalar nada e sem aceder à sua rede interna. Vê o que qualquer pessoa (ou atacante) consegue ver da sua empresa de fora.</p>
-          <p><strong className="text-white">Porque existe.</strong> Muitas vulnerabilidades estão à vista de quem sabe procurar: um certificado de segurança expirado, um serviço desatualizado, a falta de proteção contra falsificação de email. O scanner encontra estes problemas antes que um atacante o faça.</p>
-          <p><strong className="text-white">Quando fazer.</strong> Depois do questionário, para que o seu score combine as duas fontes (o que declarou no questionário e o que a análise técnica encontrou).</p>
-          <p><strong className="text-white">O que NÃO faz.</strong> O scanner é externo — analisa o que está exposto na internet. Não vê o interior da sua rede (os computadores internos, servidores privados). Para isso seria necessária uma análise interna dedicada.</p>
-        </ExplainerPanel>
-        <ExplainerPanel resourceKey="scanner-como-usar" title="Como usar o scanner (passo importante antes de começar)">
+        <InfoNote>
+          <p><strong className="text-text">O que é.</strong> Uma análise da presença digital da sua empresa — o seu site, os seus domínios e subdomínios — feita a partir da internet, sem instalar nada e sem aceder à sua rede interna. Vê o que qualquer pessoa (ou atacante) consegue ver da sua empresa de fora.</p>
+          <p><strong className="text-text">Porque existe.</strong> Muitas vulnerabilidades estão à vista de quem sabe procurar: um certificado de segurança expirado, um serviço desatualizado, a falta de proteção contra falsificação de email. O scanner encontra estes problemas antes que um atacante o faça.</p>
+          <p><strong className="text-text">Quando fazer.</strong> Depois do questionário, para que o seu score combine as duas fontes (o que declarou no questionário e o que a análise técnica encontrou).</p>
+          <p><strong className="text-text">O que NÃO faz.</strong> O scanner é externo — analisa o que está exposto na internet. Não vê o interior da sua rede (os computadores internos, servidores privados). Para isso seria necessária uma análise interna dedicada.</p>
+        </InfoNote>
+        <InfoNote label="Como usar o scanner (passo importante antes de começar)">
           <p>Antes de analisar um domínio, precisa de confirmar que ele lhe pertence. É uma medida de segurança: impede que alguém use a CISPLAN para analisar sites de terceiros sem autorização.</p>
-          <p><strong className="text-white">Como confirmar (uma vez por domínio):</strong></p>
-          <p><strong className="text-white">1.</strong> Precisa de adicionar uma "etiqueta de confirmação" ao registo do seu domínio — um registo DNS TXT. O valor a colocar é: nis2pt-verify= seguido do número da sua conta (por exemplo, nis2pt-verify=1).</p>
-          <p><strong className="text-white">2.</strong> Entre no painel onde gere o seu domínio (o site onde o comprou / paga a renovação). Procure a secção "DNS" ou "Registos DNS".</p>
-          <p><strong className="text-white">3.</strong> Adicione um novo registo do tipo TXT. No campo Nome/Host, deixe em branco ou coloque @. No campo Valor/Content, cole o seu código de verificação. Guarde.</p>
-          <p><strong className="text-white">4.</strong> Volte ao scanner, escreva o domínio e clique em Verificar. As alterações de DNS podem demorar alguns minutos a ficar ativas.</p>
+          <p><strong className="text-text">Como confirmar (uma vez por domínio):</strong></p>
+          <p><strong className="text-text">1.</strong> Precisa de adicionar uma "etiqueta de confirmação" ao registo do seu domínio — um registo DNS TXT. O valor a colocar é: nis2pt-verify= seguido do número da sua conta (por exemplo, nis2pt-verify=1).</p>
+          <p><strong className="text-text">2.</strong> Entre no painel onde gere o seu domínio (o site onde o comprou / paga a renovação). Procure a secção "DNS" ou "Registos DNS".</p>
+          <p><strong className="text-text">3.</strong> Adicione um novo registo do tipo TXT. No campo Nome/Host, deixe em branco ou coloque @. No campo Valor/Content, cole o seu código de verificação. Guarde.</p>
+          <p><strong className="text-text">4.</strong> Volte ao scanner, escreva o domínio e clique em Verificar. As alterações de DNS podem demorar alguns minutos a ficar ativas.</p>
           <p>Não consegue fazer isto? É normal — nem toda a gente gere o seu próprio domínio. Peça a quem trata do seu site para adicionar um registo DNS TXT com o seu código de verificação, ou fale connosco.</p>
-        </ExplainerPanel>
+        </InfoNote>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
           {/* Left — form panel */}
@@ -729,11 +721,11 @@ export default function ScanStart() {
             </div>
 
             {/* Info note — dark themed */}
-            <div className="p-4 bg-blue-950/60 border border-blue-700/30 rounded-xl flex items-start gap-3">
-              <span className="text-blue-400 text-sm shrink-0 mt-0.5 font-bold">ℹ</span>
+            <div className="p-4 bg-field border border-line rounded-xl flex items-start gap-3">
+              <span className="text-accent text-sm shrink-0 mt-0.5 font-bold">ℹ</span>
               <div>
-                <p className="text-xs font-semibold text-blue-300 mb-0.5">Verificação de propriedade</p>
-                <p className="text-xs text-blue-400/80 leading-relaxed">
+                <p className="text-xs font-semibold text-accent mb-0.5">Verificação de propriedade</p>
+                <p className="text-xs text-dim leading-relaxed">
                   Antes de iniciar o scan, verificamos que é o proprietário do target via DNS TXT record ou ficheiro HTTP. Isto protege terceiros de scans não autorizados.
                 </p>
               </div>
