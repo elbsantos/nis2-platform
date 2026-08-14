@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../lib/auth";
-import { ExplainerPanel } from "../components/ExplainerPanel";
 import { ENABLE_PRICING } from "../lib/featureFlags";
 import { Card } from "../components/ui/Card";
 import { Radar, Bug, Lock, Mail, ShieldCheck, EyeOff, Search, List, Network, type LucideIcon } from "lucide-react";
@@ -79,46 +78,6 @@ export function CopyButton({ value }: { value: string }) {
     >
       {status === "copied" ? "✓ Copiado!" : status === "failed" ? "Selecione e copie" : "Copiar"}
     </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Bloco permanente do código de verificação — visível assim que se entra no
-// scanner, antes de escrever qualquer domínio (o orgId já está disponível
-// via useAuth, que só renderiza depois de RequireAuth confirmar a sessão).
-// ---------------------------------------------------------------------------
-
-function VerificationCodeCard() {
-  const { user } = useAuth();
-  const orgId = user?.org?.id;
-  if (!orgId) return null;
-
-  const token = `nis2pt-verify=${orgId}`;
-
-  return (
-    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/50 p-6 space-y-4">
-      <div>
-        <p className="text-sm font-semibold text-gray-700 mb-1.5">O seu código de verificação de domínio</p>
-        <p className="text-xs text-gray-400 mb-3">
-          Vai precisar deste valor para confirmar que é dono do domínio antes de o analisar. Copie-o já — vai levá-lo ao painel de DNS do seu domínio.
-        </p>
-        <div className="flex items-stretch gap-2">
-          <code className="flex-1 block text-xs bg-gray-50 border border-gray-200 rounded-lg p-2.5 font-mono break-all text-blue-700">
-            {token}
-          </code>
-          <CopyButton value={token} />
-        </div>
-      </div>
-      <ExplainerPanel resourceKey="ownership-help" title="Como confirmo que este domínio é meu?">
-        <p>Antes de analisar um site, precisamos de confirmar que ele lhe pertence. É uma medida de segurança: impede que alguém use a CISPLAN para analisar sites de terceiros sem autorização. Faz-se uma vez por domínio, e demora poucos minutos.</p>
-        <p>Vai adicionar uma pequena "etiqueta de confirmação" ao registo do seu domínio — como carimbar um documento para provar que é seu. Essa etiqueta é um registo TXT, e o valor a colocar é o seu código de verificação (mostrado acima, com o botão Copiar).</p>
-        <p><strong className="text-white">Passo 1.</strong> Entre no painel onde gere o seu domínio. É o site onde comprou o domínio (onde paga a renovação anual). Se não sabe qual é, procure nos seus emails por "renovação de domínio".</p>
-        <p><strong className="text-white">Passo 2.</strong> Procure a secção de "DNS" ou "Registos DNS". Pode chamar-se "Gestão de DNS", "Zona DNS" ou "Advanced DNS".</p>
-        <p><strong className="text-white">Passo 3.</strong> Adicione um novo registo do tipo "TXT". No campo Nome (ou "Host"): deixe em branco ou coloque @. No campo Valor (ou "Content"): cole o seu código de verificação. Guarde.</p>
-        <p><strong className="text-white">Passo 4.</strong> Volte aqui e clique em Verificar. As alterações de DNS podem demorar alguns minutos a ficar ativas. Se não funcionar logo, aguarde um pouco e tente de novo.</p>
-        <p>Não consegue fazer isto? É normal — nem toda a gente gere o seu próprio domínio. Peça a quem trata do seu site (o seu informático ou a agência que o criou): envie-lhe o seu código de verificação e peça para adicionar um registo DNS TXT com esse valor. Ou fale connosco — podemos ajudá-lo.</p>
-      </ExplainerPanel>
-    </div>
   );
 }
 
@@ -707,12 +666,6 @@ export default function ScanStart() {
 
           {/* Left — form panel */}
           <div className="lg:col-span-2 space-y-4">
-            {/* VerificationCodeCard desativado temporariamente — não estava a renderizar em
-                produção (causa de deploy/build por confirmar). Instruções de ownership movidas
-                para o ExplainerPanel "scanner-como-usar" acima, que já é o mecanismo provado
-                em produção. Reativar aqui quando a causa raiz estiver resolvida. */}
-            {/* <VerificationCodeCard /> */}
-
             <div className="bg-surface border border-line rounded-2xl p-6">
               <TabBar active={tab} setTab={setTab} />
               {tab === "único"       && <SingleScanTab />}
