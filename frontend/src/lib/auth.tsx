@@ -69,8 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Erro ao fazer login");
-    setUser(data);
-  }, []);
+    await fetchMe();   // /me é a fonte de verdade do formato do user (org completo com token)
+  }, [fetchMe]);
 
   const register = useCallback(async (payload: {
     email: string;
@@ -86,8 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Erro ao registar");
-    setUser(data);
-  }, []);
+    await fetchMe();
+  }, [fetchMe]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
