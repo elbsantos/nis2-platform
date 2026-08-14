@@ -12,7 +12,7 @@ export interface AuthUser {
   id: number;
   email: string;
   name?: string | null;
-  org?: { id: number; name: string } | null;
+  org?: { id: number; name: string; verificationToken?: string | null } | null;
 }
 
 interface AuthCtx {

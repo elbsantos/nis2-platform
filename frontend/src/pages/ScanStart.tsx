@@ -600,6 +600,41 @@ function CapabilitiesPanel() {
 }
 
 // ---------------------------------------------------------------------------
+// Org verification card — fixo no topo, visível antes de escrever um domínio
+// ---------------------------------------------------------------------------
+
+function OrgVerificationCard() {
+  const { user } = useAuth();
+  const suffix = user?.org?.verificationToken;
+  const token = suffix ? `nis2pt-verify=${suffix}` : null;
+
+  return (
+    <Card className="p-5 mb-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon as={ShieldCheck} className="text-accent" />
+        <h3 className="text-sm font-semibold text-text">O seu código de verificação</h3>
+      </div>
+      <p className="text-xs text-dim mb-3">
+        Adicione este valor como registo DNS TXT (nome <code className="text-faint">@</code>) no
+        domínio que quer analisar. Depois, escreva o domínio abaixo e clique em Verificar.
+      </p>
+      {token ? (
+        <div className="flex items-stretch gap-2">
+          <code className="flex-1 block text-sm bg-field border border-accent/40 rounded-lg p-2.5 font-mono break-all text-text">
+            {token}
+          </code>
+          <CopyButton value={token} />
+        </div>
+      ) : (
+        <div className="text-xs text-dim bg-field border border-line rounded-lg p-2.5">
+          A preparar o seu código de verificação… atualize a página dentro de instantes.
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root page
 // ---------------------------------------------------------------------------
 
@@ -667,6 +702,8 @@ export default function ScanStart() {
 
           {/* Left — form panel */}
           <div className="lg:col-span-2 space-y-4">
+            <OrgVerificationCard />
+
             <div className="bg-surface border border-line rounded-2xl p-6">
               <TabBar active={tab} setTab={setTab} />
               {tab === "único"       && <SingleScanTab />}
