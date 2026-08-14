@@ -4,10 +4,13 @@ import { trpc } from "../lib/trpc";
 import { useAuth } from "../lib/auth";
 import { ENABLE_PRICING } from "../lib/featureFlags";
 import { Card } from "../components/ui/Card";
-import { Radar, Bug, Lock, Mail, ShieldCheck, EyeOff, Search, List, Network, type LucideIcon } from "lucide-react";
+import { Radar, Bug, Lock, Mail, ShieldCheck, EyeOff, Search, List, Network, CheckCircle2, XCircle, AlertTriangle, type LucideIcon } from "lucide-react";
 import { Icon } from "../components/ui/Icon";
 import { Badge } from "../components/ui/Badge";
 import { InfoNote } from "../components/ui/InfoNote";
+import { Button } from "../components/ui/Button";
+import { Alert } from "../components/ui/Alert";
+import { Input, Textarea } from "../components/ui/Input";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
@@ -224,13 +227,12 @@ function SingleScanTab() {
         <label htmlFor="domain-single" className="block text-sm font-semibold text-gray-700 mb-1.5">
           Domínio ou endereço IP
         </label>
-        <input
+        <Input
           id="domain-single"
           type="text"
           value={domain}
           onChange={(e) => { setDomain(e.target.value); setVerified(false); setToken(""); setNormalizedDomain(""); setError(""); }}
           placeholder="exemplo.pt ou 185.1.2.3"
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
         />
         {domain && (
           <p className="text-xs text-gray-400 mt-1.5">
@@ -242,38 +244,34 @@ function SingleScanTab() {
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0 mt-0.5">❌</span>
-          <span>{error}</span>
-        </div>
+        <Alert tone="bad"><Icon as={XCircle} className="shrink-0 mt-0.5" />{error}</Alert>
       )}
 
       {!verified ? (
         <>
-          <button
+          <Button
+            variant="primary"
+            className="w-full"
             onClick={handleVerify}
             disabled={!domain || verifying}
-            className="w-full py-3 px-4 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             {verifying ? <><Spinner />A verificar…</> : "Verificar propriedade →"}
-          </button>
+          </Button>
           {token && !verified && (
             <OwnershipBox token={token} isIp={isIp} domain={normalizedDomain || domain} wellKnownUrl={wellKnownUrl} />
           )}
         </>
       ) : (
         <>
-          <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2.5 text-sm text-green-800">
-            <span className="text-green-600 text-base">✓</span>
-            <span><strong>Propriedade verificada</strong> via {isIp ? "ficheiro HTTP" : "DNS TXT"}.</span>
-          </div>
-          <button
+          <Alert tone="ok"><Icon as={CheckCircle2} className="shrink-0" /><span><strong>Propriedade verificada</strong> via {isIp ? "ficheiro HTTP" : "DNS TXT"}.</span></Alert>
+          <Button
+            variant="primary"
+            className="w-full"
             onClick={handleStart}
             disabled={startMutation.isPending}
-            className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-sm font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-sm"
           >
             {startMutation.isPending ? <><Spinner />A iniciar scan…</> : "Iniciar Scan NIS2 →"}
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -314,14 +312,16 @@ function BulkScanTab() {
   if (plan === "free") {
     return (
       <div className="text-center py-10">
-        <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">📋</div>
+        <div className="w-14 h-14 bg-surface-2 border border-line rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Icon as={Lock} className="text-accent" />
+        </div>
         <p className="font-bold text-gray-900 mb-2">Scan em lote — Plano Pro</p>
         <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
           Scana múltiplos domínios de uma vez. Até {DEMO_MAX_TARGETS} alvos por batch nesta fase.
         </p>
         {ENABLE_PRICING && (
-          <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
-            Ver planos →
+          <Link to="/billing">
+            <Button variant="primary">Ver planos →</Button>
           </Link>
         )}
       </div>
@@ -337,12 +337,11 @@ function BulkScanTab() {
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
           Targets <span className="font-normal text-gray-400">(um por linha)</span>
         </label>
-        <textarea
+        <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={7}
           placeholder={"empresa1.pt\nempresa2.pt\n185.1.2.3"}
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 focus:bg-white transition-all"
         />
         {targets.length > 0 && (
           <div className="flex items-center justify-between mt-1.5">
@@ -353,15 +352,16 @@ function BulkScanTab() {
           </div>
         )}
       </div>
-      {error   && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
-      {warning && <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">{warning}</div>}
-      <button
+      {error   && <Alert tone="bad">{error}</Alert>}
+      {warning && <Alert tone="warn"><Icon as={AlertTriangle} className="shrink-0 mt-0.5" />{warning}</Alert>}
+      <Button
+        variant="primary"
+        className="w-full"
         onClick={() => { setError(""); setWarning(""); startBulkMut.mutate({ targets: targets.slice(0, maxTargets), mode: "sme" }); }}
         disabled={targets.length === 0 || startBulkMut.isPending}
-        className="w-full py-3 px-4 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm"
       >
         {startBulkMut.isPending ? <><Spinner />A preparar batch…</> : `Iniciar ${Math.min(targets.length, maxTargets)} scan${Math.min(targets.length, maxTargets) !== 1 ? "s" : ""} em lote →`}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -402,14 +402,16 @@ function SubdomainScanTab() {
   if (plan === "free") {
     return (
       <div className="text-center py-10">
-        <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">🌐</div>
+        <div className="w-14 h-14 bg-surface-2 border border-line rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Icon as={Network} className="text-accent" />
+        </div>
         <p className="font-bold text-gray-900 mb-2">Descoberta de subdomínios — Plano Pro</p>
         <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
           Descobre automaticamente subdomínios via CT logs e DNS, e scana todos de uma vez.
         </p>
         {ENABLE_PRICING && (
-          <Link to="/billing" className="inline-block px-6 py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
-            Ver planos →
+          <Link to="/billing">
+            <Button variant="primary">Ver planos →</Button>
           </Link>
         )}
       </div>
@@ -435,43 +437,42 @@ function SubdomainScanTab() {
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Domínio raiz</label>
         <div className="flex gap-2">
-          <input
+          <Input
             type="text"
             value={domain}
             onChange={(e) => { setDomain(e.target.value); setVerified(false); setDiscovered([]); setError(""); }}
             placeholder="empresa.pt"
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-all"
+            className="flex-1"
           />
-          <button
+          <Button
+            variant="primary"
+            className="shrink-0"
             onClick={handleVerify}
             disabled={!domain || verifyMut.isPending}
-            className="px-5 py-3 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 disabled:opacity-50 shrink-0 transition-colors shadow-sm"
           >
             {verifyMut.isPending ? <Spinner /> : "Verificar"}
-          </button>
+          </Button>
         </div>
       </div>
 
       {token && !verified && <OwnershipBox token={token} isIp={false} domain={normalizedDomain || domain} />}
       {verified && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-sm text-green-800">
-          <span className="text-green-600">✓</span>
-          <span><strong>{domain}</strong> verificado</span>
-        </div>
+        <Alert tone="ok"><Icon as={CheckCircle2} className="shrink-0" /><span><strong>{domain}</strong> verificado</span></Alert>
       )}
-      {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
+      {error && <Alert tone="bad">{error}</Alert>}
 
       {verified && discovered.length === 0 && !discoverMut.isPending && (
-        <button
+        <Button
+          variant="primary"
+          className="w-full"
           onClick={() => { setError(""); setDiscovered([]); setSelected(new Set()); discoverMut.mutate({ domain }); }}
-          className="w-full py-3 px-4 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
         >
-          🌐 Descobrir subdomínios (até {maxSubs})
-        </button>
+          <Icon as={Network} /> Descobrir subdomínios (até {maxSubs})
+        </Button>
       )}
 
       {discoverMut.isPending && (
-        <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="text-center py-8 bg-field rounded-xl border border-line">
           <div className="h-8 w-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm font-medium text-gray-700 mt-3">A consultar CT logs e a resolver DNS…</p>
           <p className="text-xs text-gray-400 mt-1">Pode demorar 10–30 segundos</p>
@@ -489,20 +490,21 @@ function SubdomainScanTab() {
           </div>
           <div className="border border-gray-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
             {publicSubs.map((s) => (
-              <label key={s.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors">
+              <label key={s.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2 cursor-pointer border-b border-gray-100 last:border-0 transition-colors">
                 <input type="checkbox" checked={selected.has(s.name)} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(s.name) : n.delete(s.name); setSelected(n); }} className="rounded shrink-0" />
                 <span className="text-sm font-mono text-gray-800 flex-1 truncate">{s.name}</span>
                 {s.ip && <span className="text-xs text-gray-400 shrink-0 font-mono">{s.ip}</span>}
               </label>
             ))}
           </div>
-          <button
+          <Button
+            variant="primary"
+            className="mt-3 w-full"
             onClick={() => { setError(""); startBulkMut.mutate({ targets: [...selected], mode: "sme", rootDomain: domain }); }}
             disabled={selected.size === 0 || startBulkMut.isPending}
-            className="mt-3 w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-sm font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-sm"
           >
             {startBulkMut.isPending ? <><Spinner />A iniciar scans…</> : `Iniciar scan para ${selected.size} subdomínio${selected.size !== 1 ? "s" : ""} →`}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -530,7 +532,7 @@ function SubdomainScanTab() {
       )}
 
       {discoverMut.isSuccess && discovered.length === 0 && (
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 text-center">
+        <div className="p-4 bg-field border border-line rounded-xl text-sm text-dim text-center">
           Nenhum subdomínio activo encontrado para <strong>{domain}</strong>.
         </div>
       )}
