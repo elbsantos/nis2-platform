@@ -43,8 +43,12 @@ vi.mock("../integrations/nvd", () => ({
 }));
 
 vi.mock("../db", () => ({
-  updateScanStatus: vi.fn().mockResolvedValue(undefined),
+  updateScanStatus:    vi.fn().mockResolvedValue(undefined),
   createVulnerability: vi.fn().mockResolvedValue(undefined),
+  getOrganizationById: vi.fn(),
+  getDb: vi.fn(() => ({
+    update: () => ({ set: () => ({ where: () => Promise.resolve(undefined) }) }),
+  })),
 }));
 
 vi.mock("dns/promises", () => ({
@@ -61,16 +65,25 @@ import { checkDirectTls } from "../integrations/direct-tls";
 import { batchLookupCveVersionRanges, isVersionInNvdRanges } from "../integrations/nvd";
 import { checkSsh } from "../integrations/ssh-check";
 import { resolveTxt } from "dns/promises";
-import { updateScanStatus, createVulnerability } from "../db";
+import { updateScanStatus, createVulnerability, getOrganizationById } from "../db";
+
+// Default global: token de verificação = "1" (nis2pt-verify=1), coincide com os
+// literais já espalhados nos testes de executeAgentlessScan. Os describes que
+// precisam de outro token (verifyOwnership, verifyOwnershipWithRootFallback)
+// sobrepõem isto no seu próprio beforeEach, que corre depois deste.
+beforeEach(() => {
+  vi.mocked(getOrganizationById).mockResolvedValue({ id: 1, verificationToken: "1" } as any);
+});
 
 describe("verifyOwnership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getOrganizationById).mockResolvedValue({ id: 123, verificationToken: "testtoken123" } as any);
   });
 
   // Domain — DNS TXT path
   it("returns verified=true when DNS TXT record matches", async () => {
-    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=123"]]);
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=testtoken123"]]);
     const result = await verifyOwnership("example.com", 123);
     expect(result.verified).toBe(true);
     expect(result.method).toBe("dns-txt");
@@ -93,15 +106,34 @@ describe("verifyOwnership", () => {
     const result = await verifyOwnership("185.0.0.1", 42);
     expect(result.verified).toBe(false);
   });
+
+  // Caminho novo (B3) — token vem da coluna verificationToken, não do orgId
+  it("caminho feliz — usa o verificationToken da coluna (não o orgId) para construir o token esperado", async () => {
+    vi.mocked(getOrganizationById).mockResolvedValue({ id: 999, verificationToken: "abc999" } as any);
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=abc999"]]);
+    const result = await verifyOwnership("example.com", 999);
+    expect(result.verified).toBe(true);
+    expect(result.method).toBe("dns-txt");
+  });
+
+  it("fallback — erro ao ler a org (ex.: coluna ainda não existe na BD) cai no esquema antigo nis2pt-verify=<orgId>", async () => {
+    vi.mocked(getOrganizationById).mockRejectedValue(new Error("Unknown column 'verificationToken'"));
+    vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=777"]]);
+    const result = await verifyOwnership("example.com", 777);
+    expect(result.verified).toBe(true);
+    expect(result.method).toBe("dns-txt");
+  });
 });
 
 describe("verifyOwnershipWithRootFallback — herança de domínio raiz (segurança)", () => {
+  const ORG_ID = 1;
+  const VERIF_TOKEN = "roottoken456";
+  const TOKEN = `nis2pt-verify=${VERIF_TOKEN}`;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getOrganizationById).mockResolvedValue({ id: ORG_ID, verificationToken: VERIF_TOKEN } as any);
   });
-
-  const ORG_ID = 1;
-  const TOKEN = `nis2pt-verify=${ORG_ID}`;
 
   /** Só os hostnames em `withToken` respondem com o token — os restantes falham (ENOTFOUND), como DNS real. */
   function mockTxtFor(withToken: string[]) {
