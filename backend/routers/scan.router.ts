@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { freeProcedure } from "../middlewares/planGuard";
-import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback, isIpAddress } from "../services/scan-executor";
+import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback, isIpAddress, buildVerificationToken } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan, getLatestCompletedQuestionnaireForOrg } from "../db";
 import { combinedNis2Scores, overallCombinedScore } from "../utils/combined-score";
 import type { NIS2ArticleScore } from "../services/scan-executor";
@@ -72,7 +72,7 @@ export const scanRouter = {
     .mutation(async ({ ctx, input }) => {
       const isIp  = isIpAddress(input.domain);
       const result = await verifyOwnership(input.domain, ctx.org.id);
-      const token  = `nis2pt-verify=${ctx.org.id}`;
+      const token  = buildVerificationToken(ctx.org.id);
       return {
         verified: result.verified,
         method:   result.method,
@@ -103,8 +103,8 @@ export const scanRouter = {
       const ownership = await verifyOwnership(input.target, ctx.org.id);
       if (!ownership.verified) {
         const hint = isIpAddress(input.target)
-          ? `Cria http://${input.target}/.well-known/nis2pt.txt com o conteúdo: nis2pt-verify=${ctx.org.id}`
-          : `Adiciona este DNS TXT ao domínio: nis2pt-verify=${ctx.org.id}`;
+          ? `Cria http://${input.target}/.well-known/nis2pt.txt com o conteúdo: ${buildVerificationToken(ctx.org.id)}`
+          : `Adiciona este DNS TXT ao domínio: ${buildVerificationToken(ctx.org.id)}`;
         throw new TRPCError({ code: "FORBIDDEN", message: `Verificação de ownership falhou. ${hint}` });
       }
 
@@ -274,7 +274,7 @@ export const scanRouter = {
       if (!ownership.verified) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: `Verifica primeiro o ownership do domínio ${input.domain} (DNS TXT: nis2pt-verify=${ctx.org.id}).`,
+          message: `Verifica primeiro o ownership do domínio ${input.domain} (DNS TXT: ${buildVerificationToken(ctx.org.id)}).`,
         });
       }
       const maxResults = ctx.plan === "mssp" ? 200 : 50;
@@ -350,7 +350,7 @@ export const scanRouter = {
         if (!ownership.verified) {
           failed.push({
             target,
-            reason: `Ownership não verificado. Adiciona DNS TXT: nis2pt-verify=${ctx.org.id}`,
+            reason: `Ownership não verificado. Adiciona DNS TXT: ${buildVerificationToken(ctx.org.id)}`,
           });
           continue;
         }

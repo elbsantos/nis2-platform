@@ -233,6 +233,12 @@ const PUBLIC_TEST_TARGETS = new Set([
   "self-signed.badssl.com",
 ]);
 
+/** Valor único de verificação de propriedade (DNS TXT / ficheiro HTTP).
+ *  Fonte de verdade — não formatar "nis2pt-verify=" em mais lado nenhum. */
+export function buildVerificationToken(orgId: number): string {
+  return `nis2pt-verify=${orgId}`;
+}
+
 export async function verifyOwnership(
   target: string,
   orgId: number
@@ -242,7 +248,7 @@ export async function verifyOwnership(
     return { verified: true, method: "public-test-target" };
   }
 
-  const token = `nis2pt-verify=${orgId}`;
+  const token = buildVerificationToken(orgId);
 
   if (isIpAddress(target)) {
     const found = await fetchWellKnownToken(target);
@@ -543,8 +549,8 @@ export async function executeAgentlessScan(
     const ownership = await verifyOwnershipWithRootFallback(options.target, options.organizationId, options.rootDomain);
     if (!ownership.verified) {
       const hint = isIpAddress(options.target)
-        ? `Cria http://${options.target}/.well-known/nis2pt.txt com o conteúdo: nis2pt-verify=${options.organizationId}`
-        : `Adiciona o DNS TXT record: nis2pt-verify=${options.organizationId}`;
+        ? `Cria http://${options.target}/.well-known/nis2pt.txt com o conteúdo: ${buildVerificationToken(options.organizationId)}`
+        : `Adiciona o DNS TXT record: ${buildVerificationToken(options.organizationId)}`;
       throw new Error(`Verificação de ownership falhou. ${hint}`);
     }
 
