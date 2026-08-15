@@ -4,6 +4,13 @@ import { trpc } from "../lib/trpc";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DataTable, type ColumnDef } from "../components/ui/DataTable";
 import { ExplainerPanel } from "../components/ExplainerPanel";
+import {
+  statusTone, statusLabel,
+  sevClasses, sevLabel,
+  effortTone, effortLabel,
+  modeTone, modeLabel,
+  toneClasses,
+} from "../lib/remediationTones";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,54 +49,6 @@ type ScanGroup = {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const STATUS_LABEL: Record<Status, string> = {
-  todo:        "Por fazer",
-  in_progress: "Em curso",
-  done:        "Concluído",
-  wont_fix:    "Não corrigir",
-};
-
-const STATUS_BADGE: Record<Status, string> = {
-  todo:        "bg-red-900/40 text-red-400 border border-red-700",
-  in_progress: "bg-blue-900/40 text-blue-400 border border-blue-700",
-  done:        "bg-green-900/40 text-green-400 border border-green-700",
-  wont_fix:    "bg-slate-700 text-slate-400 border border-slate-600",
-};
-
-const SEV_BADGE: Record<Severity, string> = {
-  critical: "bg-red-900/40 text-red-400 border border-red-700",
-  high:     "bg-orange-900/40 text-orange-400 border border-orange-700",
-  medium:   "bg-yellow-900/40 text-yellow-400 border border-yellow-700",
-  low:      "bg-blue-900/40 text-blue-400 border border-blue-700",
-};
-
-const SEV_LABEL: Record<Severity, string> = {
-  critical: "Crítica",
-  high:     "Alta",
-  medium:   "Média",
-  low:      "Baixa",
-};
-
-const EFFORT_BADGE: Record<Effort, string> = {
-  low:    "bg-green-900/30 text-green-400",
-  medium: "bg-amber-900/30 text-amber-400",
-  high:   "bg-red-900/30 text-red-400",
-};
-
-const EFFORT_LABEL: Record<Effort, string> = {
-  low: "Baixo", medium: "Médio", high: "Alto",
-};
-
-const MODE_BADGE: Record<ScanMode, string> = {
-  sme:    "bg-amber-900/30 text-amber-400 border border-amber-700",
-  supply: "bg-teal-900/30 text-teal-400 border border-teal-700",
-};
-
-const MODE_LABEL: Record<ScanMode, string> = {
-  sme:    "PME",
-  supply: "Supply Chain",
-};
 
 const PLATFORM_ICONS: Record<string, string> = {
   windows: "🪟", linux: "🐧", macos: "🍎", cloud: "☁️", all: "🔧",
@@ -154,9 +113,9 @@ const COLUMNS: ColumnDef<RemItem>[] = [
       return (
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span
-            className={`px-2 py-0.5 text-xs font-medium rounded-full ${SEV_BADGE[row.severity]}`}
+            className={`px-2 py-0.5 text-xs font-medium rounded-full ${sevClasses[row.severity]}`}
           >
-            {SEV_LABEL[row.severity]}
+            {sevLabel[row.severity]}
           </span>
           {row.cvssScore && (
             <span className="text-xs text-slate-400">{row.cvssScore}</span>
@@ -179,9 +138,9 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     header: "Esforço",
     render: (row) => (
       <span
-        className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap ${EFFORT_BADGE[row.effort]}`}
+        className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap ${toneClasses[effortTone[row.effort]]}`}
       >
-        {EFFORT_LABEL[row.effort]}
+        {effortLabel[row.effort]}
       </span>
     ),
   },
@@ -210,9 +169,9 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     header: "Estado",
     render: (row) => (
       <span
-        className={`px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${STATUS_BADGE[row.status]}`}
+        className={`px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${toneClasses[statusTone[row.status]]}`}
       >
-        {STATUS_LABEL[row.status]}
+        {statusLabel[row.status]}
       </span>
     ),
   },
@@ -302,7 +261,7 @@ function ExpandedContent({
                   : "text-slate-400 border-slate-600 hover:bg-[#152744]"
               }`}
             >
-              {STATUS_LABEL[s]}
+              {statusLabel[s]}
             </button>
           ))}
         </div>
@@ -441,7 +400,7 @@ export default function Remediation() {
                 : "text-slate-300 border-slate-600 hover:bg-slate-700/50"
             }`}
           >
-            {STATUS_LABEL[s]} ({counts[s] ?? 0})
+            {statusLabel[s]} ({counts[s] ?? 0})
           </button>
         ))}
       </div>
@@ -518,9 +477,9 @@ export default function Remediation() {
                 </h2>
                 {group.mode && (
                   <span
-                    className={`px-2 py-0.5 text-xs font-medium rounded-full ${MODE_BADGE[group.mode]}`}
+                    className={`px-2 py-0.5 text-xs font-medium rounded-full ${toneClasses[modeTone[group.mode]]}`}
                   >
-                    {MODE_LABEL[group.mode]}
+                    {modeLabel[group.mode]}
                   </span>
                 )}
                 <span className="text-xs text-slate-400">
