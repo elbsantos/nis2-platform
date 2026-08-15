@@ -8,7 +8,8 @@ import { Badge } from "../components/ui/Badge";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { InfoNote } from "../components/ui/InfoNote";
 import { Icon } from "../components/ui/Icon";
-import { ClipboardList, Plus } from "lucide-react";
+import { Alert } from "../components/ui/Alert";
+import { ClipboardList, Plus, CheckCircle2 } from "lucide-react";
 
 const ARTICLE_LABELS: Record<string, string> = {
   a: "Políticas de segurança",
@@ -262,22 +263,26 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
       {/* Main content */}
       <main className="flex-1 min-w-0">
         {isCompleted && (
-          <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800 flex items-center justify-between gap-4">
-            <span>Avaliação concluída — Score: <strong>{session.score}/100</strong></span>
-            <button
+          <Card className="p-5 mb-4 border-ok/40 flex items-center justify-between gap-4">
+            <span className="text-sm text-text flex items-center gap-2">
+              <Icon as={CheckCircle2} className="text-ok" />
+              Avaliação concluída — Score: <strong>{session.score}/100</strong>
+            </span>
+            <Button
+              variant="primary"
+              className="px-3 py-1.5 text-xs shrink-0"
               onClick={() => navigate(`/questionnaire/${sessionId}/report`)}
-              className="px-3 py-1.5 text-xs font-medium bg-green-700 text-white rounded-lg hover:bg-green-800 shrink-0"
             >
               Ver relatório
-            </button>
-          </div>
+            </Button>
+          </Card>
         )}
 
         <div className="mb-4">
-          <h2 className="text-lg font-bold text-white">
+          <h2 className="text-lg font-bold text-text">
             Art. 21(2)({activeArticle}) — {ARTICLE_LABELS[activeArticle]}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-dim mt-0.5">
             {answeredIn(activeArticle)}/{byArticle(activeArticle).length} controlos respondidos
           </p>
         </div>
@@ -286,15 +291,12 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
           {byArticle(activeArticle).map((control) => {
             const current = answers[control.id];
             return (
-              <div
-                key={control.id}
-                className="bg-white border border-gray-200 rounded-xl p-5"
-              >
-                <p className="text-sm font-medium text-gray-900 mb-1">
-                  <span className="font-mono text-xs text-blue-600 mr-2">{control.id}</span>
+              <Card key={control.id} className="p-5 mb-3">
+                <p className="text-sm font-medium text-text mb-1">
+                  <span className="font-mono text-xs text-accent mr-2">{control.id}</span>
                   {control.question}
                 </p>
-                <p className="text-xs text-gray-400 mb-4">{control.helpText}</p>
+                <p className="text-xs text-dim mb-4">{control.helpText}</p>
 
                 {/* Answer buttons */}
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -321,7 +323,7 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
                       setExpandedExplain(control.id);
                     }
                   }}
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-xs text-accent hover:underline"
                 >
                   {expandedExplain === control.id ? "▲ Fechar explicação" : "▼ Explicar este controlo com IA"}
                 </button>
@@ -335,7 +337,7 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
                     }
                   />
                 )}
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -415,27 +417,27 @@ function ExplainPanel({
 
   if (isLoading) {
     return (
-      <div className="mt-3 p-3 bg-blue-50 rounded-lg text-xs text-blue-600 animate-pulse">
+      <Alert tone="info" className="mt-3">
         A gerar explicação com IA…
-      </div>
+      </Alert>
     );
   }
 
   if (error) {
     const isUpgrade = error.message?.includes("pro") || error.data?.code === "FORBIDDEN";
     return (
-      <div className="mt-3 p-3 bg-amber-50 rounded-lg text-xs text-amber-700">
+      <Alert tone="warn" className="mt-3">
         {isUpgrade
           ? "Explicações com IA estão disponíveis nos planos Pro e MSSP."
           : `Erro: ${error.message}`}
-      </div>
+      </Alert>
     );
   }
 
   if (!text) return null;
 
   return (
-    <div className="mt-3 p-4 bg-blue-50 border border-blue-100 rounded-lg text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+    <div className="mt-3 p-4 bg-field border border-line rounded-xl text-xs text-dim leading-relaxed whitespace-pre-wrap">
       {text}
     </div>
   );
