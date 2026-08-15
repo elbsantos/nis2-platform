@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { Icon } from "./components/ui/Icon";
 import { useAuth } from "./lib/auth";
-import { ENABLE_PRICING } from "./lib/featureFlags";
+import { ENABLE_PRICING, ENABLE_COURSE } from "./lib/featureFlags";
 import Landing        from "./pages/Landing";
 import Login          from "./pages/Login";
 import Register       from "./pages/Register";
@@ -65,7 +65,7 @@ const MAIN_ITEMS: NavItem[] = [
 ];
 
 const SECONDARY_ITEMS: NavItem[] = [
-  { to: "/course",        label: "Curso",     icon: GraduationCap },
+  ...(ENABLE_COURSE ? [{ to: "/course", label: "Curso", icon: GraduationCap }] : []),
   { to: "/scan/history",  label: "Histórico", icon: History },
   { to: "/billing",       label: ENABLE_PRICING ? "Planos" : "Conta", icon: CreditCard },
 ];

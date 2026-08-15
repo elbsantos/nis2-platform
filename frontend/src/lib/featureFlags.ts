@@ -15,3 +15,7 @@ export const ENABLE_PRICING = false;
 // A lógica de bulk continua ativa — é usada internamente pela descoberta de subdomínios.
 // Reativar depois da demo: mudar para `true`.
 export const ENABLE_BATCH_SCAN = false;
+
+// DEMO: esconde o Curso do menu (a lógica, dados e rotas ficam intactos).
+// Reativar depois da demo: mudar para `true`.
+export const ENABLE_COURSE = false;
