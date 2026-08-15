@@ -7,15 +7,20 @@
 
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
-import { ExplainerPanel } from "../components/ExplainerPanel";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
+import { InfoNote } from "../components/ui/InfoNote";
+import { Icon } from "../components/ui/Icon";
+import { Plus, Scale, ChevronRight } from "lucide-react";
 
-const CLASS_BADGE: Record<string, string> = {
-  essencial:              "bg-green-900/40 text-green-300 border-green-700",
-  importante:             "bg-blue-900/40  text-blue-300  border-blue-700",
-  a_confirmar:            "bg-amber-900/40 text-amber-300 border-amber-700",
-  a_confirmar_contratual: "bg-amber-900/40 text-amber-300 border-amber-700",
-  fora_condicional:       "bg-slate-800    text-slate-400 border-slate-600",
-  fora_mvp:               "bg-red-900/40   text-red-300   border-red-700",
+const CLASS_TONE: Record<string, "ok" | "info" | "warn" | "neutral" | "bad"> = {
+  essencial:              "ok",
+  importante:             "info",
+  a_confirmar:            "warn",
+  a_confirmar_contratual: "warn",
+  fora_condicional:       "neutral",
+  fora_mvp:               "bad",
 };
 
 const CLASS_PT: Record<string, string> = {
@@ -32,46 +37,41 @@ export default function Enquadramento() {
   const { data: items, isLoading } = trpc.enquadramento.list.useQuery();
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <ExplainerPanel resourceKey="enquadramento">
-        <p><strong className="text-white">O que é.</strong> Um questionário curto que determina se a sua empresa é abrangida pela NIS2 e como se classifica. A lei portuguesa (DL 125/2025) prevê várias situações — desde empresas claramente abrangidas (como Entidade Essencial ou Importante), a casos que dependem de confirmação do CNCS ou de relações contratuais, até empresas fora do âmbito. O enquadramento diz-lhe exatamente onde a sua se encaixa.</p>
-        <p><strong className="text-white">Porque existe.</strong> A NIS2 não se aplica a todas as empresas da mesma forma. Depende do setor, da dimensão e do tipo de atividade. O enquadramento diz-lhe, com base na lei, qual é a sua situação — para não fazer nem a mais nem a menos do que a lei exige.</p>
-        <p><strong className="text-white">Quando fazer.</strong> Logo a seguir ao perfil. Determina as suas obrigações antes de avançar.</p>
-      </ExplainerPanel>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <InfoNote>
+        <p><strong className="text-text">O que é.</strong> Um questionário curto que determina se a sua empresa é abrangida pela NIS2 e como se classifica. A lei portuguesa (DL 125/2025) prevê várias situações — desde empresas claramente abrangidas (como Entidade Essencial ou Importante), a casos que dependem de confirmação do CNCS ou de relações contratuais, até empresas fora do âmbito. O enquadramento diz-lhe exatamente onde a sua se encaixa.</p>
+        <p><strong className="text-text">Porque existe.</strong> A NIS2 não se aplica a todas as empresas da mesma forma. Depende do setor, da dimensão e do tipo de atividade. O enquadramento diz-lhe, com base na lei, qual é a sua situação — para não fazer nem a mais nem a menos do que a lei exige.</p>
+        <p><strong className="text-text">Quando fazer.</strong> Logo a seguir ao perfil. Determina as suas obrigações antes de avançar.</p>
+      </InfoNote>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Enquadramento NIS2</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <h1 className="text-xl font-bold text-text">Enquadramento NIS2</h1>
+          <p className="text-sm text-dim mt-0.5">
             Classificação ao abrigo do DL 125/2025 (entidade essencial, importante ou fora)
           </p>
         </div>
-        <button
-          onClick={() => navigate("/enquadramento/new")}
-          className="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
-        >
-          + Novo enquadramento
-        </button>
+        <Button variant="primary" onClick={() => navigate("/enquadramento/new")}>
+          <Icon as={Plus} />
+          Novo enquadramento
+        </Button>
       </div>
 
       {isLoading && (
-        <div className="text-center py-16 text-slate-400 text-sm">A carregar…</div>
+        <div className="text-center py-16 text-dim text-sm">A carregar…</div>
       )}
 
       {!isLoading && items?.length === 0 && (
         <div className="text-center py-16">
-          <div className="text-4xl mb-4">⚖️</div>
-          <p className="text-slate-300 font-medium mb-2">Nenhum enquadramento realizado</p>
-          <p className="text-sm text-slate-400 mb-6">
+          <Icon as={Scale} className="mx-auto mb-4 text-faint" size={32} />
+          <p className="text-text font-medium mb-2">Nenhum enquadramento realizado</p>
+          <p className="text-sm text-dim mb-6">
             O assistente faz-lhe 3 a 4 perguntas e classifica a sua empresa ao abrigo do DL 125/2025.
             Demora menos de 5 minutos.
           </p>
-          <button
-            onClick={() => navigate("/enquadramento/new")}
-            className="px-5 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 transition-colors"
-          >
+          <Button variant="primary" onClick={() => navigate("/enquadramento/new")}>
             Iniciar enquadramento
-          </button>
+          </Button>
         </div>
       )}
 
@@ -81,48 +81,36 @@ export default function Enquadramento() {
             const done = item.status === "completed";
             const cls  = item.classification ?? null;
             return (
-              <div
+              <Card
                 key={item.id}
-                className="bg-[#0f1e38] border border-[#1e3a5f] rounded-xl p-4 hover:border-blue-700 transition-colors cursor-pointer"
                 onClick={() => navigate(`/enquadramento/${item.id}`)}
+                className="p-4 hover:border-accent/50 transition-colors"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        done
-                          ? "bg-green-900/40 text-green-300"
-                          : "bg-slate-800 text-slate-400"
-                      }`}>
-                        {done ? "Concluído" : "Em curso"}
-                      </span>
-                      <span className="text-xs text-slate-500">#{item.id}</span>
+                      <Badge tone={done ? "ok" : "info"}>{done ? "Concluído" : "Em curso"}</Badge>
+                      <span className="text-xs text-faint">#{item.id}</span>
                     </div>
 
                     {cls && done && (
-                      <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded border ${
-                        CLASS_BADGE[cls] ?? "bg-slate-800 text-slate-400 border-slate-600"
-                      }`}>
-                        {CLASS_PT[cls] ?? cls}
-                      </span>
+                      <Badge tone={CLASS_TONE[cls] ?? "neutral"}>{CLASS_PT[cls] ?? cls}</Badge>
                     )}
 
                     {!done && (
-                      <p className="text-xs text-slate-500 mt-1">Wizard não concluído</p>
+                      <p className="text-xs text-faint mt-1">Wizard não concluído</p>
                     )}
 
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-faint mt-1">
                       {new Date(item.createdAt).toLocaleDateString("pt-PT")}
                     </p>
                   </div>
 
                   {done && (
-                    <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <Icon as={ChevronRight} className="text-faint shrink-0" />
                   )}
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
