@@ -9,7 +9,7 @@ import { SectionHeader } from "../components/ui/SectionHeader";
 import { InfoNote } from "../components/ui/InfoNote";
 import { Icon } from "../components/ui/Icon";
 import { Alert } from "../components/ui/Alert";
-import { ClipboardList, Plus, CheckCircle2 } from "lucide-react";
+import { ClipboardList, Plus, CheckCircle2, Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 const ARTICLE_LABELS: Record<string, string> = {
   a: "Políticas de segurança",
@@ -200,13 +200,13 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
       {/* Left sidebar — article navigation */}
       <aside className="w-52 shrink-0">
         <div className="sticky top-6 space-y-1">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          <p className="text-xs font-semibold text-dim uppercase tracking-wide mb-3">
             {totalAnswered}/{totalControls} respondidos
           </p>
           {/* Progress bar */}
-          <div className="w-full bg-slate-700 rounded-full h-1.5 mb-4">
+          <div className="w-full bg-surface-2 rounded-full h-1.5 mb-4">
             <div
-              className="h-1.5 rounded-full bg-blue-600 transition-all"
+              className="h-1.5 rounded-full bg-accent transition-all"
               style={{ width: `${totalControls > 0 ? (totalAnswered / totalControls) * 100 : 0}%` }}
             />
           </div>
@@ -220,12 +220,12 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
                 onClick={() => setActiveArticle(slug)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
                   activeArticle === slug
-                    ? "bg-blue-700 text-white"
-                    : "text-slate-300 hover:bg-[#152744]"
+                    ? "bg-accent text-accent-ink"
+                    : "text-dim hover:bg-surface-2 hover:text-text"
                 }`}
               >
                 <span className="font-mono text-xs mr-1">
-                  {done ? "✓" : `${answered}/${total}`}
+                  {done ? <Icon as={Check} size={13} className="text-ok inline" /> : `${answered}/${total}`}
                 </span>{" "}
                 {ARTICLE_LABELS[slug]}
               </button>
@@ -233,24 +233,26 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
           })}
 
           <div className="pt-4 space-y-2">
-            <button
+            <Button
+              variant="ghost"
+              className="w-full text-xs px-3 py-2"
               onClick={handleSave}
               disabled={saving || isCompleted}
-              className="w-full px-3 py-2 text-xs border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700/50 disabled:opacity-40"
             >
               {saving ? "A guardar…" : "Guardar progresso"}
-            </button>
+            </Button>
             {!isCompleted && (
               <>
-                <button
+                <Button
+                  variant="primary"
+                  className="w-full text-xs px-3 py-2"
                   onClick={handleComplete}
                   disabled={!canComplete || completeMut.isPending}
-                  className="w-full px-3 py-2 text-xs bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-40"
                 >
                   {completeMut.isPending ? "A concluir…" : "Concluir avaliação"}
-                </button>
+                </Button>
                 {!canComplete && missingCount > 0 && (
-                  <p className="text-xs text-amber-400 text-center">
+                  <p className="text-xs text-warn text-center">
                     Faltam {missingCount} pergunta{missingCount === 1 ? "" : "s"} para concluir
                   </p>
                 )}
@@ -344,38 +346,41 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
 
         {/* Article navigation */}
         <div className="flex justify-between mt-8">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => {
               const idx = articles.indexOf(activeArticle);
               if (idx > 0) setActiveArticle(articles[idx - 1]);
             }}
             disabled={articles.indexOf(activeArticle) === 0}
-            className="px-4 py-2 text-sm border border-slate-600 rounded-md text-slate-300 disabled:opacity-40 hover:bg-slate-700/50"
           >
-            ← Artigo anterior
-          </button>
+            <Icon as={ChevronLeft} />
+            Artigo anterior
+          </Button>
           {articles.indexOf(activeArticle) < articles.length - 1 ? (
-            <button
+            <Button
+              variant="primary"
               onClick={() => {
                 const idx = articles.indexOf(activeArticle);
                 setActiveArticle(articles[idx + 1]);
               }}
-              className="px-4 py-2 text-sm bg-blue-700 text-white rounded-md hover:bg-blue-800"
             >
-              Artigo seguinte →
-            </button>
+              Artigo seguinte
+              <Icon as={ChevronRight} />
+            </Button>
           ) : (
             !isCompleted && (
               <div className="flex flex-col items-end gap-1">
-                <button
+                <Button
+                  variant="primary"
                   onClick={handleComplete}
                   disabled={!canComplete || completeMut.isPending}
-                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-40"
                 >
-                  {completeMut.isPending ? "A concluir…" : "Concluir avaliação ✓"}
-                </button>
+                  <Icon as={Check} />
+                  {completeMut.isPending ? "A concluir…" : "Concluir avaliação"}
+                </Button>
                 {!canComplete && missingCount > 0 && (
-                  <p className="text-xs text-amber-400">
+                  <p className="text-xs text-warn">
                     Faltam {missingCount} pergunta{missingCount === 1 ? "" : "s"} para concluir
                   </p>
                 )}
