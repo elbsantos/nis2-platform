@@ -55,8 +55,8 @@ type ScanGroup = {
 // Constants
 // ---------------------------------------------------------------------------
 
-const PLATFORM_ICONS: Record<string, string> = {
-  windows: "🪟", linux: "🐧", macos: "🍎", cloud: "☁️", all: "🔧",
+const PLATFORM_LABEL: Record<string, string> = {
+  windows: "Windows", linux: "Linux", macos: "macOS", cloud: "Cloud", all: "Todos", generic: "Genérico",
 };
 
 // ---------------------------------------------------------------------------
@@ -205,24 +205,23 @@ function ExpandedContent({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-medium text-white">{item.title}</p>
+      <p className="text-sm font-medium text-text">{item.title}</p>
 
       {steps.length > 0 && (
         <div>
           {osTabs.length > 0 && (
-            <div className="flex gap-1 mb-3 border-b border-[#1e3a5f] pb-2">
+            <div className="flex gap-1 mb-3 border-b border-line pb-2">
               {(["all", ...osTabs] as OsTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={(e) => { e.stopPropagation(); setOsTab(tab); }}
                   className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
                     osTab === tab
-                      ? "bg-blue-700 text-white"
-                      : "text-slate-400 hover:bg-[#152744]"
+                      ? "bg-accent text-accent-ink"
+                      : "text-dim hover:bg-surface-2"
                   }`}
                 >
-                  {tab !== "all" && (PLATFORM_ICONS[tab] ?? "")}{" "}
-                  {tab === "all" ? "Todos" : tab === "windows" ? "Windows" : "Linux"}
+                  {tab === "all" ? "Todos" : PLATFORM_LABEL[tab] ?? tab}
                 </button>
               ))}
             </div>
@@ -231,16 +230,16 @@ function ExpandedContent({
           <div className="space-y-2">
             {visibleSteps.map((step) => (
               <div key={`${step.platform}-${step.order}`} className="flex gap-3">
-                <span className="flex-shrink-0 w-5 h-5 bg-blue-900/40 text-blue-400 border border-blue-700 rounded-full text-xs font-bold flex items-center justify-center">
+                <span className="flex-shrink-0 w-5 h-5 bg-accent/10 text-accent border border-accent/40 rounded-full text-xs font-bold flex items-center justify-center">
                   {step.displayOrder}
                 </span>
                 <div className="flex-1">
                   {osTab === "all" && (
-                    <span className="text-xs text-slate-500 mr-1">
-                      {PLATFORM_ICONS[step.platform] ?? "🔧"}
-                    </span>
+                    <Badge tone="neutral" className="mr-1.5 text-[10px]">
+                      {PLATFORM_LABEL[step.platform] ?? step.platform}
+                    </Badge>
                   )}
-                  <span className="text-sm text-slate-300">{step.instruction}</span>
+                  <span className="text-sm text-dim">{step.instruction}</span>
                 </div>
               </div>
             ))}
@@ -248,8 +247,8 @@ function ExpandedContent({
         </div>
       )}
 
-      <div className="pt-3 border-t border-[#1e3a5f]">
-        <p className="text-xs text-slate-500 mb-2">Actualizar estado:</p>
+      <div className="pt-3 border-t border-line">
+        <p className="text-xs text-faint mb-2">Actualizar estado:</p>
         <div className="flex flex-wrap gap-2">
           {(["todo", "in_progress", "done", "wont_fix"] as Status[]).map((s) => (
             <button
@@ -258,8 +257,8 @@ function ExpandedContent({
               disabled={item.status === s}
               className={`px-3 py-1 text-xs rounded-full border transition-colors disabled:opacity-40 ${
                 item.status === s
-                  ? "bg-slate-700 text-white border-slate-600"
-                  : "text-slate-400 border-slate-600 hover:bg-[#152744]"
+                  ? "bg-accent text-accent-ink border-accent"
+                  : "text-dim border-line hover:bg-surface-2"
               }`}
             >
               {statusLabel[s]}
