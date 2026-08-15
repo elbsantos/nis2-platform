@@ -3,7 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DataTable, type ColumnDef } from "../components/ui/DataTable";
-import { ExplainerPanel } from "../components/ExplainerPanel";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
+import { Alert } from "../components/ui/Alert";
+import { InfoNote } from "../components/ui/InfoNote";
+import { Icon } from "../components/ui/Icon";
+import { Wrench } from "lucide-react";
 import {
   statusTone, statusLabel,
   sevClasses, sevLabel,
@@ -88,7 +93,7 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     key: "target",
     header: "Alvo",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-300 whitespace-nowrap">
+      <span className="font-mono text-xs text-dim whitespace-nowrap">
         {row.target ?? "—"}
       </span>
     ),
@@ -98,18 +103,18 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     header: "CVE",
     render: (row) =>
       row.cveId ? (
-        <span className="font-mono text-xs text-amber-400 whitespace-nowrap">
+        <span className="font-mono text-xs text-warn whitespace-nowrap">
           {row.cveId}
         </span>
       ) : (
-        <span className="text-slate-500">—</span>
+        <span className="text-faint">—</span>
       ),
   },
   {
     key: "severity",
     header: "Severidade",
     render: (row) => {
-      if (!row.severity) return <span className="text-slate-500">—</span>;
+      if (!row.severity) return <span className="text-faint">—</span>;
       return (
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           <span
@@ -118,7 +123,7 @@ const COLUMNS: ColumnDef<RemItem>[] = [
             {sevLabel[row.severity]}
           </span>
           {row.cvssScore && (
-            <span className="text-xs text-slate-400">{row.cvssScore}</span>
+            <span className="text-xs text-dim">{row.cvssScore}</span>
           )}
         </div>
       );
@@ -128,7 +133,7 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     key: "component",
     header: "Componente",
     render: (row) => (
-      <span className="text-xs text-slate-300">
+      <span className="text-xs text-dim">
         {row.affectedComponent ?? "—"}
       </span>
     ),
@@ -137,11 +142,9 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     key: "effort",
     header: "Esforço",
     render: (row) => (
-      <span
-        className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap ${toneClasses[effortTone[row.effort]]}`}
-      >
+      <Badge tone={effortTone[row.effort]} className="whitespace-nowrap">
         {effortLabel[row.effort]}
-      </span>
+      </Badge>
     ),
   },
   {
@@ -149,16 +152,16 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     header: "Artigo NIS2",
     render: (row) => {
       const articles = row.nis2Articles ?? [];
-      if (!articles.length) return <span className="text-slate-500">—</span>;
+      if (!articles.length) return <span className="text-faint">—</span>;
       return (
         <div className="flex flex-wrap gap-1">
           {articles.slice(0, 2).map((a) => (
-            <span key={a} className="text-xs text-blue-400 whitespace-nowrap">
+            <span key={a} className="text-xs text-accent whitespace-nowrap">
               {a}
             </span>
           ))}
           {articles.length > 2 && (
-            <span className="text-xs text-slate-500">+{articles.length - 2}</span>
+            <span className="text-xs text-faint">+{articles.length - 2}</span>
           )}
         </div>
       );
@@ -168,11 +171,9 @@ const COLUMNS: ColumnDef<RemItem>[] = [
     key: "status",
     header: "Estado",
     render: (row) => (
-      <span
-        className={`px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${toneClasses[statusTone[row.status]]}`}
-      >
+      <Badge tone={statusTone[row.status]} className="whitespace-nowrap">
         {statusLabel[row.status]}
-      </span>
+      </Badge>
     ),
   },
 ];
@@ -384,8 +385,8 @@ export default function Remediation() {
           onClick={() => setStatusFilter(undefined)}
           className={`px-3 py-1 text-xs rounded-full border transition-colors ${
             !statusFilter
-              ? "bg-white text-gray-900 border-white font-medium"
-              : "text-slate-300 border-slate-600 hover:bg-slate-700/50"
+              ? "bg-accent text-accent-ink border-accent font-medium"
+              : "text-dim border-line hover:bg-surface-2"
           }`}
         >
           Todos ({totalCount})
@@ -396,8 +397,8 @@ export default function Remediation() {
             onClick={() => setStatusFilter(statusFilter === s ? undefined : s)}
             className={`px-3 py-1 text-xs rounded-full border transition-colors ${
               statusFilter === s
-                ? "bg-white text-gray-900 border-white font-medium"
-                : "text-slate-300 border-slate-600 hover:bg-slate-700/50"
+                ? "bg-accent text-accent-ink border-accent font-medium"
+                : "text-dim border-line hover:bg-surface-2"
             }`}
           >
             {statusLabel[s]} ({counts[s] ?? 0})
@@ -407,57 +408,57 @@ export default function Remediation() {
     ) : undefined;
 
   return (
-    <div className="px-8 py-6">
+    <div className="max-w-6xl mx-auto px-8 py-6">
       <PageHeader
         title="Planos de Remediação"
         subtitle="Gerados por IA com base nos resultados dos scans NIS2"
         actions={filterToolbar}
       />
 
-      <ExplainerPanel resourceKey="remediacao">
-        <p><strong className="text-white">O que é.</strong> Para cada vulnerabilidade que o scanner encontra, a plataforma gera um plano de correção — o que fazer, por que ordem, e com que prioridade.</p>
-        <p><strong className="text-white">Porque existe.</strong> Encontrar problemas não basta — é preciso saber como os resolver. A remediação traduz cada achado técnico numa ação concreta, priorizada por risco, para que saiba por onde começar.</p>
-        <p><strong className="text-white">Quando fazer.</strong> Depois de um scan que tenha encontrado vulnerabilidades. Se o scan estiver limpo, não há nada a remediar.</p>
-      </ExplainerPanel>
+      <InfoNote>
+        <p><strong className="text-text">O que é.</strong> Para cada vulnerabilidade que o scanner encontra, a plataforma gera um plano de correção — o que fazer, por que ordem, e com que prioridade.</p>
+        <p><strong className="text-text">Porque existe.</strong> Encontrar problemas não basta — é preciso saber como os resolver. A remediação traduz cada achado técnico numa ação concreta, priorizada por risco, para que saiba por onde começar.</p>
+        <p><strong className="text-text">Quando fazer.</strong> Depois de um scan que tenha encontrado vulnerabilidades. Se o scan estiver limpo, não há nada a remediar.</p>
+      </InfoNote>
 
       {/* Alerts */}
       {genMsg && (
-        <div className={`mb-5 rounded-lg p-3 text-sm ${polling ? "bg-blue-900/30 border border-blue-700 text-blue-400" : "bg-green-900/30 border border-green-700 text-green-400"}`}>
+        <Alert tone={polling ? "info" : "ok"} className="mb-5">
           {genMsg}
-        </div>
+        </Alert>
       )}
       {genError && (
-        <div className="mb-5 bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm text-red-400">
+        <Alert tone="bad" className="mb-5">
           {genError.includes("pro") || genError.includes("FORBIDDEN")
             ? "A geração de planos de remediação com IA está disponível nos planos Pro e MSSP."
             : genError}
-        </div>
+        </Alert>
       )}
 
       {/* Generate CTA — only when deep-linked to a specific scan */}
       {scanIdFromUrl && (
         <div className="mb-6">
-          <button
+          <Button
+            variant="primary"
             onClick={handleGenerate}
             disabled={generating || polling}
-            className="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 disabled:opacity-50 transition-colors"
           >
             {generating ? "A iniciar…" : polling ? "A gerar…" : "Gerar planos para este scan"}
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Loading */}
       {isLoading && (
-        <div className="py-16 text-center text-slate-400 text-sm">A carregar…</div>
+        <div className="py-16 text-center text-dim text-sm">A carregar…</div>
       )}
 
       {/* Empty state */}
       {!isLoading && totalCount === 0 && (
         <div className="py-16 text-center">
-          <div className="text-4xl mb-4">🛠️</div>
-          <p className="text-slate-300 font-medium mb-2">Sem planos de remediação</p>
-          <p className="text-sm text-slate-400 max-w-sm mx-auto">
+          <Icon as={Wrench} className="mx-auto mb-4 text-faint" size={32} />
+          <p className="text-text font-medium mb-2">Sem planos de remediação</p>
+          <p className="text-sm text-dim max-w-sm mx-auto">
             {scanIdFromUrl
               ? "Ainda não há planos gerados para este scan. Clica em \"Gerar planos\" para começar."
               : "Acede aos resultados de um scan e clica em \"Gerar plano de remediação IA\" para criar planos."}
@@ -471,8 +472,8 @@ export default function Remediation() {
           {groups.map((group) => (
             <section key={group.scanId ?? "__null__"}>
               {/* Section header */}
-              <div className="flex items-center gap-3 mb-3 pb-2 border-b border-[#1e3a5f]">
-                <h2 className="text-sm font-semibold text-white font-mono">
+              <div className="flex items-center gap-3 mb-3 pb-2 border-b border-line">
+                <h2 className="text-sm font-semibold text-text font-mono">
                   {group.target}
                 </h2>
                 {group.mode && (
@@ -482,7 +483,7 @@ export default function Remediation() {
                     {modeLabel[group.mode]}
                   </span>
                 )}
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-dim">
                   {group.items.length}{" "}
                   {group.items.length === 1 ? "item" : "itens"}
                 </span>
