@@ -149,10 +149,19 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
       continue;
     }
 
-    // First substantial non-step line = risk summary
-    if (!riskSummary && line.length > 30) {
+    // Risk summary — só a primeira linha substancial ANTES de qualquer passo
+    if (!riskSummary && steps.length === 0 && line.length > 30) {
       riskSummary = stripMarkdown(line);
+      continue;
     }
+
+    // Continuação de um passo multi-linha — anexa ao último passo
+    if (steps.length > 0) {
+      steps[steps.length - 1].instruction += " " + stripMarkdown(line);
+      continue;
+    }
+
+    // Sem passos e riskSummary já preenchido — linha ignorada, como antes
   }
 
   return {

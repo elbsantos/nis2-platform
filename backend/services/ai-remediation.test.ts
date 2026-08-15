@@ -179,6 +179,39 @@ Art. 21(2)(e)
 });
 
 // ---------------------------------------------------------------------------
+// parseAIPlan — continuação de passo multi-linha (corte no meio da instrução)
+// ---------------------------------------------------------------------------
+
+describe("parseAIPlan — multi-line step continuation", () => {
+  it("anexa a linha de continuação ao passo anterior, sem a perder", () => {
+    const raw = [
+      "Risco: componente desatualizado com CVE conhecido.",
+      "1. Liga-te ao servidor via SSH.",
+      "2. Verifica a versao com o comando",
+      "apache2 -v",
+      "3. Reinicia o servico.",
+    ].join("\n");
+    const plan = parseAIPlan(raw, "CVE-TESTE — apache");
+    expect(plan.steps).toHaveLength(3);
+    expect(plan.steps[1].instruction).toContain("apache2 -v");
+    expect(plan.steps[1].instruction).toBe("Verifica a versao com o comando apache2 -v");
+  });
+
+  it("não afeta o risk summary — a linha de risco antes dos passos continua a ir para riskSummary, não para um passo", () => {
+    const raw = [
+      "Esta vulnerabilidade permite acesso não autorizado ao servidor via SSH.",
+      "1. Liga-te ao servidor via SSH.",
+      "2. Verifica a versao com o comando",
+      "apache2 -v",
+    ].join("\n");
+    const plan = parseAIPlan(raw, "CVE-TESTE — apache");
+    expect(plan.riskSummary).toBe("Esta vulnerabilidade permite acesso não autorizado ao servidor via SSH.");
+    expect(plan.steps).toHaveLength(2);
+    expect(plan.steps[1].instruction).toContain("apache2 -v");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // normalizeOsKey
 // ---------------------------------------------------------------------------
 
