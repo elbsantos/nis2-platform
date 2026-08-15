@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
-import { ExplainerPanel } from "../components/ExplainerPanel";
 import { answerTone, answerLabel, answerSelectedClasses, answerIdleClasses, type AnswerValue } from "../lib/answerTone";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { InfoNote } from "../components/ui/InfoNote";
+import { Icon } from "../components/ui/Icon";
+import { ClipboardList, Plus } from "lucide-react";
 
 const ARTICLE_LABELS: Record<string, string> = {
   a: "Políticas de segurança",
@@ -28,46 +34,40 @@ function SessionList() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <ExplainerPanel resourceKey="questionario">
-        <p><strong className="text-white">O que é.</strong> Um conjunto de perguntas sobre como a sua empresa gere a segurança da informação — desde cópias de segurança e controlo de acessos até formação e resposta a incidentes. Cobre as medidas que a NIS2 exige.</p>
-        <p><strong className="text-white">Porque existe.</strong> A NIS2 exige que as empresas apliquem um conjunto de medidas de segurança. O questionário mede, medida a medida, onde está a sua empresa — o que já cumpre e o que falta. É a base do seu grau de conformidade.</p>
-        <p><strong className="text-white">Quando fazer.</strong> Depois do enquadramento. As respostas alimentam o seu score e vários documentos.</p>
-        <p><strong className="text-white">Uma nota:</strong> responda com honestidade. Se uma medida não se aplica à sua empresa, pode indicá-lo. O objetivo é um retrato verdadeiro, não uma pontuação alta artificial.</p>
-      </ExplainerPanel>
+      <InfoNote>
+        <p><strong className="text-text">O que é.</strong> Um conjunto de perguntas sobre como a sua empresa gere a segurança da informação — desde cópias de segurança e controlo de acessos até formação e resposta a incidentes. Cobre as medidas que a NIS2 exige.</p>
+        <p><strong className="text-text">Porque existe.</strong> A NIS2 exige que as empresas apliquem um conjunto de medidas de segurança. O questionário mede, medida a medida, onde está a sua empresa — o que já cumpre e o que falta. É a base do seu grau de conformidade.</p>
+        <p><strong className="text-text">Quando fazer.</strong> Depois do enquadramento. As respostas alimentam o seu score e vários documentos.</p>
+        <p><strong className="text-text">Uma nota:</strong> responda com honestidade. Se uma medida não se aplica à sua empresa, pode indicá-lo. O objetivo é um retrato verdadeiro, não uma pontuação alta artificial.</p>
+      </InfoNote>
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-white">Questionário NIS2</h1>
-          <p className="text-sm text-slate-400 mt-0.5">42 controlos do Art. 21(2) da Diretiva NIS2</p>
-        </div>
-        <button
-          onClick={() => startMut.mutate({})}
-          disabled={startMut.isPending}
-          className="px-4 py-2 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 disabled:opacity-50"
-        >
-          {startMut.isPending ? "A iniciar…" : "+ Nova avaliação"}
-        </button>
-      </div>
+      <SectionHeader
+        eyebrow="AUTOAVALIAÇÃO · NIS2 ART. 21"
+        title="Questionário NIS2"
+        description="42 controlos do Art. 21(2) da Directiva NIS2."
+        action={
+          <Button onClick={() => startMut.mutate({})} disabled={startMut.isPending}>
+            <Icon as={Plus} />
+            {startMut.isPending ? "A iniciar…" : "Nova avaliação"}
+          </Button>
+        }
+      />
 
       {isLoading && (
-        <div className="text-center py-16 text-gray-400 text-sm">A carregar…</div>
+        <div className="text-center py-16 text-dim text-sm">A carregar…</div>
       )}
 
       {!isLoading && sessions?.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-4xl mb-4">📋</div>
-          <p className="text-slate-300 font-medium mb-2">Ainda não fez nenhuma avaliação</p>
-          <p className="text-sm text-slate-400 mb-6">
+        <Card className="text-center py-16 px-4">
+          <Icon as={ClipboardList} className="mx-auto mb-4 text-dim" size={40} />
+          <p className="text-text font-medium mb-2">Ainda não fez nenhuma avaliação</p>
+          <p className="text-sm text-dim mb-6">
             O questionário avalia a conformidade da sua empresa com os 42 controlos obrigatórios do Art. 21(2) da NIS2.
           </p>
-          <button
-            onClick={() => startMut.mutate({})}
-            disabled={startMut.isPending}
-            className="px-5 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-800 disabled:opacity-50"
-          >
-            Iniciar primeira avaliação
-          </button>
-        </div>
+          <Button onClick={() => startMut.mutate({})} disabled={startMut.isPending}>
+            {startMut.isPending ? "A iniciar…" : "Iniciar primeira avaliação"}
+          </Button>
+        </Card>
       )}
 
       {sessions && sessions.length > 0 && (
@@ -76,51 +76,45 @@ function SessionList() {
             const score   = s.score ? parseInt(s.score) : null;
             const answers = (s.answers as any[]) ?? [];
             const done    = s.status === "completed";
+            const scoreTone = score === null ? "" : score >= 80 ? "bg-ok" : score >= 60 ? "bg-warn" : "bg-bad";
             return (
-              <div
-                key={s.id}
-                className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all"
-              >
+              <Card key={s.id} className="p-4 hover:border-accent/50 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <button
                     className="flex-1 text-left"
                     onClick={() => navigate(`/questionnaire/${s.id}`)}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        done ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
-                      }`}>
-                        {done ? "Concluído" : "Em curso"}
-                      </span>
-                      <span className="text-xs text-gray-400">#{s.id}</span>
+                      <Badge tone={done ? "ok" : "info"}>{done ? "Concluído" : "Em curso"}</Badge>
+                      <span className="text-xs text-faint">#{s.id}</span>
                     </div>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-dim">
                       {answers.length}/42 controlos respondidos
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-faint mt-0.5">
                       {new Date(s.createdAt).toLocaleDateString("pt-PT")}
                     </p>
                   </button>
                   <div className="flex items-center gap-3 shrink-0">
                     {done && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        className="px-3 py-1.5 text-xs"
                         onClick={() => navigate(`/questionnaire/${s.id}/report`)}
-                        className="px-3 py-1.5 text-xs font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800"
                       >
                         Ver relatório
-                      </button>
+                      </Button>
                     )}
                     {score !== null && (
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                        style={{ backgroundColor: score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444" }}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${scoreTone}`}
                       >
                         {score}
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
