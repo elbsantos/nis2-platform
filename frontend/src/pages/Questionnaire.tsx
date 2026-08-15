@@ -2,27 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { ExplainerPanel } from "../components/ExplainerPanel";
-
-type AnswerValue = "yes" | "partial" | "no" | "na";
-
-const ANSWER_LABELS: Record<AnswerValue, string> = {
-  yes:     "Sim",
-  partial: "Parcialmente",
-  no:      "Não",
-  na:      "N.A.",
-};
-
-const ANSWER_CLASSES: Record<AnswerValue, string> = {
-  yes:     "border-green-500 bg-green-50 text-green-800",
-  partial: "border-amber-400 bg-amber-50 text-amber-800",
-  no:      "border-red-400 bg-red-50 text-red-700",
-  // Cor neutra (roxo) — N.A. não é bom/parcial/mau, mas tem de se distinguir
-  // claramente do estado NÃO selecionado ("border-gray-200 text-gray-500").
-  // O cinzento anterior (border-gray-300 bg-gray-50 text-gray-500) tinha a
-  // MESMA cor de texto do estado não selecionado e um fundo sem matiz —
-  // ficava indistinguível de "não escolhido" sobre o cartão branco.
-  na:      "border-purple-400 bg-purple-50 text-purple-800",
-};
+import { answerTone, answerLabel, answerSelectedClasses, answerIdleClasses, type AnswerValue } from "../lib/answerTone";
 
 const ARTICLE_LABELS: Record<string, string> = {
   a: "Políticas de segurança",
@@ -330,12 +310,10 @@ function ActiveQuestionnaire({ sessionId }: { sessionId: number }) {
                       disabled={isCompleted}
                       onClick={() => setAnswer(control.id, val)}
                       className={`px-4 py-1.5 text-xs font-medium border rounded-full transition-all ${
-                        current === val
-                          ? ANSWER_CLASSES[val]
-                          : "border-gray-200 text-gray-500 hover:border-gray-400"
+                        current === val ? answerSelectedClasses[answerTone[val]] : answerIdleClasses
                       }`}
                     >
-                      {ANSWER_LABELS[val]}
+                      {answerLabel[val]}
                     </button>
                   ))}
                 </div>

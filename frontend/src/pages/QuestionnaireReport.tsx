@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
+import { answerTone, answerSelectedClasses } from "../lib/answerTone";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -19,9 +20,9 @@ function scoreLabel(score: number): string {
 }
 
 function answerBadge(answer: "no" | "partial") {
-  return answer === "partial"
-    ? <span className="px-1.5 py-0.5 text-xs rounded bg-amber-100 text-amber-800 font-medium">Parcial</span>
-    : <span className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-700 font-medium">Não</span>;
+  const tone  = answerTone[answer];
+  const label = answer === "partial" ? "Parcial" : "Não";
+  return <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${answerSelectedClasses[tone]}`}>{label}</span>;
 }
 
 function evidenceTag(type: string) {
