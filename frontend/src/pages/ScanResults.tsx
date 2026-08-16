@@ -5,12 +5,10 @@ import VulnerabilityList from "../components/VulnerabilityList";
 import { DocButton } from "../components/DocButton";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
 import { sevCardClass, sevBadgeClass, sevLabel } from "../lib/remediationTones";
 
 const POLL_INTERVAL = 4_000;
-
-// Dark theme tokens
-const CARD = "bg-surface border border-line rounded-xl";
 
 export default function ScanResults() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -52,10 +50,10 @@ export default function ScanResults() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0f1e38] flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center">
           <Spinner />
-          <p className="mt-4 text-slate-400 text-xl">A carregar resultados…</p>
+          <p className="mt-4 text-dim text-xl">A carregar resultados…</p>
         </div>
       </div>
     );
@@ -63,10 +61,10 @@ export default function ScanResults() {
 
   if (error || !scan) {
     return (
-      <div className="min-h-screen bg-[#0f1e38] flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-400 font-medium text-2xl">Scan não encontrado</p>
-          <Link to="/scan/history" className="mt-4 inline-block text-xl text-amber-400 hover:underline">
+          <p className="text-bad font-medium text-2xl">Scan não encontrado</p>
+          <Link to="/scan/history" className="mt-4 inline-block text-xl text-accent hover:underline">
             ← Ver histórico
           </Link>
         </div>
@@ -76,17 +74,15 @@ export default function ScanResults() {
 
   if (scan.status === "failed") {
     return (
-      <div className="min-h-screen bg-[#0f1e38] flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-3">⚠️</p>
-          <p className="font-semibold text-white text-2xl mb-1">Scan falhou</p>
-          <p className="text-xl text-slate-400 mb-6">
+          <p className="font-semibold text-text text-2xl mb-1">Scan falhou</p>
+          <p className="text-xl text-dim mb-6">
             Verifica que o DNS TXT record está correcto e tenta novamente.
           </p>
-          <Link to="/scan/start"
-            className="inline-block px-6 py-3 bg-red-700 text-white text-xl rounded-md hover:bg-red-800"
-          >
-            Novo scan
+          <Link to="/scan/start">
+            <Button variant="primary">Novo scan</Button>
           </Link>
         </div>
       </div>
@@ -95,13 +91,13 @@ export default function ScanResults() {
 
   if (scan.status === "pending" || scan.status === "running") {
     return (
-      <div className="min-h-screen bg-[#0f1e38] flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center max-w-2xl px-4">
           <Spinner size="lg" />
-          <p className="mt-6 text-white font-medium text-2xl">
+          <p className="mt-6 text-text font-medium text-2xl">
             {scan.status === "pending" ? "Scan na fila…" : "A executar scan NIS2…"}
           </p>
-          <p className="text-xl text-slate-400 mt-2">
+          <p className="text-xl text-dim mt-2">
             A analisar <span className="font-mono">{scan.target}</span> via Shodan + Censys + DNS.
             Pode demorar 1–3 minutos.
           </p>
@@ -116,10 +112,10 @@ export default function ScanResults() {
               "Score NIS2",
             ].map((step, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
-                <div className="w-10 h-10 rounded-full bg-amber-900/30 border border-amber-500/40 flex items-center justify-center animate-pulse">
-                  <span className="text-amber-400 text-lg font-bold">{i + 1}</span>
+                <div className="w-10 h-10 rounded-full bg-warn/10 border border-warn/40 flex items-center justify-center animate-pulse">
+                  <span className="text-warn text-lg font-bold">{i + 1}</span>
                 </div>
-                <span className="text-lg text-slate-400 max-w-[90px] text-center">{step}</span>
+                <span className="text-lg text-dim max-w-[90px] text-center">{step}</span>
               </div>
             ))}
           </div>
@@ -199,8 +195,8 @@ export default function ScanResults() {
         </div>
 
         {/* NIS2 Score chart */}
-        <section className={`${CARD} p-6`}>
-          <h2 className="text-2xl font-semibold text-white mb-4">Score NIS2 por Artigo</h2>
+        <Card as="section" className="p-6">
+          <h2 className="text-2xl font-semibold text-text mb-4">Score NIS2 por Artigo</h2>
           {results?.nis2Scores ? (
             <Nis2ScoreChart
               scores={results.nis2Scores}
@@ -210,63 +206,63 @@ export default function ScanResults() {
               hasQuestionnaire={combinedData?.hasQuestionnaire ?? false}
             />
           ) : (
-            <p className="text-xl text-slate-400">Dados de score não disponíveis para este scan.</p>
+            <p className="text-xl text-dim">Dados de score não disponíveis para este scan.</p>
           )}
-        </section>
+        </Card>
 
         {/* TLS & Certificates */}
         {results?.directTls && (
-          <section className={`${CARD} p-6`}>
-            <h2 className="text-2xl font-semibold text-white mb-4">TLS &amp; Certificados</h2>
+          <Card as="section" className="p-6">
+            <h2 className="text-2xl font-semibold text-text mb-4">TLS &amp; Certificados</h2>
             <TlsSection directTls={results.directTls} />
-          </section>
+          </Card>
         )}
 
         {/* Ports & Services */}
         {results?.openPorts && results.openPorts.length > 0 && (
-          <section className={`${CARD} p-6`}>
-            <h2 className="text-2xl font-semibold text-white mb-4">Portos &amp; Serviços</h2>
+          <Card as="section" className="p-6">
+            <h2 className="text-2xl font-semibold text-text mb-4">Portos &amp; Serviços</h2>
             <PortsSection ports={results.openPorts} cdn={results.directTls?.cdn} />
-          </section>
+          </Card>
         )}
 
         {/* Email security */}
         {results?.emailSecurity && (
-          <section className={`${CARD} p-6`}>
-            <h2 className="text-2xl font-semibold text-white mb-4">Segurança de Email</h2>
+          <Card as="section" className="p-6">
+            <h2 className="text-2xl font-semibold text-text mb-4">Segurança de Email</h2>
             <SecurityChecklist checks={results.emailSecurity.checks} />
-          </section>
+          </Card>
         )}
 
         {/* HTTP headers */}
         {results?.httpHeaders && (
-          <section className={`${CARD} p-6`}>
-            <h2 className="text-2xl font-semibold text-white mb-1">Headers de Segurança HTTP</h2>
-            <p className="text-lg text-slate-400 mb-4">
+          <Card as="section" className="p-6">
+            <h2 className="text-2xl font-semibold text-text mb-1">Headers de Segurança HTTP</h2>
+            <p className="text-lg text-dim mb-4">
               Analisado via <span className="font-mono">{results.httpHeaders.url}</span>
             </p>
             <SecurityChecklist checks={results.httpHeaders.checks} />
-          </section>
+          </Card>
         )}
 
         {/* Dark web & reputation */}
         {results?.darkWeb && (
-          <section className={`${CARD} p-6`}>
-            <h2 className="text-2xl font-semibold text-white mb-4">Dark Web &amp; Reputação</h2>
+          <Card as="section" className="p-6">
+            <h2 className="text-2xl font-semibold text-text mb-4">Dark Web &amp; Reputação</h2>
             <DarkWebSection darkWeb={results.darkWeb} />
-          </section>
+          </Card>
         )}
 
         {/* Vulnerabilities */}
-        <section className={`${CARD} p-6`}>
-          <h2 className="text-2xl font-semibold text-white mb-4">
+        <Card as="section" className="p-6">
+          <h2 className="text-2xl font-semibold text-text mb-4">
             Vulnerabilidades
             {vulnCount > 0 && (
-              <span className="ml-2 text-xl font-normal text-slate-400">({vulnCount})</span>
+              <span className="ml-2 text-xl font-normal text-dim">({vulnCount})</span>
             )}
           </h2>
           <VulnerabilityListFromScan results={results} />
-        </section>
+        </Card>
 
         {/* Documentos NIS2 */}
         <DocumentsSection scanId={scan.id} eligibleCount={eligibleCount} portsCount={portsCount} />
@@ -274,12 +270,12 @@ export default function ScanResults() {
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-2">
           <Link to="/scan/start"
-            className="px-5 py-3 border border-[#1e3a5f] text-xl rounded-md text-slate-300 hover:bg-[#152744]"
+            className="px-5 py-3 border border-line text-xl rounded-md text-dim hover:bg-surface-2"
           >
             Novo scan
           </Link>
           <Link to="/scan/history"
-            className="px-5 py-3 border border-[#1e3a5f] text-xl rounded-md text-slate-300 hover:bg-[#152744]"
+            className="px-5 py-3 border border-line text-xl rounded-md text-dim hover:bg-surface-2"
           >
             Ver histórico
           </Link>
@@ -375,9 +371,9 @@ function DocumentsSection({ scanId, eligibleCount, portsCount }: { scanId: numbe
   );
 
   return (
-    <section className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-6">
-      <h2 className="text-2xl font-semibold text-white mb-1">Documentos NIS2</h2>
-      <p className="text-slate-400 text-lg mb-5">
+    <Card as="section" className="p-6">
+      <h2 className="text-2xl font-semibold text-text mb-1">Documentos NIS2</h2>
+      <p className="text-dim text-lg mb-5">
         Documentos pré-preenchidos com os dados do scan — reveja e complete antes de usar.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -484,7 +480,7 @@ function DocumentsSection({ scanId, eligibleCount, portsCount }: { scanId: numbe
           }}
         />
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -507,13 +503,13 @@ function FrameworkTags({ cis, iso, nist }: { cis?: string[]; iso?: string[]; nis
   return (
     <>
       {cis?.map((c) => (
-        <span key={c} className="px-2 py-0.5 text-lg font-medium rounded bg-slate-700 text-slate-300 border border-slate-600">{c}</span>
+        <Badge key={c} tone="neutral" className="text-lg">{c}</Badge>
       ))}
       {iso?.map((c) => (
-        <span key={c} className="px-2 py-0.5 text-lg font-medium rounded bg-blue-900/40 text-blue-300 border border-blue-700">{c}</span>
+        <Badge key={c} tone="neutral" className="text-lg">{c}</Badge>
       ))}
       {nist?.map((c) => (
-        <span key={c} className="px-2 py-0.5 text-lg font-medium rounded bg-teal-900/40 text-teal-300 border border-teal-700">{c}</span>
+        <Badge key={c} tone="neutral" className="text-lg">{c}</Badge>
       ))}
     </>
   );
@@ -521,27 +517,24 @@ function FrameworkTags({ cis, iso, nist }: { cis?: string[]; iso?: string[]; nis
 
 function SecurityChecklist({ checks }: { checks: SecurityCheck[] }) {
   const badge = (status: "pass" | "warn" | "fail" | "unverified") => {
-    if (status === "pass")
-      return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">OK</span>;
-    if (status === "warn")
-      return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-amber-900/40 text-amber-400 border border-amber-700">Aviso</span>;
-    if (status === "unverified")
-      return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-slate-700/60 text-slate-400 border border-slate-600">Não verificado</span>;
-    return <span className="px-3 py-1 text-lg font-semibold rounded-full bg-red-900/40 text-red-400 border border-red-700">Falha</span>;
+    if (status === "pass")       return <Badge tone="ok" className="text-lg">OK</Badge>;
+    if (status === "warn")       return <Badge tone="warn" className="text-lg">Aviso</Badge>;
+    if (status === "unverified") return <Badge tone="neutral" className="text-lg">Não verificado</Badge>;
+    return <Badge tone="bad" className="text-lg">Falha</Badge>;
   };
 
   return (
     <ul className="space-y-4">
       {checks.map((c) => (
-        <li key={c.name} className="flex items-start gap-4 bg-[#0f1e38] border border-[#1e3a5f] rounded-lg p-4">
+        <li key={c.name} className="flex items-start gap-4 bg-surface-2 border border-line rounded-lg p-4">
           <div className="mt-0.5 shrink-0">{badge(c.status)}</div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center flex-wrap gap-2 mb-1">
-              <p className="text-xl font-medium text-white">{c.name}</p>
-              <span className="text-lg text-slate-400">{c.nis2Article}</span>
+              <p className="text-xl font-medium text-text">{c.name}</p>
+              <span className="text-lg text-dim">{c.nis2Article}</span>
               <FrameworkTags cis={c.cisControls} iso={c.iso27001Controls} nist={c.nistCsfControls} />
             </div>
-            <p className="text-lg text-slate-300">{c.detail}</p>
+            <p className="text-lg text-dim">{c.detail}</p>
           </div>
         </li>
       ))}
@@ -573,7 +566,7 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
 
   if (!hasAnyVulns) {
     return (
-      <p className="text-xl text-slate-400 text-center py-8">
+      <p className="text-xl text-dim text-center py-8">
         Nenhuma vulnerabilidade registada.
       </p>
     );
@@ -618,7 +611,7 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
             <span className={`px-3 py-1 text-lg font-semibold rounded-full ${sevBadgeClass[v.severity] ?? sevBadgeClass.low}`}>
               {sevLabel[v.severity] ?? v.severity}
             </span>
-            <span className="text-xl font-mono font-medium text-white">
+            <span className="text-xl font-mono font-medium text-text">
               {v.cveId.startsWith("CVE-") ? (
                 <a
                   href={`https://nvd.nist.gov/vuln/detail/${v.cveId}`}
@@ -633,15 +626,15 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
               )}
             </span>
             {v.cvssScore > 0 && (
-              <span className="text-lg text-slate-400">CVSS {v.cvssScore.toFixed(1)}</span>
+              <span className="text-lg text-dim">CVSS {v.cvssScore.toFixed(1)}</span>
             )}
           </div>
-          <p className="text-lg text-slate-300 leading-relaxed">{v.description}</p>
-          <p className="text-lg text-slate-400">{v.affectedService}</p>
+          <p className="text-lg text-dim leading-relaxed">{v.description}</p>
+          <p className="text-lg text-dim">{v.affectedService}</p>
           {((v.nis2Articles?.length ?? 0) > 0 || (v.cisControls?.length ?? 0) > 0 || (v.iso27001Controls?.length ?? 0) > 0 || (v.nistCsfControls?.length ?? 0) > 0) && (
             <div className="flex items-center flex-wrap gap-2">
               {v.nis2Articles?.map((a) => (
-                <span key={a} className="text-lg text-slate-400">{a}</span>
+                <span key={a} className="text-lg text-dim">{a}</span>
               ))}
               <FrameworkTags cis={v.cisControls} iso={v.iso27001Controls} nist={v.nistCsfControls} />
             </div>
@@ -671,35 +664,33 @@ function DarkWebSection({ darkWeb }: { darkWeb: DarkWeb }) {
     <div className="space-y-6">
       {darkWeb.hibpEnabled ? (
         <div>
-          <p className="text-lg font-semibold text-slate-400 uppercase tracking-wide mb-3">
+          <p className="text-lg font-semibold text-dim uppercase tracking-wide mb-3">
             Credenciais expostas (Have I Been Pwned)
           </p>
           {darkWeb.breachesFound === 0 ? (
-            <div className="flex items-center gap-3 text-xl text-green-400">
-              <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">Sem fugas</span>
+            <div className="flex items-center gap-3 text-xl text-ok">
+              <Badge tone="ok" className="text-lg">Sem fugas</Badge>
               <span>Nenhuma fuga de credenciais detectada para este domínio.</span>
             </div>
           ) : (
             <>
               <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 text-lg font-semibold rounded-full bg-red-900/40 text-red-400 border border-red-700">
+                <Badge tone="bad" className="text-lg">
                   {darkWeb.breachesFound} breach{darkWeb.breachesFound !== 1 ? "es" : ""}
-                </span>
+                </Badge>
                 {darkWeb.hasPasswordExposure && (
-                  <span className="text-xl font-medium text-red-400">inclui passwords expostas — risco crítico</span>
+                  <span className="text-xl font-medium text-bad">inclui passwords expostas — risco crítico</span>
                 )}
               </div>
               <ul className="space-y-3">
                 {darkWeb.breaches.map((b) => (
-                  <li key={b.name} className="flex items-start gap-4 border border-[#1e3a5f] rounded-lg px-4 py-3 bg-[#0f1e38]">
-                    <span className={`px-3 py-1 text-lg font-semibold rounded-full shrink-0 mt-0.5 ${
-                      b.hasPasswords ? "bg-red-900/40 text-red-400 border border-red-700" : "bg-amber-900/40 text-amber-400 border border-amber-700"
-                    }`}>
+                  <li key={b.name} className="flex items-start gap-4 border border-line rounded-lg px-4 py-3 bg-surface-2">
+                    <Badge tone={b.hasPasswords ? "bad" : "warn"} className="text-lg shrink-0 mt-0.5">
                       {b.hasPasswords ? "Crítico" : "Alto"}
-                    </span>
+                    </Badge>
                     <div className="min-w-0">
-                      <p className="text-xl font-medium text-white">{b.name}</p>
-                      <p className="text-lg text-slate-400 mt-0.5">{b.dataClasses.join(" · ")}</p>
+                      <p className="text-xl font-medium text-text">{b.name}</p>
+                      <p className="text-lg text-dim mt-0.5">{b.dataClasses.join(" · ")}</p>
                     </div>
                   </li>
                 ))}
@@ -708,28 +699,24 @@ function DarkWebSection({ darkWeb }: { darkWeb: DarkWeb }) {
           )}
         </div>
       ) : (
-        <div className="text-lg text-slate-400 italic">
+        <div className="text-lg text-dim italic">
           Verificação HIBP não configurada (HIBP_API_KEY ausente) — contacta o suporte para activar.
         </div>
       )}
 
       <div>
-        <p className="text-lg font-semibold text-slate-400 uppercase tracking-wide mb-3">
+        <p className="text-lg font-semibold text-dim uppercase tracking-wide mb-3">
           Listas negras DNS (Spamhaus / SpamCop)
         </p>
         <ul className="space-y-3">
           {darkWeb.blacklists.map((bl) => (
-            <li key={bl.name} className="flex items-start gap-4 bg-[#0f1e38] border border-[#1e3a5f] rounded-lg px-4 py-3">
-              <span className={`px-3 py-1 text-lg font-semibold rounded-full shrink-0 mt-0.5 ${
-                bl.listed
-                  ? "bg-red-900/40 text-red-400 border border-red-700"
-                  : "bg-green-900/40 text-green-400 border border-green-700"
-              }`}>
+            <li key={bl.name} className="flex items-start gap-4 bg-surface-2 border border-line rounded-lg px-4 py-3">
+              <Badge tone={bl.listed ? "bad" : "ok"} className="text-lg shrink-0 mt-0.5">
                 {bl.listed ? "Listado" : "Limpo"}
-              </span>
+              </Badge>
               <div className="min-w-0">
-                <p className="text-xl font-medium text-white">{bl.name}</p>
-                <p className="text-lg text-slate-400 mt-0.5">{bl.detail}</p>
+                <p className="text-xl font-medium text-text">{bl.name}</p>
+                <p className="text-lg text-dim mt-0.5">{bl.detail}</p>
               </div>
             </li>
           ))}
@@ -763,11 +750,11 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
   return (
     <div className="space-y-5">
       {cdn.detected && (
-        <div className="flex items-start gap-4 p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
-          <span className="text-blue-400 mt-0.5 shrink-0 text-2xl">🛡️</span>
+        <div className="flex items-start gap-4 p-4 bg-accent/10 border border-accent/30 rounded-lg">
+          <span className="text-accent mt-0.5 shrink-0 text-2xl">🛡️</span>
           <div>
-            <p className="text-xl font-semibold text-blue-300">Protegido por {cdn.provider}</p>
-            <p className="text-lg text-blue-400 mt-1">
+            <p className="text-xl font-semibold text-accent">Protegido por {cdn.provider}</p>
+            <p className="text-lg text-accent mt-1">
               O servidor está atrás de um CDN/proxy. Portos internos não são expostos directamente — é uma boa prática de segurança.
               A análise TLS foi feita directamente ao domínio.
             </p>
@@ -776,11 +763,11 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
       )}
 
       {cert ? (
-        <div className="border border-[#1e3a5f] rounded-lg overflow-hidden">
-          <div className="bg-[#0f1e38] px-5 py-3 border-b border-[#1e3a5f]">
-            <p className="text-lg font-semibold text-slate-400 uppercase tracking-wide">Certificado TLS</p>
+        <div className="border border-line rounded-lg overflow-hidden">
+          <div className="bg-surface-2 px-5 py-3 border-b border-line">
+            <p className="text-lg font-semibold text-dim uppercase tracking-wide">Certificado TLS</p>
           </div>
-          <div className="divide-y divide-[#1e3a5f]">
+          <div className="divide-y divide-line">
             {[
               { label: "Emitido para",  value: cert.subject },
               { label: "Emissor (CA)",  value: cert.issuer },
@@ -800,16 +787,16 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
               { label: "Auto-assinado", value: cert.isSelfSigned ? "Sim ⚠️" : "Não ✓" },
             ].map((row) => (
               <div key={row.label} className="flex gap-4 px-5 py-3">
-                <span className="text-lg text-slate-400 w-36 shrink-0">{row.label}</span>
-                <span className={`text-lg font-mono ${(row as any).highlight ?? "text-white"} break-all`}>
+                <span className="text-lg text-dim w-36 shrink-0">{row.label}</span>
+                <span className={`text-lg font-mono ${(row as any).highlight ?? "text-text"} break-all`}>
                   {row.value}
                 </span>
               </div>
             ))}
             {cert.sans.length > 0 && (
               <div className="flex gap-4 px-5 py-3">
-                <span className="text-lg text-slate-400 w-36 shrink-0">SANs</span>
-                <span className="text-lg font-mono text-slate-300 break-all">
+                <span className="text-lg text-dim w-36 shrink-0">SANs</span>
+                <span className="text-lg font-mono text-dim break-all">
                   {cert.sans.slice(0, 6).join(", ")}{cert.sans.length > 6 ? ` (+${cert.sans.length - 6})` : ""}
                 </span>
               </div>
@@ -817,17 +804,17 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
           </div>
         </div>
       ) : (
-        <div className="text-xl text-slate-400 italic">
+        <div className="text-xl text-dim italic">
           {directTls.accessible ? "Certificado não obtido." : "Servidor HTTPS não acessível."}
         </div>
       )}
 
       {directTls.tlsIssues.length > 0 && (
         <div>
-          <p className="text-lg font-semibold text-slate-400 uppercase tracking-wide mb-3">Problemas TLS detectados</p>
+          <p className="text-lg font-semibold text-dim uppercase tracking-wide mb-3">Problemas TLS detectados</p>
           <ul className="space-y-3">
             {directTls.tlsIssues.map((issue, i) => (
-              <li key={i} className="flex items-start gap-4 bg-[#0f1e38] border border-[#1e3a5f] rounded-lg p-4">
+              <li key={i} className="flex items-start gap-4 bg-surface-2 border border-line rounded-lg p-4">
                 <span className={`px-3 py-1 text-lg font-semibold rounded-full shrink-0 mt-0.5 ${
                   issue.severity === "critical" ? "bg-sev-critica/20 text-sev-critica border border-sev-critica/40"
                   : issue.severity === "high"   ? "bg-sev-alta/20 text-sev-alta border border-sev-alta/40"
@@ -836,8 +823,8 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
                   {issue.severity === "critical" ? "Crítico" : issue.severity === "high" ? "Alto" : "Aviso"}
                 </span>
                 <div>
-                  <p className="text-xl text-white">{issue.issue}</p>
-                  <p className="text-lg text-slate-400">{issue.nis2Article}</p>
+                  <p className="text-xl text-text">{issue.issue}</p>
+                  <p className="text-lg text-dim">{issue.nis2Article}</p>
                 </div>
               </li>
             ))}
@@ -846,8 +833,8 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
       )}
 
       {cert && directTls.tlsIssues.length === 0 && (
-        <div className="flex items-center gap-3 text-xl text-green-400">
-          <span className="px-3 py-1 text-lg font-semibold rounded-full bg-green-900/40 text-green-400 border border-green-700">OK</span>
+        <div className="flex items-center gap-3 text-xl text-ok">
+          <Badge tone="ok" className="text-lg">OK</Badge>
           <span>TLS configurado correctamente. Sem problemas detectados.</span>
         </div>
       )}
@@ -865,25 +852,25 @@ function PortsSection({ ports, cdn }: { ports: PortEntry[]; cdn?: { detected: bo
   return (
     <div className="space-y-4">
       {cdn?.detected && (
-        <p className="text-lg text-slate-400 italic">
+        <p className="text-lg text-dim italic">
           Domínio atrás de {cdn.provider} — apenas portos 80/443 expostos publicamente.
         </p>
       )}
-      <div className="border border-[#1e3a5f] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-4 bg-[#0f1e38] px-5 py-3 border-b border-[#1e3a5f]">
+      <div className="border border-line rounded-lg overflow-hidden">
+        <div className="grid grid-cols-4 bg-surface-2 px-5 py-3 border-b border-line">
           {["Porto", "Protocolo", "Serviço", "CVEs"].map((h) => (
-            <p key={h} className="text-lg font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
+            <p key={h} className="text-lg font-semibold text-dim uppercase tracking-wide">{h}</p>
           ))}
         </div>
         {ports.map((p) => (
-          <div key={p.port} className="grid grid-cols-4 px-5 py-3 border-b border-[#1e3a5f] last:border-0 hover:bg-[#152744] transition-colors">
-            <span className="text-xl font-mono font-semibold text-white">{p.port}</span>
-            <span className="text-lg text-slate-400 uppercase">{p.protocol ?? "tcp"}</span>
-            <span className="text-lg text-slate-300">{p.product ? `${p.service} (${p.product}${p.version ? " " + p.version : ""})` : p.service}</span>
+          <div key={p.port} className="grid grid-cols-4 px-5 py-3 border-b border-line last:border-0 hover:bg-surface-2 transition-colors">
+            <span className="text-xl font-mono font-semibold text-text">{p.port}</span>
+            <span className="text-lg text-dim uppercase">{p.protocol ?? "tcp"}</span>
+            <span className="text-lg text-dim">{p.product ? `${p.service} (${p.product}${p.version ? " " + p.version : ""})` : p.service}</span>
             <span className="text-lg">
               {p.cves && p.cves.length > 0
-                ? <span className="text-red-400 font-medium">{p.cves.length} CVE{p.cves.length > 1 ? "s" : ""}</span>
-                : <span className="text-green-400">—</span>
+                ? <span className="text-bad font-medium">{p.cves.length} CVE{p.cves.length > 1 ? "s" : ""}</span>
+                : <span className="text-ok">—</span>
               }
             </span>
           </div>
