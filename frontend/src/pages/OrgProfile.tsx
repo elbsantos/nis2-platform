@@ -7,7 +7,12 @@ import {
 } from "../../../backend/utils/org-options";
 import { toIntegerDigits } from "../lib/formatMilhares";
 import { MoneyInput } from "../components/MoneyInput";
-import { ExplainerPanel } from "../components/ExplainerPanel";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
+import { Alert } from "../components/ui/Alert";
+import { InfoNote } from "../components/ui/InfoNote";
 
 // ---------------------------------------------------------------------------
 // Campos essenciais para geração de documentos
@@ -39,21 +44,18 @@ type FieldProps = {
 function Field({ id, label, required, children }: FieldProps) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-300 mb-1">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      <label htmlFor={id} className="block text-sm font-medium text-dim mb-1">
+        {label}{required && <span className="text-bad ml-0.5">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-const INPUT_CLS =
-  "w-full px-3 py-2 bg-[#0b1526] border border-slate-600 rounded-lg text-sm text-white " +
-  "placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
-
-const SELECT_CLS =
-  "w-full px-3 py-2 bg-[#0b1526] border border-slate-600 rounded-lg text-sm text-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+// MoneyInput não usa a primitiva Input (tem máscara própria) — mesmas classes-base, tokenizadas.
+const MONEY_INPUT_CLS =
+  "w-full px-4 py-3 rounded-xl text-sm bg-field border border-line text-text placeholder:text-faint " +
+  "focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 transition-colors";
 
 // ---------------------------------------------------------------------------
 // Main page
@@ -210,18 +212,18 @@ export default function OrgProfile() {
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-10">
+      <div className="max-w-4xl mx-auto px-4 py-10">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-slate-700 rounded w-48" />
-          <div className="h-4 bg-slate-700 rounded w-72" />
-          <div className="h-40 bg-slate-700 rounded" />
+          <div className="h-6 bg-surface-2 rounded w-48" />
+          <div className="h-4 bg-surface-2 rounded w-72" />
+          <div className="h-40 bg-surface-2 rounded" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
+    <div className="max-w-4xl mx-auto px-4 py-10">
 
       {/* Toast */}
       {toast && (
@@ -230,16 +232,16 @@ export default function OrgProfile() {
         </div>
       )}
 
-      <ExplainerPanel resourceKey="perfil">
-        <p><strong className="text-white">O que é.</strong> Os dados de identificação da sua empresa: nome legal, NIF, morada, e os responsáveis (o gestor de topo e o responsável de segurança).</p>
-        <p><strong className="text-white">Porque existe.</strong> Os documentos de conformidade que a plataforma gera — a Carta de Nomeação do responsável de segurança, o Plano de Resposta a Incidentes, e outros — precisam destes dados para saírem completos e prontos a assinar. Sem o perfil preenchido, os documentos saem com espaços por completar.</p>
-        <p><strong className="text-white">Quando fazer.</strong> Primeiro. É a base de tudo o resto.</p>
-      </ExplainerPanel>
+      <InfoNote>
+        <p><strong className="text-text">O que é.</strong> Os dados de identificação da sua empresa: nome legal, NIF, morada, e os responsáveis (o gestor de topo e o responsável de segurança).</p>
+        <p><strong className="text-text">Porque existe.</strong> Os documentos de conformidade que a plataforma gera — a Carta de Nomeação do responsável de segurança, o Plano de Resposta a Incidentes, e outros — precisam destes dados para saírem completos e prontos a assinar. Sem o perfil preenchido, os documentos saem com espaços por completar.</p>
+        <p><strong className="text-text">Quando fazer.</strong> Primeiro. É a base de tudo o resto.</p>
+      </InfoNote>
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Perfil da Entidade</h1>
-        <p className="text-slate-400 mt-1 text-sm">
+        <h1 className="text-2xl font-bold text-text">Perfil da Entidade</h1>
+        <p className="text-dim mt-1 text-sm">
           Dados de identidade reutilizados automaticamente em todos os documentos NIS2 gerados
           pela plataforma (Carta CISO, IRP, Notificação CNCS, etc.).
         </p>
@@ -268,130 +270,119 @@ export default function OrgProfile() {
       <form onSubmit={handleSubmit} className="space-y-8">
 
         {/* ── Secção A: Identificação ── */}
-        <section className="bg-[#0f1e38] border border-slate-700 rounded-xl p-6 space-y-5">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
+        <Card as="section" className="p-6 space-y-5">
+          <h2 className="text-sm font-semibold text-dim uppercase tracking-wide">
             A — Identificação da Empresa
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="legalName" label="Denominação social (nome legal)" required>
-              <input
+              <Input
                 id="legalName" type="text" value={legalName}
                 onChange={e => setLegalName(e.target.value)}
                 placeholder="Empresa Exemplo, Lda."
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="domain" label="Domínio web">
-              <input
+              <Input
                 id="domain" type="text" value={domain}
                 onChange={e => setDomain(e.target.value)}
                 placeholder="empresa.pt"
-                className={INPUT_CLS}
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field id="taxIdType" label="Tipo de NIF">
-              <select
+              <Select
                 id="taxIdType" value={taxIdType}
                 onChange={e => setTaxIdType(e.target.value)}
-                className={SELECT_CLS}
               >
                 {TAX_ID_TYPE_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field id="taxId" label="NIF / NIPC" required>
-              <input
+              <Input
                 id="taxId" type="text" value={taxId}
                 onChange={e => setTaxId(e.target.value)}
                 placeholder="509000000"
                 maxLength={20}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="contactPhone" label="Telefone de contacto">
-              <input
+              <Input
                 id="contactPhone" type="tel" value={contactPhone}
                 onChange={e => setContactPhone(e.target.value)}
                 placeholder="+351 910 000 000"
                 maxLength={50}
-                className={INPUT_CLS}
               />
             </Field>
           </div>
 
           <Field id="address" label="Sede social (morada completa)">
-            <input
+            <Input
               id="address" type="text" value={address}
               onChange={e => setAddress(e.target.value)}
               placeholder="Rua Exemplo 1, 1000-001 Lisboa"
               maxLength={500}
-              className={INPUT_CLS}
             />
           </Field>
 
           <Field id="city" label="Localidade">
-            <input
+            <Input
               id="city" type="text" value={city}
               onChange={e => setCity(e.target.value)}
               placeholder="Lisboa"
               maxLength={120}
-              className={INPUT_CLS}
             />
           </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="sector" label="Setor de atividade (NIS2)" required>
-              <select
+              <Select
                 id="sector" value={sector}
                 onChange={e => setSector(e.target.value)}
-                className={SELECT_CLS}
               >
                 <option value="">— Seleccionar setor —</option>
                 {SECTOR_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field id="size" label="Dimensão da empresa">
-              <select
+              <Select
                 id="size" value={size}
                 onChange={e => setSize(e.target.value)}
-                className={SELECT_CLS}
               >
                 <option value="">— Seleccionar dimensão —</option>
                 {SIZE_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="caeCode" label="Código CAE">
-              <input
+              <Input
                 id="caeCode" type="text" value={caeCode}
                 onChange={e => setCaeCode(e.target.value)}
                 placeholder="62010"
                 maxLength={20}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="employeeCount" label="Nº de colaboradores">
-              <input
+              <Input
                 id="employeeCount" type="number" min={0} step={1} value={employeeCount}
                 onChange={e => setEmployeeCount(e.target.value)}
                 placeholder="230"
-                className={INPUT_CLS}
               />
             </Field>
           </div>
@@ -402,7 +393,7 @@ export default function OrgProfile() {
                 id="annualTurnover" value={annualTurnover}
                 onChange={setAnnualTurnover}
                 placeholder="990000"
-                className={INPUT_CLS}
+                className={MONEY_INPUT_CLS}
               />
             </Field>
 
@@ -411,163 +402,150 @@ export default function OrgProfile() {
                 id="annualBalance" value={annualBalance}
                 onChange={setAnnualBalance}
                 placeholder="430000"
-                className={INPUT_CLS}
+                className={MONEY_INPUT_CLS}
               />
             </Field>
           </div>
 
           <Field id="countriesOfOperation" label="País(es) de operação, além de Portugal">
-            <input
+            <Input
               id="countriesOfOperation" type="text" value={countriesOfOperation}
               onChange={e => setCountriesOfOperation(e.target.value)}
               placeholder="Espanha, França (deixar vazio se só opera em Portugal)"
-              className={INPUT_CLS}
             />
           </Field>
-        </section>
+        </Card>
 
         {/* ── Secção B: Órgão de Gestão ── */}
-        <section className="bg-[#0f1e38] border border-slate-700 rounded-xl p-6 space-y-5">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
+        <Card as="section" className="p-6 space-y-5">
+          <h2 className="text-sm font-semibold text-dim uppercase tracking-wide">
             B — Órgão de Gestão
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="legalRepresentative" label="Representante legal (nome)" required>
-              <input
+              <Input
                 id="legalRepresentative" type="text" value={legalRepresentative}
                 onChange={e => setLegalRepresentative(e.target.value)}
                 placeholder="João Silva"
                 maxLength={255}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="legalRepresentativeRole" label="Cargo do representante legal">
-              <input
+              <Input
                 id="legalRepresentativeRole" type="text" value={legalRepresentativeRole}
                 onChange={e => setLegalRepresentativeRole(e.target.value)}
                 placeholder="Administrador-Delegado"
                 maxLength={120}
-                className={INPUT_CLS}
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="ceoName" label="Nome do CEO / gestão de topo">
-              <input
+              <Input
                 id="ceoName" type="text" value={ceoName}
                 onChange={e => setCeoName(e.target.value)}
                 placeholder="Maria Santos (se distinto do representante legal)"
                 maxLength={255}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="ceoContact" label="Email de contacto (CEO/gestão de topo)">
-              <input
+              <Input
                 id="ceoContact" type="email" value={ceoContact}
                 onChange={e => setCeoContact(e.target.value)}
                 placeholder="ceo@empresa.pt"
                 maxLength={120}
-                className={INPUT_CLS}
               />
             </Field>
           </div>
-        </section>
+        </Card>
 
         {/* ── Secção C: CISO ── */}
-        <section className="bg-[#0f1e38] border border-slate-700 rounded-xl p-6 space-y-5">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
+        <Card as="section" className="p-6 space-y-5">
+          <h2 className="text-sm font-semibold text-dim uppercase tracking-wide">
             C — Responsável de Segurança (CISO)
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="ciso-name" label="Nome completo do CISO" required>
-              <input
+              <Input
                 id="ciso-name" type="text" value={securityOfficerName}
                 onChange={e => setSecurityOfficerName(e.target.value)}
                 placeholder="Ana Costa"
                 maxLength={255}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="ciso-email" label="Email institucional do CISO">
-              <input
+              <Input
                 id="ciso-email" type="email" value={securityOfficerEmail}
                 onChange={e => setSecurityOfficerEmail(e.target.value)}
                 placeholder="ciso@empresa.pt"
                 maxLength={255}
-                className={INPUT_CLS}
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="securityOfficerRole" label="Cargo actual do CISO">
-              <input
+              <Input
                 id="securityOfficerRole" type="text" value={securityOfficerRole}
                 onChange={e => setSecurityOfficerRole(e.target.value)}
                 placeholder="Diretor de TI"
                 maxLength={120}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="securityOfficerPhone" label="Telemóvel do CISO">
-              <input
+              <Input
                 id="securityOfficerPhone" type="tel" value={securityOfficerPhone}
                 onChange={e => setSecurityOfficerPhone(e.target.value)}
                 placeholder="+351 910 000 000"
                 maxLength={30}
-                className={INPUT_CLS}
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field id="securityOfficerTaxId" label="NIF pessoal do CISO">
-              <input
+              <Input
                 id="securityOfficerTaxId" type="text" value={securityOfficerTaxId}
                 onChange={e => setSecurityOfficerTaxId(e.target.value)}
                 placeholder="123456789"
                 maxLength={20}
-                className={INPUT_CLS}
               />
             </Field>
 
             <Field id="securityOfficerStartDate" label="Data de início no cargo">
-              <input
+              <Input
                 id="securityOfficerStartDate" type="date" value={securityOfficerStartDate}
                 onChange={e => setSecurityOfficerStartDate(e.target.value)}
-                className={INPUT_CLS}
               />
             </Field>
           </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-faint">
             Estes dados são usados na Carta de Nomeação do CISO e no IRP. O CISO tem reporte
             directo ao órgão de gestão nos termos do Art. 20.º NIS2.
           </p>
-        </section>
+        </Card>
 
         {/* Erros e submit */}
         {error && (
-          <div className="text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-4 py-3">
-            {error}
-          </div>
+          <Alert tone="bad">{error}</Alert>
         )}
 
         <div className="flex justify-end">
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={updateMut.isPending}
-            className="px-6 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-lg hover:bg-blue-800 disabled:opacity-50 transition-colors"
           >
             {updateMut.isPending ? "A guardar…" : "Guardar perfil"}
-          </button>
+          </Button>
         </div>
 
       </form>
