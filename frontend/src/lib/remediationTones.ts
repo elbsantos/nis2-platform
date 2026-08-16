@@ -22,6 +22,20 @@ export const sevLabel: Record<string, string> = {
   low:      "Baixa",
 };
 
+// Severidade — variante para FUNDO DE CARTÃO (suave) e para BADGE/PILL (mais forte).
+export const sevCardClass: Record<string, string> = {
+  critical: "bg-sev-critica/10 border-sev-critica/30",
+  high:     "bg-sev-alta/10 border-sev-alta/30",
+  medium:   "bg-sev-media/10 border-sev-media/30",
+  low:      "bg-sev-baixa/10 border-sev-baixa/30",
+};
+export const sevBadgeClass: Record<string, string> = {
+  critical: "bg-sev-critica/20 text-sev-critica border border-sev-critica/40",
+  high:     "bg-sev-alta/20 text-sev-alta border border-sev-alta/40",
+  medium:   "bg-sev-media/20 text-sev-media border border-sev-media/40",
+  low:      "bg-sev-baixa/20 text-sev-baixa border border-sev-baixa/40",
+};
+
 // Esforço — tom contido (não é severidade)
 export const effortTone: Record<string, Tone> = {
   low: "ok", medium: "warn", high: "bad",

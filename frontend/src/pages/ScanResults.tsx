@@ -5,12 +5,12 @@ import VulnerabilityList from "../components/VulnerabilityList";
 import { DocButton } from "../components/DocButton";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { sevCardClass, sevBadgeClass, sevLabel } from "../lib/remediationTones";
 
 const POLL_INTERVAL = 4_000;
 
 // Dark theme tokens
-const CARD  = "bg-surface border border-line rounded-xl";
-const CARD2 = "bg-surface-2 border border-line rounded-lg";
+const CARD = "bg-surface border border-line rounded-xl";
 
 export default function ScanResults() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -565,27 +565,6 @@ interface VulnSummary {
   nistCsfControls?: string[];
 }
 
-function severityColor(s: string) {
-  if (s === "critical") return "text-red-400 bg-red-900/30 border-red-700";
-  if (s === "high")     return "text-orange-400 bg-orange-900/30 border-orange-700";
-  if (s === "medium")   return "text-yellow-400 bg-yellow-900/30 border-yellow-700";
-  return "text-blue-400 bg-blue-900/30 border-blue-700";
-}
-
-function severityBadge(s: string) {
-  if (s === "critical") return "text-red-400 bg-red-900/40 border border-red-700";
-  if (s === "high")     return "text-orange-400 bg-orange-900/40 border border-orange-700";
-  if (s === "medium")   return "text-yellow-400 bg-yellow-900/40 border border-yellow-700";
-  return "text-blue-400 bg-blue-900/40 border border-blue-700";
-}
-
-function severityLabel(s: string) {
-  if (s === "critical") return "Crítica";
-  if (s === "high")     return "Alta";
-  if (s === "medium")   return "Média";
-  return "Baixa";
-}
-
 function VulnerabilityListFromScan({ results }: { results: any }) {
   // Fonte única: results.vulnerabilities (array, pós-consolidação).
   // Fallback vulnerabilitiesFound para retrocompatibilidade com scans antigos.
@@ -604,27 +583,27 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
         {results.criticalCount > 0 && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-5">
-            <p className="text-4xl font-bold text-red-400">{results.criticalCount}</p>
-            <p className="text-xl text-red-300 mt-1">Críticas</p>
+          <div className={`border rounded-xl p-5 ${sevCardClass.critical}`}>
+            <p className="text-4xl font-bold text-sev-critica">{results.criticalCount}</p>
+            <p className="text-xl text-dim mt-1">Críticas</p>
           </div>
         )}
         {results.highCount > 0 && (
-          <div className="bg-orange-900/30 border border-orange-700 rounded-xl p-5">
-            <p className="text-4xl font-bold text-orange-400">{results.highCount}</p>
-            <p className="text-xl text-orange-300 mt-1">Altas</p>
+          <div className={`border rounded-xl p-5 ${sevCardClass.high}`}>
+            <p className="text-4xl font-bold text-sev-alta">{results.highCount}</p>
+            <p className="text-xl text-dim mt-1">Altas</p>
           </div>
         )}
         {results.mediumCount > 0 && (
-          <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-5">
-            <p className="text-4xl font-bold text-yellow-400">{results.mediumCount}</p>
-            <p className="text-xl text-yellow-300 mt-1">Médias</p>
+          <div className={`border rounded-xl p-5 ${sevCardClass.medium}`}>
+            <p className="text-4xl font-bold text-sev-media">{results.mediumCount}</p>
+            <p className="text-xl text-dim mt-1">Médias</p>
           </div>
         )}
         {results.lowCount > 0 && (
-          <div className="bg-blue-900/30 border border-blue-700 rounded-xl p-5">
-            <p className="text-4xl font-bold text-blue-400">{results.lowCount}</p>
-            <p className="text-xl text-blue-300 mt-1">Baixas</p>
+          <div className={`border rounded-xl p-5 ${sevCardClass.low}`}>
+            <p className="text-4xl font-bold text-sev-baixa">{results.lowCount}</p>
+            <p className="text-xl text-dim mt-1">Baixas</p>
           </div>
         )}
       </div>
@@ -634,10 +613,10 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
   return (
     <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       {vulns.map((v) => (
-        <li key={v.cveId} className={`border rounded-xl p-5 flex flex-col gap-3 ${severityColor(v.severity)}`}>
+        <li key={v.cveId} className={`border rounded-xl p-5 flex flex-col gap-3 ${sevCardClass[v.severity] ?? sevCardClass.low}`}>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`px-3 py-1 text-lg font-semibold rounded-full ${severityBadge(v.severity)}`}>
-              {severityLabel(v.severity)}
+            <span className={`px-3 py-1 text-lg font-semibold rounded-full ${sevBadgeClass[v.severity] ?? sevBadgeClass.low}`}>
+              {sevLabel[v.severity] ?? v.severity}
             </span>
             <span className="text-xl font-mono font-medium text-white">
               {v.cveId.startsWith("CVE-") ? (
@@ -850,9 +829,9 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
             {directTls.tlsIssues.map((issue, i) => (
               <li key={i} className="flex items-start gap-4 bg-[#0f1e38] border border-[#1e3a5f] rounded-lg p-4">
                 <span className={`px-3 py-1 text-lg font-semibold rounded-full shrink-0 mt-0.5 ${
-                  issue.severity === "critical" ? "bg-red-900/40 text-red-400 border border-red-700"
-                  : issue.severity === "high"   ? "bg-orange-900/40 text-orange-400 border border-orange-700"
-                  : "bg-amber-900/40 text-amber-400 border border-amber-700"
+                  issue.severity === "critical" ? "bg-sev-critica/20 text-sev-critica border border-sev-critica/40"
+                  : issue.severity === "high"   ? "bg-sev-alta/20 text-sev-alta border border-sev-alta/40"
+                  : "bg-warn/20 text-warn border border-warn/40"
                 }`}>
                   {issue.severity === "critical" ? "Crítico" : issue.severity === "high" ? "Alto" : "Aviso"}
                 </span>
