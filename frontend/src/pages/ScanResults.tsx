@@ -4,12 +4,13 @@ import { trpc } from "../lib/trpc";
 import Nis2ScoreChart from "../components/Nis2ScoreChart";
 import VulnerabilityList from "../components/VulnerabilityList";
 import { DocButton } from "../components/DocButton";
+import { Card } from "../components/ui/Card";
 
 const POLL_INTERVAL = 4_000;
 
 // Dark theme tokens
-const CARD  = "bg-[#152744] border border-[#1e3a5f] rounded-xl";
-const CARD2 = "bg-[#0f1e38] border border-[#1e3a5f] rounded-lg";
+const CARD  = "bg-surface border border-line rounded-xl";
+const CARD2 = "bg-surface-2 border border-line rounded-lg";
 
 export default function ScanResults() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -139,17 +140,17 @@ export default function ScanResults() {
   const low       = results?.lowCount ?? 0;
 
   return (
-    <div className="min-h-screen bg-[#0f1e38]">
-      <div className="max-w-[100rem] mx-auto px-8 py-8 space-y-8">
+    <div className="min-h-screen bg-bg">
+      <div className="max-w-6xl mx-auto px-8 py-8 space-y-8">
 
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <Link to="/scan/history" className="text-lg text-slate-400 hover:text-slate-200 hover:underline">
+            <Link to="/scan/history" className="text-lg text-dim hover:text-text hover:underline">
               ← Histórico
             </Link>
-            <h1 className="text-3xl font-bold text-white mt-1">{scan.target}</h1>
-            <p className="text-xl text-slate-400">
+            <h1 className="text-3xl font-bold text-text mt-1">{scan.target}</h1>
+            <p className="text-xl text-dim">
               Scan #{scan.id} · {new Date(scan.completedAt ?? scan.createdAt).toLocaleString("pt-PT")}
             </p>
           </div>
@@ -287,17 +288,17 @@ function SummaryCard({
 }: {
   label: string; value: string; accent?: boolean; danger?: boolean; warn?: boolean; mediumSev?: boolean; lowSev?: boolean;
 }) {
-  const color = danger && accent    ? "text-red-400"
-    : warn && accent       ? "text-orange-400"
-    : mediumSev && accent  ? "text-yellow-400"
-    : lowSev && accent     ? "text-blue-400"
-    : accent               ? "text-amber-400"
-    : "text-white";
+  const color = danger && accent    ? "text-bad"
+    : warn && accent       ? "text-sev-alta"
+    : mediumSev && accent  ? "text-sev-media"
+    : lowSev && accent     ? "text-sev-baixa"
+    : accent               ? "text-accent"
+    : "text-text";
   return (
-    <div className="bg-[#152744] border border-[#1e3a5f] rounded-xl p-5 text-center">
+    <Card className="p-5 text-center">
       <p className={`text-4xl font-bold ${color}`}>{value}</p>
-      <p className="text-lg text-slate-400 mt-1">{label}</p>
-    </div>
+      <p className="text-lg text-dim mt-1">{label}</p>
+    </Card>
   );
 }
 
