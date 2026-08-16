@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import Nis2ScoreChart from "../components/Nis2ScoreChart";
 import VulnerabilityList from "../components/VulnerabilityList";
 import { DocButton } from "../components/DocButton";
 import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
 
 const POLL_INTERVAL = 4_000;
 
@@ -34,6 +34,15 @@ export default function ScanResults() {
   const { data: combinedData } = trpc.scan.combinedArticleScores.useQuery(
     { scanId: id },
     { enabled: !isNaN(id) && scanDone }
+  );
+
+  const pdfExecutive = trpc.report.generate.useQuery(
+    { scanId: scan?.id ?? 0, type: "executive" },
+    { enabled: false, retry: false }
+  );
+  const pdfTechnical = trpc.report.generate.useQuery(
+    { scanId: scan?.id ?? 0, type: "technical" },
+    { enabled: false, retry: false }
   );
 
   if (isNaN(id)) {
@@ -155,14 +164,25 @@ export default function ScanResults() {
             </p>
           </div>
           <div className="flex gap-3 flex-wrap items-start">
-            <PdfButton scanId={scan.id} type="executive" label="PDF Executivo" />
-            <PdfButton scanId={scan.id} type="technical" label="PDF Técnico" />
+            <DocButton
+              label="PDF Executivo"
+              onDownload={async () => {
+                const r = await pdfExecutive.refetch();
+                if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+                return { fileBase64: r.data.pdfBase64, filename: r.data.filename, contentType: "application/pdf" };
+              }}
+            />
+            <DocButton
+              label="PDF Técnico"
+              onDownload={async () => {
+                const r = await pdfTechnical.refetch();
+                if (!r.data) throw new Error(r.error?.message ?? "Sem dados");
+                return { fileBase64: r.data.pdfBase64, filename: r.data.filename, contentType: "application/pdf" };
+              }}
+            />
             {eligibleCount > 0 && (
-              <Link
-                to={`/remediation?scanId=${scan.id}`}
-                className="px-4 py-2 bg-blue-700 text-white text-lg font-medium rounded-md hover:bg-blue-800 transition-colors whitespace-nowrap"
-              >
-                Planos de Remediação IA
+              <Link to={`/remediation?scanId=${scan.id}`}>
+                <Button variant="primary">Planos de Remediação IA</Button>
               </Link>
             )}
           </div>
@@ -299,48 +319,6 @@ function SummaryCard({
       <p className={`text-4xl font-bold ${color}`}>{value}</p>
       <p className="text-lg text-dim mt-1">{label}</p>
     </Card>
-  );
-}
-
-function PdfButton({ scanId, type, label }: { scanId: number; type: "executive" | "technical"; label: string }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const generate = trpc.report.generate.useQuery(
-    { scanId, type },
-    { enabled: false, retry: false }
-  );
-
-  async function handleClick() {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await generate.refetch();
-      if (!result.data) throw new Error("Sem dados");
-      const { pdfBase64, filename } = result.data;
-      const bytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
-      const blob  = new Blob([bytes], { type: "application/pdf" });
-      const url   = URL.createObjectURL(blob);
-      const a     = document.createElement("a");
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err?.message ?? "Erro ao gerar PDF");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <button
-        onClick={handleClick}
-        disabled={loading}
-        className="px-4 py-2 bg-red-700 text-white text-lg font-medium rounded-md hover:bg-red-800 transition-colors disabled:opacity-50"
-      >
-        {loading ? "A gerar…" : `↓ ${label}`}
-      </button>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-    </div>
   );
 }
 
