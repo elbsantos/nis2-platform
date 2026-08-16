@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { DocButton } from "../components/DocButton";
-import { ExplainerPanel } from "../components/ExplainerPanel";
-
-const CARD = "bg-[#152744] border border-[#1e3a5f] rounded-xl";
+import { Card } from "../components/ui/Card";
+import { Select } from "../components/ui/Select";
+import { InfoNote } from "../components/ui/InfoNote";
+import { Alert } from "../components/ui/Alert";
 
 const CLASSIFICATION_LABEL: Record<string, string> = {
   essencial:              "Entidade Essencial",
@@ -29,9 +30,9 @@ function SeccaoGeral() {
   const dossier           = trpc.documents.dossier.useQuery(undefined, { enabled: false, retry: false });
 
   return (
-    <section className={`${CARD} p-6`}>
-      <h2 className="text-2xl font-semibold text-white mb-1">Documentos Gerais</h2>
-      <p className="text-slate-400 text-lg mb-5">
+    <Card as="section" className="p-6">
+      <h2 className="text-2xl font-semibold text-text mb-1">Documentos Gerais</h2>
+      <p className="text-dim text-lg mb-5">
         Documentos gerados a partir do perfil, enquadramento e questionário da sua organização —
         sem depender de um scan específico. Se faltar algum dado, o botão mostra exatamente o que
         precisa de completar primeiro.
@@ -94,7 +95,7 @@ function SeccaoGeral() {
           }}
         />
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -130,35 +131,35 @@ function SeccaoScan() {
   );
 
   return (
-    <section className={`${CARD} p-6`}>
-      <h2 className="text-2xl font-semibold text-white mb-1">Documentos do Scan</h2>
-      <p className="text-slate-400 text-lg mb-4">
+    <Card as="section" className="p-6">
+      <h2 className="text-2xl font-semibold text-text mb-1">Documentos do Scan</h2>
+      <p className="text-dim text-lg mb-4">
         Documentos que analisam um scan específico — escolha o scan acima dos botões.
       </p>
 
-      {isLoading && <p className="text-slate-400 text-lg">A carregar scans…</p>}
+      {isLoading && <p className="text-dim text-lg">A carregar scans…</p>}
 
       {!isLoading && !hasScan && (
-        <div className="bg-[#0f1e38] border border-[#1e3a5f] rounded-lg p-4 text-lg text-slate-300 mb-4">
+        <Alert tone="info" className="mb-4 text-lg">
           Ainda não tem nenhum scan concluído.{" "}
-          <Link to="/scan/start" className="text-amber-400 hover:underline">Faça um scan primeiro →</Link>
-        </div>
+          <Link to="/scan/start" className="text-accent hover:underline">Faça um scan primeiro →</Link>
+        </Alert>
       )}
 
       {hasScan && (
         <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-1">Scan selecionado</label>
-          <select
+          <label className="block text-sm text-dim mb-1">Scan selecionado</label>
+          <Select
             value={effectiveScanId ?? ""}
             onChange={(e) => setScanIdOverride(Number(e.target.value))}
-            className="bg-[#0f1e38] border border-[#1e3a5f] text-white text-lg rounded-md px-3 py-2 min-w-[320px] focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="min-w-[320px]"
           >
             {completedScans.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.target} — {new Date(s.completedAt ?? s.createdAt).toLocaleDateString("pt-PT")}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -200,7 +201,7 @@ function SeccaoScan() {
           }}
         />
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -227,28 +228,28 @@ function SeccaoEnquadramento() {
   );
 
   return (
-    <section className={`${CARD} p-6`}>
-      <h2 className="text-2xl font-semibold text-white mb-1">Documento do Enquadramento</h2>
-      <p className="text-slate-400 text-lg mb-4">
+    <Card as="section" className="p-6">
+      <h2 className="text-2xl font-semibold text-text mb-1">Documento do Enquadramento</h2>
+      <p className="text-dim text-lg mb-4">
         Relatório do enquadramento NIS2 — escolha qual avaliação, se tiver feito mais do que uma.
       </p>
 
-      {isLoading && <p className="text-slate-400 text-lg">A carregar enquadramentos…</p>}
+      {isLoading && <p className="text-dim text-lg">A carregar enquadramentos…</p>}
 
       {!isLoading && !hasAssessment && (
-        <div className="bg-[#0f1e38] border border-[#1e3a5f] rounded-lg p-4 text-lg text-slate-300 mb-4">
+        <Alert tone="info" className="mb-4 text-lg">
           Ainda não fez nenhum enquadramento.{" "}
-          <Link to="/enquadramento/new" className="text-amber-400 hover:underline">Fazer o enquadramento →</Link>
-        </div>
+          <Link to="/enquadramento/new" className="text-accent hover:underline">Fazer o enquadramento →</Link>
+        </Alert>
       )}
 
       {hasAssessment && (
         <div className="mb-4">
-          <label className="block text-sm text-slate-400 mb-1">Enquadramento selecionado</label>
-          <select
+          <label className="block text-sm text-dim mb-1">Enquadramento selecionado</label>
+          <Select
             value={effectiveAssessmentId ?? ""}
             onChange={(e) => setAssessmentIdOverride(Number(e.target.value))}
-            className="bg-[#0f1e38] border border-[#1e3a5f] text-white text-lg rounded-md px-3 py-2 min-w-[320px] focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="min-w-[320px]"
           >
             {sorted.map((a) => (
               <option key={a.id} value={a.id}>
@@ -256,7 +257,7 @@ function SeccaoEnquadramento() {
                 {new Date(a.completedAt ?? a.createdAt).toLocaleDateString("pt-PT")}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -271,7 +272,7 @@ function SeccaoEnquadramento() {
           }}
         />
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -281,28 +282,28 @@ function SeccaoEnquadramento() {
 
 export default function Documentos() {
   return (
-    <div className="min-h-screen bg-[#0f1e38]">
-      <div className="max-w-[100rem] mx-auto px-8 py-8 space-y-8">
+    <div className="min-h-screen bg-bg">
+      <div className="max-w-6xl mx-auto px-8 py-8 space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-white">Documentos NIS2</h1>
-          <p className="text-xl text-slate-400 mt-1">
+          <h1 className="text-3xl font-bold text-text">Documentos NIS2</h1>
+          <p className="text-xl text-dim mt-1">
             Todos os documentos de conformidade gerados automaticamente, num único sítio.
           </p>
         </div>
 
-        <ExplainerPanel resourceKey="documentos">
-          <p><strong className="text-white">O que é.</strong> O centro dos seus documentos de conformidade. A plataforma gera aqui os documentos técnicos e de governança que a NIS2 exige — preenchidos com os seus dados reais.</p>
-          <p><strong className="text-white">Porque existe.</strong> A conformidade NIS2 exige um conjunto de documentos (políticas, planos, registos). Muitos são técnicos ou jurídicos e difíceis de produzir sozinho. A plataforma gera-os por si, a partir do que já preencheu.</p>
+        <InfoNote>
+          <p><strong className="text-text">O que é.</strong> O centro dos seus documentos de conformidade. A plataforma gera aqui os documentos técnicos e de governança que a NIS2 exige — preenchidos com os seus dados reais.</p>
+          <p><strong className="text-text">Porque existe.</strong> A conformidade NIS2 exige um conjunto de documentos (políticas, planos, registos). Muitos são técnicos ou jurídicos e difíceis de produzir sozinho. A plataforma gera-os por si, a partir do que já preencheu.</p>
           <div>
-            <p className="font-semibold text-white mb-1">Como está organizado:</p>
+            <p className="font-semibold text-text mb-1">Como está organizado:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li><strong className="text-white">Documentos gerais</strong> — gerados a partir do seu perfil, enquadramento e questionário. Aparecem sempre.</li>
-              <li><strong className="text-white">Documentos do scan</strong> — analisam um scan específico (escolha qual acima). Precisam de um scan feito.</li>
-              <li><strong className="text-white">Documento do enquadramento</strong> — o relatório da sua classificação NIS2.</li>
+              <li><strong className="text-text">Documentos gerais</strong> — gerados a partir do seu perfil, enquadramento e questionário. Aparecem sempre.</li>
+              <li><strong className="text-text">Documentos do scan</strong> — analisam um scan específico (escolha qual acima). Precisam de um scan feito.</li>
+              <li><strong className="text-text">Documento do enquadramento</strong> — o relatório da sua classificação NIS2.</li>
             </ul>
           </div>
-          <p><strong className="text-white">O que a plataforma não gera.</strong> Alguns documentos dependem de atos da sua empresa — uma ata de reunião, um registo de formação, um contrato com um fornecedor. A plataforma não os inventa (isso seria falsificar evidência), mas o Dossier de Conformidade indica-lhe quais são, a obrigação legal de cada um, e como os deve produzir.</p>
-        </ExplainerPanel>
+          <p><strong className="text-text">O que a plataforma não gera.</strong> Alguns documentos dependem de atos da sua empresa — uma ata de reunião, um registo de formação, um contrato com um fornecedor. A plataforma não os inventa (isso seria falsificar evidência), mas o Dossier de Conformidade indica-lhe quais são, a obrigação legal de cada um, e como os deve produzir.</p>
+        </InfoNote>
 
         <SeccaoGeral />
         <SeccaoScan />
