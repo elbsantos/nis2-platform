@@ -6,6 +6,8 @@ import { DocButton } from "../components/DocButton";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
+import { Icon } from "../components/ui/Icon";
+import { Shield, AlertTriangle, Check } from "lucide-react";
 import { sevCardClass, sevBadgeClass, sevLabel } from "../lib/remediationTones";
 
 const POLL_INTERVAL = 4_000;
@@ -76,7 +78,7 @@ export default function ScanResults() {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center">
-          <p className="text-4xl mb-3">⚠️</p>
+          <Icon as={AlertTriangle} className="text-warn mx-auto mb-3" size={36} />
           <p className="font-semibold text-text text-2xl mb-1">Scan falhou</p>
           <p className="text-xl text-dim mb-6">
             Verifica que o DNS TXT record está correcto e tenta novamente.
@@ -292,7 +294,7 @@ export default function ScanResults() {
 function Spinner({ size = "md" }: { size?: "md" | "lg" }) {
   const cls = size === "lg" ? "h-14 w-14" : "h-10 w-10";
   return (
-    <svg className={`${cls} animate-spin text-amber-400 mx-auto`} viewBox="0 0 24 24" fill="none">
+    <svg className={`${cls} animate-spin text-accent mx-auto`} viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
     </svg>
@@ -617,7 +619,7 @@ function VulnerabilityListFromScan({ results }: { results: any }) {
                   href={`https://nvd.nist.gov/vuln/detail/${v.cveId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-amber-400 hover:underline"
+                  className="text-accent hover:underline"
                 >
                   {v.cveId}
                 </a>
@@ -751,7 +753,7 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
     <div className="space-y-5">
       {cdn.detected && (
         <div className="flex items-start gap-4 p-4 bg-accent/10 border border-accent/30 rounded-lg">
-          <span className="text-accent mt-0.5 shrink-0 text-2xl">🛡️</span>
+          <Icon as={Shield} className="text-accent mt-0.5 shrink-0" size={22} />
           <div>
             <p className="text-xl font-semibold text-accent">Protegido por {cdn.provider}</p>
             <p className="text-lg text-accent mt-1">
@@ -774,17 +776,23 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
               { label: "Versão TLS",    value: cert.tlsVersion },
               { label: "Cifra",         value: cert.cipher },
               { label: "Válido até",
-                value: `${new Date(cert.validTo).toLocaleDateString("pt-PT")} ${
-                  cert.isExpired
-                    ? "— ⚠️ EXPIRADO"
-                    : cert.daysUntilExpiry < 30
-                    ? `— ⚠️ Expira em ${cert.daysUntilExpiry} dias`
-                    : `— ✓ ${cert.daysUntilExpiry} dias restantes`
-                }`,
-                highlight: cert.isExpired ? "text-red-400" : cert.daysUntilExpiry < 30 ? "text-amber-400" : "text-green-400",
+                value: cert.isExpired ? (
+                  <>{new Date(cert.validTo).toLocaleDateString("pt-PT")} — <Icon as={AlertTriangle} size={15} className="inline mr-1 text-bad" />EXPIRADO</>
+                ) : cert.daysUntilExpiry < 30 ? (
+                  <>{new Date(cert.validTo).toLocaleDateString("pt-PT")} — <Icon as={AlertTriangle} size={15} className="inline mr-1 text-warn" />Expira em {cert.daysUntilExpiry} dias</>
+                ) : (
+                  <>{new Date(cert.validTo).toLocaleDateString("pt-PT")} — <Icon as={Check} size={15} className="inline mr-1 text-ok" />{cert.daysUntilExpiry} dias restantes</>
+                ),
+                highlight: cert.isExpired ? "text-bad" : cert.daysUntilExpiry < 30 ? "text-warn" : "text-ok",
               },
               { label: "Wildcard",      value: cert.isWildcard ? "Sim" : "Não" },
-              { label: "Auto-assinado", value: cert.isSelfSigned ? "Sim ⚠️" : "Não ✓" },
+              { label: "Auto-assinado",
+                value: cert.isSelfSigned ? (
+                  <><Icon as={AlertTriangle} size={15} className="inline mr-1 text-warn" />Sim</>
+                ) : (
+                  <><Icon as={Check} size={15} className="inline mr-1 text-ok" />Não</>
+                ),
+              },
             ].map((row) => (
               <div key={row.label} className="flex gap-4 px-5 py-3">
                 <span className="text-lg text-dim w-36 shrink-0">{row.label}</span>
