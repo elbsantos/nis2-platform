@@ -7,6 +7,18 @@ import {
   Tooltip,
 } from "recharts";
 
+// Valores das cores do sistema (recharts não lê CSS vars — espelhadas aqui).
+const C = {
+  accent:   "#5b9cff",  // --color-accent
+  ok:       "#10b981",  // --color-ok
+  warn:     "#f59e0b",  // --color-warn
+  bad:      "#ef4444",  // --color-bad
+  line:     "#1e3a5f",  // --color-line
+  surface2: "#152744",  // --color-surface-2
+  text:     "#e7edf6",  // --color-text
+  dim:      "#8a99b4",  // --color-dim
+};
+
 // ---------------------------------------------------------------------------
 // Tipos — espelham CombinedArticleScore de backend/utils/combined-score.ts
 // ---------------------------------------------------------------------------
@@ -49,9 +61,9 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 function scoreColor(score: number): string {
-  if (score >= 80) return "#10b981";
-  if (score >= 60) return "#f59e0b";
-  return "#ef4444";
+  if (score >= 80) return C.ok;
+  if (score >= 60) return C.warn;
+  return C.bad;
 }
 
 function shortLabel(article: string): string {
@@ -179,16 +191,16 @@ export default function Nis2ScoreChart({
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={radarData} margin={{ top: 16, right: 30, bottom: 16, left: 30 }}>
-            <PolarGrid stroke="#1e3a5f" />
+            <PolarGrid stroke={C.line} />
             <PolarAngleAxis
               dataKey="subject"
-              tick={{ fontSize: 16, fill: "#94a3b8", fontWeight: 600 }}
+              tick={{ fontSize: 16, fill: C.dim, fontWeight: 600 }}
             />
             <Radar
               name="Score"
               dataKey="score"
-              stroke="#f0c040"
-              fill="#f0c040"
+              stroke={C.accent}
+              fill={C.accent}
               fillOpacity={0.12}
               strokeWidth={2}
             />
@@ -196,12 +208,12 @@ export default function Nis2ScoreChart({
               formatter={(value: number) => [`${value}/100`, "Pontuação"]}
               contentStyle={{
                 fontSize: 16,
-                backgroundColor: "#152744",
-                border: "1px solid #1e3a5f",
+                backgroundColor: C.surface2,
+                border: `1px solid ${C.line}`,
                 borderRadius: "8px",
-                color: "#ffffff",
+                color: C.text,
               }}
-              labelStyle={{ color: "#f0c040", fontWeight: 700 }}
+              labelStyle={{ color: C.accent, fontWeight: 700 }}
             />
           </RadarChart>
         </ResponsiveContainer>
@@ -241,11 +253,11 @@ export default function Nis2ScoreChart({
 
                 {/* Barra de progresso */}
                 {score === null ? (
-                  <div className="flex-1 h-3 bg-[#1e3a5f] rounded-full overflow-hidden">
+                  <div className="flex-1 h-3 bg-line rounded-full overflow-hidden">
                     <div className="h-full w-0" />
                   </div>
                 ) : (
-                  <div className="flex-1 h-3 bg-[#1e3a5f] rounded-full overflow-hidden">
+                  <div className="flex-1 h-3 bg-line rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{ width: `${score}%`, backgroundColor: scoreColor(score) }}
