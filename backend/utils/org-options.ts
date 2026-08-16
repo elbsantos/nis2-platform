@@ -13,6 +13,7 @@ export const SECTOR_OPTIONS = [
   { value: "quimicos_alimentar",   label: "Químicos ou setor alimentar (distribuição a grande escala)" },
   { value: "industria",            label: "Indústria e manufatura (dispositivos médicos, equipamentos, veículos)" },
   { value: "digital_b2c",          label: "Mercados online, motores de busca ou redes sociais" },
+  { value: "investigacao",         label: "Organizações de investigação científica (investigação aplicada e experimental)" },
   { value: "admin_publica",        label: "Administração Pública" },
   { value: "outro",                label: "Outro setor" },
 ] as const;

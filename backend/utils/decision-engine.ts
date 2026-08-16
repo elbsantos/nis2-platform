@@ -99,6 +99,7 @@ export const SECTOR_ANEXO: Record<string, SectorAnexo> = {
   quimicos_alimentar:   "anexo_ii",
   industria:            "anexo_ii",
   digital_b2c:          "anexo_ii",
+  investigacao:         "anexo_ii",
 };
 
 /** "tld_dns_confianca"/"telecom"/"anexo_i_outros" → Anexo I; "anexo_ii" → Anexo II. */
@@ -245,6 +246,11 @@ export const NIS2_PT_TREE: DecisionTree = {
           id: "digital_b2c",
           label: "Mercados online, motores de busca online ou plataformas de redes sociais",
           legalRef: "Anexo II, ponto 6",
+        },
+        {
+          id: "investigacao",
+          label: "Organizações de investigação científica (investigação aplicada e experimental)",
+          legalRef: "Anexo II, ponto 7",
         },
         {
           id: "admin_publica",
