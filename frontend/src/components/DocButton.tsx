@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Download } from "lucide-react";
+import { Icon } from "./ui/Icon";
 
 export function triggerDownload(base64: string, filename: string, contentType: string) {
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -51,11 +53,11 @@ export function DocButton({
       <button
         onClick={handleClick}
         disabled={loading || disabled}
-        className="px-4 py-2 bg-teal-700 text-white text-lg font-medium rounded-md hover:bg-teal-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+        className="inline-flex items-center gap-2 border border-line text-text bg-surface hover:border-accent hover:text-accent text-sm font-medium px-4 py-2.5 rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
       >
-        {loading ? "A gerar…" : `↓ ${label}`}
+        {loading ? "A gerar…" : <><Icon as={Download} size={15} /> {label}</>}
       </button>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-bad text-sm">{error}</p>}
     </div>
   );
 }
