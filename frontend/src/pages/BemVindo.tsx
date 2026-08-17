@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { CopyButton } from "./ScanStart";
-
-const CARD = "bg-[#152744] border border-[#1e3a5f] rounded-xl";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
 
 const STEPS: Array<{ n: number; title: string; text: string }> = [
   {
@@ -44,11 +44,11 @@ export default function BemVindo() {
   const token = suffix ? `nis2pt-verify=${suffix}` : null;
 
   return (
-    <div className="min-h-screen bg-[#0f1e38]">
+    <div className="min-h-screen bg-bg">
       <div className="max-w-4xl mx-auto px-8 py-12 space-y-8">
         <div>
-          <h1 className="text-4xl font-bold text-white">Bem-vindo à CISPLAN</h1>
-          <p className="text-xl text-slate-300 mt-4 leading-relaxed">
+          <h1 className="text-4xl font-bold text-text">Bem-vindo à CISPLAN</h1>
+          <p className="text-xl text-dim mt-4 leading-relaxed">
             A CISPLAN ajuda a sua empresa a cumprir a NIS2 — a diretiva europeia de cibersegurança
             que Portugal transpôs no Decreto-Lei 125/2025. Em vez de contratar consultores caros ou
             tentar decifrar textos legais, a plataforma diagnostica a sua situação e gera os
@@ -56,30 +56,30 @@ export default function BemVindo() {
           </p>
         </div>
 
-        <section className={`${CARD} p-6`}>
-          <h2 className="text-2xl font-semibold text-white mb-1">Como funciona</h2>
-          <p className="text-slate-400 text-lg mb-6">
+        <Card className="p-6">
+          <h2 className="text-2xl font-semibold text-text mb-1">Como funciona</h2>
+          <p className="text-dim text-lg mb-6">
             A conformidade NIS2 segue uma sequência lógica. Recomendamos fazer por esta ordem —
             cada passo prepara o seguinte:
           </p>
           <ol className="space-y-5">
             {STEPS.map((s) => (
               <li key={s.n} className="flex gap-4">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-[#1f3864] border border-[#b8860b] text-[#f0c040] font-bold flex items-center justify-center text-sm">
+                <div className="shrink-0 w-8 h-8 rounded-full bg-surface-2 border border-accent/40 text-accent font-bold flex items-center justify-center text-sm">
                   {s.n}
                 </div>
                 <div>
-                  <p className="text-white font-semibold text-lg">{s.title}</p>
-                  <p className="text-slate-400 text-lg">{s.text}</p>
+                  <p className="text-text font-semibold text-lg">{s.title}</p>
+                  <p className="text-dim text-lg">{s.text}</p>
                 </div>
               </li>
             ))}
           </ol>
-        </section>
+        </Card>
 
-        <div className="bg-[#0f1e38] border border-[#b8860b]/40 rounded-xl p-5">
-          <p className="text-slate-300 leading-relaxed text-lg">
-            <strong className="text-[#f0c040]">Nota honesta.</strong> A CISPLAN gera
+        <div className="bg-surface border border-warn/40 rounded-xl p-5">
+          <p className="text-dim leading-relaxed text-lg">
+            <strong className="text-warn">Nota honesta.</strong> A CISPLAN gera
             automaticamente os documentos técnicos e de governança que resultam dos seus dados.
             Alguns documentos de conformidade dependem de atos da sua empresa — reuniões, formação,
             contratos — que a plataforma não inventa, mas indica-lhe quais são e como os produzir.
@@ -87,9 +87,9 @@ export default function BemVindo() {
           </p>
         </div>
 
-        <section className={`${CARD} p-6`}>
-          <h2 className="text-2xl font-semibold text-white mb-1">O seu código de verificação de domínio</h2>
-          <p className="text-slate-400 text-lg mb-5">
+        <Card className="p-6">
+          <h2 className="text-2xl font-semibold text-text mb-1">O seu código de verificação de domínio</h2>
+          <p className="text-dim text-lg mb-5">
             Antes de analisar um domínio no{" "}
             <Link to="/scan/start" className="text-accent hover:underline">
               Scanner
@@ -102,8 +102,8 @@ export default function BemVindo() {
             <div className="space-y-4">
               <div className="flex flex-wrap gap-x-10 gap-y-1 text-base">
                 <p>
-                  <span className="text-slate-500">Organização: </span>
-                  <span className="text-white font-medium">{orgName ?? "—"}</span>
+                  <span className="text-faint">Organização: </span>
+                  <span className="text-text font-medium">{orgName ?? "—"}</span>
                 </p>
               </div>
               <div className="flex items-stretch gap-2">
@@ -114,20 +114,17 @@ export default function BemVindo() {
               </div>
             </div>
           ) : (
-            <p className="text-slate-400 text-base italic">
+            <p className="text-dim text-base italic">
               A preparar o seu código de verificação… atualize a página dentro de instantes.
             </p>
           )}
-        </section>
+        </Card>
 
         <div className="flex items-center gap-6 pt-2 flex-wrap">
-          <Link
-            to="/perfil"
-            className="px-6 py-3 bg-blue-700 text-white font-semibold rounded-md hover:bg-blue-800 transition-colors text-lg"
-          >
-            Começar pelo Perfil →
+          <Link to="/perfil">
+            <Button variant="primary">Começar pelo Perfil →</Button>
           </Link>
-          <Link to="/scan/start" className="text-slate-400 hover:text-white hover:underline text-base">
+          <Link to="/scan/start" className="text-dim hover:text-text hover:underline text-base">
             Explorar a plataforma livremente
           </Link>
         </div>
