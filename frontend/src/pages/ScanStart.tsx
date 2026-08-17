@@ -692,7 +692,7 @@ export default function ScanStart() {
         <InfoNote label="Como usar o scanner (passo importante antes de começar)">
           <p>Antes de analisar um domínio, precisa de confirmar que ele lhe pertence. É uma medida de segurança: impede que alguém use a CISPLAN para analisar sites de terceiros sem autorização.</p>
           <p><strong className="text-text">Como confirmar (uma vez por domínio):</strong></p>
-          <p><strong className="text-text">1.</strong> Precisa de adicionar uma "etiqueta de confirmação" ao registo do seu domínio — um registo DNS TXT. O valor a colocar é: nis2pt-verify= seguido do número da sua conta (por exemplo, nis2pt-verify=1).</p>
+          <p><strong className="text-text">1.</strong> Precisa de adicionar uma "etiqueta de confirmação" ao registo do seu domínio — um registo DNS TXT. O valor a colocar é o código único que encontra no cartão «O seu código de verificação», no topo desta página — copie-o e adicione-o como registo TXT no DNS do seu domínio.</p>
           <p><strong className="text-text">2.</strong> Entre no painel onde gere o seu domínio (o site onde o comprou / paga a renovação). Procure a secção "DNS" ou "Registos DNS".</p>
           <p><strong className="text-text">3.</strong> Adicione um novo registo do tipo TXT. No campo Nome/Host, deixe em branco ou coloque @. No campo Valor/Content, cole o seu código de verificação. Guarde.</p>
           <p><strong className="text-text">4.</strong> Volte ao scanner, escreva o domínio e clique em Verificar. As alterações de DNS podem demorar alguns minutos a ficar ativas.</p>
