@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ENABLE_PRICING } from "../lib/featureFlags";
+import { ENABLE_PRICING, ENABLE_COURSE } from "../lib/featureFlags";
 import "./Landing.css";
 
 // ── Video player ─────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ export default function Landing() {
         <div className="nav-logo">CISPLAN <span>PT</span></div>
         <ul className="nav-links-inline">
           <li><a href="#scanner">Scanner</a></li>
-          <li><a href="#curso">Curso</a></li>
+          {ENABLE_COURSE && <li><a href="#curso">Curso</a></li>}
           <li><a href="#dossier">Dossier</a></li>
           {ENABLE_PRICING && <li><a href="#precos">Preços</a></li>}
           <li><Link to="/login" className="nav-link-ghost">Entrar</Link></li>
@@ -422,6 +422,7 @@ export default function Landing() {
                 <span className="lesson-pill">Aula 2.3 · Auditorias CNCS</span>
               </div>
             </div>
+            {ENABLE_COURSE && (
             <div className="module-card full-width" style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}>
               <div className="module-tag" style={{ color: "#d4a017" }}>Incluído no Curso · 35 Templates</div>
               <h3 style={{ color: "#ffffff" }}>Biblioteca de Templates do Curso</h3>
@@ -438,6 +439,7 @@ export default function Landing() {
                 <span className="lesson-pill">Todos os templates NIS2</span>
               </div>
             </div>
+            )}
           </div>
         </div>
       </section>
@@ -550,6 +552,7 @@ export default function Landing() {
       </section>
 
       {/* COURSE CONTENT — 2 colunas, módulos lado a lado */}
+      {ENABLE_COURSE && (
       <section className="course-content" id="curso">
         <div className="container">
           <div className="section-header" style={{ textAlign: "left", maxWidth: "var(--container-max)", marginLeft: 0 }}>
@@ -758,6 +761,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      )}
 
       {/* MATERIALS */}
       <section className="materials" id="dossier">
@@ -1008,12 +1012,16 @@ export default function Landing() {
             <p>Sim. A legislação NIS2 e os requisitos técnicos do CNCS evoluirão nos próximos anos. Todos os planos pagos têm acesso ao conteúdo actualizado e à plataforma melhorada sem custos adicionais.</p>
           </div>
           <div className="faq-item fade-in">
-            <h3>O plano MSSP serve para consultoras?</h3>
-            <p>Sim. O plano MSSP permite gerir múltiplas organizações clientes numa única conta, gerar relatórios white-label para cada cliente, e ter a IA com limites superiores para volume de remediações mensais.</p>
+            <h3>A CISPLAN serve para consultores que gerem vários clientes?</h3>
+            <p>Hoje, a CISPLAN foi desenhada para uma empresa gerir a sua própria conformidade NIS2 de ponta a
+            ponta — do enquadramento aos documentos. O suporte a consultores que gerem múltiplas organizações
+            clientes numa só conta está no nosso roadmap. Se é consultor e tem interesse, fale connosco.</p>
           </div>
           <div className="faq-item fade-in">
-            <h3>O que é o scan em lote e a descoberta de subdomínios?</h3>
-            <p>O scan em lote permite analisar vários domínios e IPs ao mesmo tempo — ideal para auditorias internas ou para MSSPs que gerem múltiplos clientes. A descoberta de subdomínios encontra automaticamente todos os subdomínios ativos de um domínio via Certificate Transparency e DNS, e inicia o scan de todos em simultâneo. Disponível nos planos Pro e MSSP.</p>
+            <h3>O que é a descoberta de subdomínios?</h3>
+            <p>A descoberta de subdomínios encontra automaticamente todos os subdomínios ativos de um domínio
+            (via Certificate Transparency e DNS) e analisa-os — útil para não deixar de fora partes da sua
+            presença digital que podiam estar esquecidas.</p>
           </div>
         </div>
       </section>
@@ -1040,7 +1048,7 @@ export default function Landing() {
           <div className="footer-col">
             <h4>Plataforma</h4>
             <a href="#scanner">Scanner NIS2</a>
-            <a href="#curso">Curso NIS2</a>
+            {ENABLE_COURSE && <a href="#curso">Curso NIS2</a>}
             <a href="#dossier">Dossier de Conformidade</a>
             {ENABLE_PRICING && <a href="#precos">Preços</a>}
           </div>
