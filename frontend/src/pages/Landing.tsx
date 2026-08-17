@@ -375,27 +375,25 @@ export default function Landing() {
             <div className="section-label">A Solução</div>
             <h2>Como a CISPLAN funciona</h2>
             <p>
-              A CISPLAN combina duas coisas que, sozinhas, não bastam. Primeiro, uma plataforma que
-              diagnostica e gera: o scanner analisa a sua exposição digital, o questionário mapeia a
-              sua postura aos 42 controlos da NIS2, e a plataforma gera automaticamente os documentos
-              técnicos e de governança — a Carta de Nomeação do CISO, o Plano de Resposta a Incidentes,
-              o Relatório para a Gestão, o Tracker das Medidas, o Dossier de Conformidade, e mais. Tudo
-              a partir dos seus dados, sem partir de uma folha em branco.
+              A CISPLAN combina diagnóstico, geração e orientação. O scanner analisa a sua exposição
+              digital, o questionário mapeia a sua postura aos 42 controlos da NIS2, e a plataforma gera
+              automaticamente os documentos técnicos e de governança — a Carta de Nomeação do CISO, o
+              Plano de Resposta a Incidentes, o Relatório para a Gestão, o Tracker das Medidas, o Dossier
+              de Conformidade, e mais. Tudo a partir dos seus dados, sem partir de uma folha em branco.
             </p>
             <p>
-              Segundo, uma formação que o capacita no que a plataforma não pode fazer por si. Porque há
-              documentos que exigem atos da sua empresa — uma reunião de gestão, um teste de backup, um
-              contrato com um fornecedor — e que nenhuma ferramenta honesta pode inventar. Para esses, o
-              curso ensina-o a produzi-los correctamente.
+              Alguns documentos de conformidade dependem de atos da sua empresa — uma reunião de gestão,
+              um teste de backup, um contrato com um fornecedor — que nenhuma ferramenta honesta pode
+              inventar. Para esses, a plataforma indica-lhe quais são, qual a obrigação legal de cada um,
+              e como os deve produzir.
             </p>
             <p>
-              <strong>A plataforma faz o técnico. A formação capacita-o no resto. Juntos, cobrem o que
-              a NIS2 exige — sem nunca falsificar evidência.</strong>
+              <strong>A CISPLAN faz o técnico e mostra-lhe o caminho para o resto — sem nunca falsificar
+              evidência.</strong>
             </p>
             <div className="solution-features">
               <div className="sf-item">Scanner agentless — portos, CVEs, TLS, email e headers HTTP</div>
               <div className="sf-item">Score NIS2 0–100 por artigo, com lacunas identificadas</div>
-              <div className="sf-item">Scan em lote — múltiplos domínios e IPs em simultâneo</div>
               <div className="sf-item">Descoberta automática de subdomínios via CT logs + DNS</div>
               <div className="sf-item">13 documentos de conformidade gerados automaticamente dos seus dados</div>
               <div className="sf-item">Remediação guiada por IA com plano personalizado</div>
@@ -403,6 +401,8 @@ export default function Landing() {
           </div>
 
           <div className="modules-grid fade-in">
+            {ENABLE_COURSE && (
+            <>
             <div className="module-card">
               <div className="module-tag">Módulo 1 · Governança</div>
               <h3>Classificação, Responsabilidades e Gestão de Risco</h3>
@@ -422,7 +422,6 @@ export default function Landing() {
                 <span className="lesson-pill">Aula 2.3 · Auditorias CNCS</span>
               </div>
             </div>
-            {ENABLE_COURSE && (
             <div className="module-card full-width" style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}>
               <div className="module-tag" style={{ color: "#d4a017" }}>Incluído no Curso · 35 Templates</div>
               <h3 style={{ color: "#ffffff" }}>Biblioteca de Templates do Curso</h3>
@@ -439,6 +438,7 @@ export default function Landing() {
                 <span className="lesson-pill">Todos os templates NIS2</span>
               </div>
             </div>
+            </>
             )}
           </div>
         </div>
@@ -460,8 +460,8 @@ export default function Landing() {
                 <span>Portos abertos, CVEs públicos, TLS, SPF/DKIM/DMARC, headers HTTP</span>
               </li>
               <li>
-                <strong>Scan em Lote + Subdomínios</strong>
-                <span>Múltiplos domínios e subdomínios em simultâneo — Pro: 15 targets · MSSP: 50 targets</span>
+                <strong>Descoberta de Subdomínios</strong>
+                <span>Encontra automaticamente os subdomínios ativos de um domínio e analisa-os</span>
               </li>
               <li>
                 <strong>Score NIS2 por Artigo</strong>
@@ -487,7 +487,6 @@ export default function Landing() {
               <div className="scan-mockup">
                 <div className="scan-tabs">
                   <div className="scan-tab active">🔍 Scan único</div>
-                  <div className="scan-tab">📋 Scan em lote</div>
                   <div className="scan-tab">🌐 Subdomínios</div>
                 </div>
                 <label className="scan-label">Domínio ou endereço IP</label>
