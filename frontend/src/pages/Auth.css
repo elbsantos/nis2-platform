@@ -59,7 +59,7 @@
 }
 
 .auth-logo-text span {
-  color: #f0c040;
+  color: #5b9cff;
 }
 
 .auth-content {
@@ -82,7 +82,7 @@
 }
 
 .auth-subtitle a {
-  color: #f0c040;
+  color: #5b9cff;
   text-decoration: none;
   font-weight: 600;
 }
@@ -93,9 +93,9 @@
 
 /* Plan banner */
 .auth-plan-banner {
-  background: rgba(240, 192, 64, 0.08);
-  border: 1px solid rgba(240, 192, 64, 0.25);
-  color: #f0c040;
+  background: rgba(91, 156, 255, 0.08);
+  border: 1px solid rgba(91, 156, 255, 0.25);
+  color: #5b9cff;
   padding: 10px 16px;
   font-size: 0.82rem;
   font-weight: 700;
@@ -183,9 +183,9 @@
 }
 
 /* Secondary link inside a field (e.g. "Esqueceste-te da senha?") — same
-   gold accent as .auth-subtitle a, for legibility on the dark background. */
+   accent as .auth-subtitle a, for legibility on the dark background. */
 .auth-hint {
-  color: #f0c040;
+  color: #5b9cff;
   text-decoration: none;
 }
 
@@ -307,7 +307,7 @@
   left: -80px;
   width: 380px;
   height: 380px;
-  background: radial-gradient(circle, rgba(240, 192, 64, 0.05) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(91, 156, 255, 0.05) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -473,7 +473,7 @@
 }
 
 .stat-value {
-  color: #f0c040;
+  color: #5b9cff;
   font-family: 'Playfair Display', serif;
   font-size: 1.4rem;
   font-weight: 700;
