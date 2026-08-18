@@ -37,6 +37,7 @@ import {
   lookupLibrary,
   generateRemediationForScan,
   countEligibleVulns,
+  REMEDIATION_PROMPT_VERSION,
 } from "./ai-remediation";
 import { chat } from "../integrations/anthropic";
 import * as db from "../db";
@@ -269,12 +270,12 @@ const LIBRARY_ENTRY_V2 = {
   riskSummary: "Risco real da biblioteca.",
   effort: "medium" as const,
   nis2Articles: ["Art. 21(2)(e)"],
-  promptVersion: 2,
+  promptVersion: REMEDIATION_PROMPT_VERSION,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
 
-const LIBRARY_ENTRY_V1 = { ...LIBRARY_ENTRY_V2, promptVersion: 1 };
+const LIBRARY_ENTRY_V1 = { ...LIBRARY_ENTRY_V2, promptVersion: REMEDIATION_PROMPT_VERSION - 1 };
 
 function setupCommonMocks() {
   mockGetExisting.mockResolvedValue([]);
@@ -340,7 +341,7 @@ describe("generateRemediationForScan — library integration", () => {
     expect(mockChat).toHaveBeenCalledTimes(1);
     expect(mockUpsert).toHaveBeenCalledTimes(1);
     expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ cveId: "CVE-2024-9999", promptVersion: 2 })
+      expect.objectContaining({ cveId: "CVE-2024-9999", promptVersion: REMEDIATION_PROMPT_VERSION })
     );
   });
 

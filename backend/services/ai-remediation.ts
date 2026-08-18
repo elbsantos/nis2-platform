@@ -16,9 +16,11 @@ import {
   upsertLibraryEntry,
 } from "../db";
 
-// Increment when remediationPlanner system prompt changes significantly.
-// Library entries with an older version are regenerated via API and updated.
-const REMEDIATION_PROMPT_VERSION = 2;
+// Increment when the planner prompt OR the parser logic changes in a way that
+// invalidates previously cached plans. Bumped 2→3: parser fix (multi-line step
+// continuation) means older cached plans may be truncated and must be regenerated.
+// Library entries with an older version are regenerated via API on next lookup.
+export const REMEDIATION_PROMPT_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // Types
