@@ -61,3 +61,4 @@ findings-catalog.md
 # Backups de base de dados — contêm dados de produção, NUNCA commitar
 *.sql
 backups/
+backend/assets/templates/_backup-pre-moldura/
