@@ -262,6 +262,28 @@ export const remediationLibrary = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// Questionnaire explanation library — canonical cross-org explanations keyed
+// by (controlId, sector, size). Mesmo padrão da remediation_library.
+// ---------------------------------------------------------------------------
+
+export const questionnaireExplanationLibrary = mysqlTable(
+  "questionnaire_explanation_library",
+  {
+    id:            int("id").autoincrement().primaryKey(),
+    controlId:     varchar("controlId", { length: 20 }).notNull(),
+    sector:        varchar("sector", { length: 60 }).notNull(),
+    size:          varchar("size", { length: 30 }).notNull(),
+    explanation:   text("explanation").notNull(),
+    promptVersion: int("promptVersion").notNull().default(1),
+    createdAt:     timestamp("createdAt").notNull().defaultNow(),
+    updatedAt:     timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_expl_control_sector_size").on(t.controlId, t.sector, t.size),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // Course progress
 // ---------------------------------------------------------------------------
 
@@ -321,4 +343,5 @@ export type Vulnerability         = typeof vulnerabilities.$inferSelect;
 export type Subscription          = typeof subscriptions.$inferSelect;
 export type ControlEvidence       = typeof controlEvidence.$inferSelect;
 export type RemediationLibraryEntry = typeof remediationLibrary.$inferSelect;
+export type QuestionnaireExplanationLibraryEntry = typeof questionnaireExplanationLibrary.$inferSelect;
 export type FrameworkAssessment   = typeof frameworkAssessments.$inferSelect;

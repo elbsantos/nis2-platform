@@ -292,7 +292,6 @@ export const questionnaireRouter = router({
       const explanation = await explainControl(control, {
         sector:  ctx.org.sector ?? undefined,
         size:    ctx.org.size   ?? undefined,
-        orgName: ctx.org.name,
         orgId:   ctx.org.id,
         plan:    ctx.plan,
       });

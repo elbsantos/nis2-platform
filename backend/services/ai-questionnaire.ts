@@ -12,6 +12,12 @@
  */
 
 import { chat, SYSTEM_PROMPTS } from "../integrations/anthropic";
+import { getExplanationFromLibrary, upsertExplanationEntry } from "../db";
+
+// Increment when the questionnaireGuide prompt changes in a way that
+// invalidates previously cached explanations. Library entries with an
+// older version are regenerated via API on next lookup.
+export const EXPLANATION_PROMPT_VERSION = 1;
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -534,12 +540,21 @@ export function calculateScores(
 
 export async function explainControl(
   control: NIS2Control,
-  context: { sector?: string; size?: string; orgName?: string; orgId?: number; plan?: string }
+  context: { sector?: string; size?: string; orgId?: number; plan?: string }
 ): Promise<string> {
+  // Chave de cache — "generic" para orgs sem sector/dimensão definidos,
+  // mesmo padrão do osKey default("generic") em remediation_library.
+  const sectorKey = context.sector ?? "generic";
+  const sizeKey   = context.size   ?? "generic";
+
+  const cached = await getExplanationFromLibrary(control.id, sectorKey, sizeKey);
+  if (cached && cached.promptVersion === EXPLANATION_PROMPT_VERSION) {
+    return cached.explanation;
+  }
+
   const contextLine = [
-    context.orgName ? `Empresa: ${context.orgName}` : null,
-    context.sector  ? `Sector: ${context.sector}`  : null,
-    context.size    ? `Dimensão: ${context.size} colaboradores` : null,
+    context.sector ? `Sector: ${context.sector}`  : null,
+    context.size   ? `Dimensão: ${context.size} colaboradores` : null,
   ]
     .filter(Boolean)
     .join(" | ");
@@ -562,5 +577,14 @@ Inclui: (1) porquê este controlo existe na lei, (2) o que significa na prática
     orgId: context.orgId,
     plan:  context.plan,
   });
+
+  await upsertExplanationEntry({
+    controlId:     control.id,
+    sector:        sectorKey,
+    size:          sizeKey,
+    explanation:   text,
+    promptVersion: EXPLANATION_PROMPT_VERSION,
+  });
+
   return text;
 }

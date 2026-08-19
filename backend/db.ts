@@ -463,7 +463,7 @@ export async function getRemediationItemByCvePrefix(orgId: number, cveId: string
 // Remediation library
 // ---------------------------------------------------------------------------
 
-import { questionnaireSessions, remediationItems, courseProgress, controlEvidence, remediationLibrary, frameworkAssessments } from "../database/schema";
+import { questionnaireSessions, remediationItems, courseProgress, controlEvidence, remediationLibrary, questionnaireExplanationLibrary, frameworkAssessments } from "../database/schema";
 
 export async function getLibraryByCveIdAndOsKey(cveId: string, osKey: string) {
   const rows = await getDb()
@@ -508,6 +508,56 @@ export async function upsertLibraryEntry(data: {
       and(
         eq(remediationLibrary.cveId, data.cveId),
         eq(remediationLibrary.osKey, data.osKey)
+      )
+    )
+    .limit(1);
+  return rows[0]!;
+}
+
+// ---------------------------------------------------------------------------
+// Questionnaire explanation library
+// ---------------------------------------------------------------------------
+
+export async function getExplanationFromLibrary(controlId: string, sector: string, size: string) {
+  const rows = await getDb()
+    .select()
+    .from(questionnaireExplanationLibrary)
+    .where(
+      and(
+        eq(questionnaireExplanationLibrary.controlId, controlId),
+        eq(questionnaireExplanationLibrary.sector, sector),
+        eq(questionnaireExplanationLibrary.size, size)
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertExplanationEntry(data: {
+  controlId:     string;
+  sector:        string;
+  size:          string;
+  explanation:   string;
+  promptVersion: number;
+}) {
+  await getDb()
+    .insert(questionnaireExplanationLibrary)
+    .values(data)
+    .onDuplicateKeyUpdate({
+      set: {
+        explanation:   data.explanation,
+        promptVersion: data.promptVersion,
+        updatedAt:     new Date(),
+      },
+    });
+  const rows = await getDb()
+    .select()
+    .from(questionnaireExplanationLibrary)
+    .where(
+      and(
+        eq(questionnaireExplanationLibrary.controlId, data.controlId),
+        eq(questionnaireExplanationLibrary.sector, data.sector),
+        eq(questionnaireExplanationLibrary.size, data.size)
       )
     )
     .limit(1);
