@@ -877,9 +877,6 @@ export async function executeAgentlessScan(
           console.log(`[CVE filter] ${cveId} — incluído (${portFinding.service} ${portFinding.version}; dentro do intervalo NVD)`);
         }
 
-        const severity = (s: number) =>
-          s >= 9 ? "critical" : s >= 7 ? "high" : s >= 4 ? "medium" : "low";
-
         // Prefer real NVD description (English). Fallback deliberately avoids "(porto N)"
         // to prevent enrichFinding's porta.*80 regex from collapsing all apache CVEs
         // into "Porta 80 Aberta" when the real description is not available.
@@ -891,7 +888,7 @@ export async function executeAgentlessScan(
         const vuln: VulnFinding = {
           cveId,
           cvssScore,
-          severity: severity(cvssScore) as VulnFinding["severity"],
+          severity: cvssToSeverity(cvssScore),
           description,
           affectedService: portFinding.service,
           port: portFinding.port,
