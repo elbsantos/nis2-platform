@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { freeProcedure } from "../middlewares/planGuard";
+import { freeProcedure, checkScanLimit } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback, isIpAddress, buildVerificationToken } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan, getLatestCompletedQuestionnaireForOrg } from "../db";
 import { combinedNis2Scores, overallCombinedScore } from "../utils/combined-score";
@@ -168,6 +168,13 @@ export const scanRouter = {
         getRedisClient()
           .then((redis) => redis.del(`censys:${input.target}`))
           .catch(() => {});
+      }
+
+      // ── Quota mensal do plano gratuito — só se aplica a scans novos, nunca
+      // a hits da cache de 24h (que já retornaram acima).
+      const limitCheck = await checkScanLimit(ctx.org.id, ctx.plan);
+      if (!limitCheck.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: limitCheck.reason });
       }
 
       // Create scan record

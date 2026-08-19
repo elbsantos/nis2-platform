@@ -29,6 +29,10 @@ const PLAN_RANK: Record<Plan, number> = {
   enterprise: 3,
 };
 
+// Limite de scans/mês do plano gratuito. Configurável por env para permitir
+// valores generosos em demos/testes sem alterar código. Default: 30.
+const FREE_SCANS_PER_MONTH = parseInt(process.env.FREE_SCANS_PER_MONTH ?? "30", 10);
+
 // ---------------------------------------------------------------------------
 // Get org plan — cached per request via tRPC context
 // Falls back to "free" if no subscription found
@@ -107,7 +111,7 @@ export const msspProcedure = planProcedure("mssp");
 export const enterpriseProcedure = planProcedure("enterprise");
 
 // ---------------------------------------------------------------------------
-// Helper: check if org is at scan limit (free tier: 1 scan/month)
+// Helper: check if org is at scan limit (free tier: FREE_SCANS_PER_MONTH/month)
 // ---------------------------------------------------------------------------
 
 export async function checkScanLimit(
@@ -119,11 +123,11 @@ export async function checkScanLimit(
   const { countScansThisMonth } = await import("../db");
   const count = await countScansThisMonth(orgId);
 
-  if (count >= 1) {
+  if (count >= FREE_SCANS_PER_MONTH) {
     return {
       allowed: false,
       reason:
-        "O plano gratuito permite 1 scan por mês. Faz upgrade para o plano Pro para scans ilimitados.",
+        `O plano gratuito permite ${FREE_SCANS_PER_MONTH} scans por mês. Faz upgrade para o plano Pro para scans ilimitados.`,
     };
   }
 
