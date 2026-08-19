@@ -305,7 +305,15 @@ export default function Remediation() {
 
   useEffect(() => {
     if (!progress || !polling) return;
-    const { done, eligible } = progress;
+    const { done, eligible, capped } = progress;
+    if (capped) {
+      setPolling(false);
+      setGenMsg(
+        `Foram gerados ${done} planos. Atingiu-se o limite de novas análises por sessão — volte a gerar mais tarde para processar os restantes.`
+      );
+      utils.remediation.list.invalidate();
+      return;
+    }
     setGenMsg(`A gerar planos… ${done} / ${eligible}`);
     if (done >= eligible) {
       setPolling(false);

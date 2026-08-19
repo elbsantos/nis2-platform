@@ -18,6 +18,7 @@ import {
   generateRemediationForScan,
   countEligibleVulns,
 } from "../services/ai-remediation";
+import { getRedisClient } from "../middlewares/rateLimit";
 
 export const remediationRouter = router({
   /**
@@ -85,7 +86,16 @@ export const remediationRouter = router({
         getRemediationItemsByScanId(input.scanId),
         countEligibleVulns(input.scanId),
       ]);
-      return { done: items.length, eligible };
+
+      let capped = false;
+      try {
+        const redis = await getRedisClient();
+        capped = (await redis.get(`remediation:capped:scan:${input.scanId}`)) === "1";
+      } catch {
+        // Redis indisponível — não bloqueia o polling, só fica sem o aviso de limite
+      }
+
+      return { done: items.length, eligible, capped };
     }),
 
   /**

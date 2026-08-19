@@ -15,12 +15,17 @@ import {
   getLibraryByCveIdAndOsKey,
   upsertLibraryEntry,
 } from "../db";
+import { getRedisClient } from "../middlewares/rateLimit";
 
 // Increment when the planner prompt OR the parser logic changes in a way that
 // invalidates previously cached plans. Bumped 2→3: parser fix (multi-line step
 // continuation) means older cached plans may be truncated and must be regenerated.
 // Library entries with an older version are regenerated via API on next lookup.
 export const REMEDIATION_PROMPT_VERSION = 3;
+
+// Teto de CVEs NOVOS (que exigem chamada à IA) por sessão de remediação.
+// CVEs já em cache não contam. Protege contra alvos com centenas de CVEs inéditos.
+const MAX_NEW_CVES_PER_RUN = parseInt(process.env.MAX_NEW_CVES_PER_RUN ?? "50", 10);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -315,7 +320,7 @@ export async function generateRemediationForScan(
   scanId: number,
   organizationId: number,
   plan?: string
-): Promise<{ created: number; skipped: number; total: number }> {
+): Promise<{ created: number; skipped: number; total: number; capped: boolean; newGenerated: number }> {
   const [scan, org] = await Promise.all([
     getScanById(scanId),
     getOrganizationById(organizationId),
@@ -371,7 +376,13 @@ export async function generateRemediationForScan(
     (v) => v.cveId?.trim() && v.description?.trim()
   );
 
-  if (filteredVulns.length === 0) return { created: 0, skipped: 0, total: 0 };
+  if (filteredVulns.length === 0) return { created: 0, skipped: 0, total: 0, capped: false, newGenerated: 0 };
+
+  // Críticos primeiro — se o teto de CVEs novos cortar, corta pelos menos graves.
+  const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  filteredVulns.sort(
+    (a, b) => (SEVERITY_ORDER[a.severity] ?? 4) - (SEVERITY_ORDER[b.severity] ?? 4)
+  );
 
   // The scanner (scan-executor.ts) does not perform OS detection.
   // detectedOS is always null; osKey is always 'generic'.
@@ -389,6 +400,8 @@ export async function generateRemediationForScan(
   // Process sequentially to avoid rate limiting
   let created = 0;
   let skipped = 0;
+  let newGenerated = 0;
+  let capped = false;
   for (const vuln of filteredVulns) {
     try {
       if (existingCveIds.has(vuln.cveId)) {
@@ -410,6 +423,16 @@ export async function generateRemediationForScan(
           nis2Articles: (libraryEntry.nis2Articles as string[] | null) ?? [],
         };
       } else {
+        // Teto de CVEs novos por sessão — corta antes de chamar a IA. Como
+        // filteredVulns está ordenado por severidade, os que ficam de fora
+        // são sempre os menos graves. Não marcar como skipped: ficam
+        // disponíveis para uma próxima sessão de geração.
+        if (newGenerated >= MAX_NEW_CVES_PER_RUN) {
+          capped = true;
+          break;
+        }
+        newGenerated += 1;
+
         // MISS or outdated version — generate via API and save/update library
         itemPlan = await generatePlanForVuln(vuln, orgContext);
         await upsertLibraryEntry({
@@ -438,7 +461,17 @@ export async function generateRemediationForScan(
     }
   }
 
-  return { created, skipped, total: filteredVulns.length };
+  if (capped) {
+    try {
+      const redis = await getRedisClient();
+      await redis.set(`remediation:capped:scan:${scanId}`, "1");
+      await redis.expire(`remediation:capped:scan:${scanId}`, 3600);
+    } catch (err) {
+      console.error(`[Remediation] Falha ao gravar flag capped no Redis (scan ${scanId}):`, err);
+    }
+  }
+
+  return { created, skipped, total: filteredVulns.length, capped, newGenerated };
 }
 
 // ---------------------------------------------------------------------------
