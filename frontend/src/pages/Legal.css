@@ -1,0 +1,152 @@
+/* ── Páginas institucionais (Sobre, FAQ, Termos, Privacidade) ──────────────
+   Reutiliza os tokens e a nav/footer definidos em Landing.css (ambos os
+   ficheiros são importados em conjunto nestas páginas). Aqui ficam só os
+   estilos do corpo do artigo. */
+
+.lp-page .legal-hero {
+  padding: 64px 6% 40px;
+  background: linear-gradient(170deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-bottom: 1px solid var(--border);
+}
+.lp-page .legal-hero .container { max-width: 860px; }
+.lp-page .legal-hero h1 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+.lp-page .legal-hero p.legal-lede {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  max-width: 640px;
+}
+.lp-page .legal-hero .legal-updated {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-top: 18px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.lp-page .legal-body {
+  padding: 56px 6% 100px;
+}
+.lp-page .legal-body .container { max-width: 860px; }
+
+.lp-page .legal-body h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin: 44px 0 16px;
+}
+.lp-page .legal-body h2:first-child { margin-top: 0; }
+.lp-page .legal-body h3 {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 28px 0 10px;
+}
+.lp-page .legal-body p {
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.8;
+  margin: 0 0 14px;
+}
+.lp-page .legal-body ul,
+.lp-page .legal-body ol {
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.8;
+  margin: 0 0 16px;
+  padding-left: 22px;
+}
+.lp-page .legal-body li { margin-bottom: 8px; }
+.lp-page .legal-body li strong,
+.lp-page .legal-body p strong { color: var(--text-primary); }
+.lp-page .legal-body a { color: var(--accent-blue); text-decoration: underline; }
+.lp-page .legal-body a:hover { color: var(--text-primary); }
+
+.lp-page .legal-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 20px;
+  font-size: 0.9rem;
+}
+.lp-page .legal-body th,
+.lp-page .legal-body td {
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+.lp-page .legal-body th {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lp-page .legal-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+.lp-page .legal-toc a {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: all 0.15s;
+}
+.lp-page .legal-toc a:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+  background: rgba(255,255,255,0.04);
+}
+
+.lp-page .legal-note {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 0 0 24px;
+}
+.lp-page .legal-note p { margin-bottom: 0; font-size: 0.9rem; }
+
+/* ── FAQ page ────────────────────────────────────────────────────────── */
+.lp-page .legal-faq-cat {
+  margin-top: 40px;
+}
+.lp-page .legal-faq-cat:first-child { margin-top: 0; }
+.lp-page .legal-faq-cat h2 { margin-top: 0; margin-bottom: 4px; }
+.lp-page .legal-faq-cat .legal-faq-cat-sub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+/* ── Sobre page ──────────────────────────────────────────────────────── */
+.lp-page .legal-pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 24px 0 36px;
+}
+.lp-page .legal-pillar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 22px;
+}
+.lp-page .legal-pillar h3 { margin-top: 0; }
+.lp-page .legal-pillar p { font-size: 0.9rem; margin-bottom: 0; }
+
+@media (max-width: 860px) {
+  .lp-page .legal-pillars { grid-template-columns: 1fr; }
+}

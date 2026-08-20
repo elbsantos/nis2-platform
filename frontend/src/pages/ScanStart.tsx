@@ -523,7 +523,7 @@ function SubdomainScanTab() {
             Estes subdomínios apontam para a rede interna da organização e não são acessíveis a
             partir da internet, pelo que não podem ser analisados por este scan externo. A sua
             verificação de segurança requer uma análise interna dedicada.{" "}
-            <a href="mailto:hello@cisplan.pt?subject=Auditoria%20interna%20de%20rede" className="text-blue-600 hover:underline">
+            <a href="mailto:geral@cisplan.com?subject=Auditoria%20interna%20de%20rede" className="text-blue-600 hover:underline">
               Fale connosco sobre uma auditoria interna →
             </a>
           </p>

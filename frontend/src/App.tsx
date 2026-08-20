@@ -28,6 +28,10 @@ import Lesson        from "./pages/Lesson";
 import OrgProfile    from "./pages/OrgProfile";
 import Documentos    from "./pages/Documentos";
 import BemVindo      from "./pages/BemVindo";
+import Privacidade   from "./pages/Privacidade";
+import Termos        from "./pages/Termos";
+import Faq           from "./pages/Faq";
+import Sobre         from "./pages/Sobre";
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function RequireAuth() {
@@ -187,6 +191,10 @@ export default function App() {
       <Route path="/register"         element={<Register />} />
       <Route path="/forgot-password"  element={<ForgotPassword />} />
       <Route path="/reset-password"   element={<ResetPassword />} />
+      <Route path="/privacidade"      element={<Privacidade />} />
+      <Route path="/termos"           element={<Termos />} />
+      <Route path="/faq"              element={<Faq />} />
+      <Route path="/sobre"            element={<Sobre />} />
 
       {/* Protected routes */}
       <Route element={<RequireAuth />}>

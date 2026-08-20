@@ -233,7 +233,7 @@ export default function Landing() {
                 <span className="dot red"></span>
                 <span className="dot yellow"></span>
                 <span className="dot green"></span>
-                <div className="url-bar">cisplan.pt/dashboard</div>
+                <div className="url-bar">cisplan.com/dashboard</div>
               </div>
               <div className="dashboard-mockup">
                 <div className="mockup-stats">
@@ -482,7 +482,7 @@ export default function Landing() {
                 <span className="dot red"></span>
                 <span className="dot yellow"></span>
                 <span className="dot green"></span>
-                <div className="url-bar">cisplan.pt/scan/novo</div>
+                <div className="url-bar">cisplan.com/scan/novo</div>
               </div>
               <div className="scan-mockup">
                 <div className="scan-tabs">
@@ -970,7 +970,7 @@ export default function Landing() {
               <li className="yes">API access completa</li>
               <li className="yes">Gestor de conta dedicado</li>
             </ul>
-            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
+            <a href="mailto:geral@cisplan.com?subject=Plano Enterprise CISPLAN" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
           </div>
         </div>
 
@@ -1057,22 +1057,24 @@ export default function Landing() {
             <a href="#precos">Starter — Gratuito</a>
             <a href="#precos">Pro — €89/mês</a>
             <a href="#precos">MSSP — €199/mês</a>
-            <a href="mailto:hello@cisplan.pt?subject=Plano Enterprise CISPLAN">Enterprise</a>
+            <a href="mailto:geral@cisplan.com?subject=Plano Enterprise CISPLAN">Enterprise</a>
           </div>
           )}
           <div className="footer-col">
             <h4>Conta</h4>
             <Link to="/login">Entrar</Link>
             <Link to="/register">Registar</Link>
-            <a href="mailto:suporte@cisplan.pt">Suporte</a>
+            <Link to="/sobre">Sobre nós</Link>
+            <Link to="/faq">FAQ</Link>
+            <a href="mailto:geral@cisplan.com">Suporte</a>
           </div>
         </div>
         <div className="footer-bottom">
           <p>© 2026 CISPLAN · DL 125/2025 · Todos os direitos reservados</p>
           <div className="footer-links">
-            <Link to="/login">Entrar</Link>
-            <Link to="/register">Registar</Link>
-            <a href="mailto:suporte@cisplan.pt">Suporte</a>
+            <Link to="/termos">Termos</Link>
+            <Link to="/privacidade">Privacidade</Link>
+            <a href="mailto:geral@cisplan.com">Suporte</a>
           </div>
         </div>
       </footer>

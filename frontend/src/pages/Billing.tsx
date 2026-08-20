@@ -586,7 +586,7 @@ export default function Billing() {
             ))}
           </ul>
           <a
-            href="mailto:hello@cisplan.pt?subject=Plano Enterprise"
+            href="mailto:geral@cisplan.com?subject=Plano Enterprise"
             className="w-full py-2.5 rounded-lg text-sm font-bold text-center bg-amber-400 text-gray-900 hover:bg-amber-300 transition-colors block"
           >
             Falar Connosco →

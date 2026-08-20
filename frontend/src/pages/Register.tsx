@@ -141,9 +141,9 @@ export default function Register() {
 
             <p className="auth-legal">
               Ao registar aceita os{" "}
-              <a href="#">termos de serviço</a>
+              <Link to="/termos" target="_blank" rel="noopener noreferrer">termos de serviço</Link>
               {" "}e a{" "}
-              <a href="#">política de privacidade</a>.
+              <Link to="/privacidade" target="_blank" rel="noopener noreferrer">política de privacidade</Link>.
             </p>
 
             <div className="auth-trust">
