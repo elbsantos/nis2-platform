@@ -144,12 +144,16 @@ export default function Privacidade() {
             <li>
               <strong>Railway Corporation</strong> (Estados Unidos) — alojamento da aplicação e da
               base de dados. A infraestrutura do prestador assenta em Google Cloud Platform.
+              Acordo de tratamento de dados celebrado em 20 de agosto de 2026.
             </li>
             <li>
               <strong>Anthropic</strong> (Estados Unidos) — geração de planos de remediação por
               inteligência artificial. São transmitidos os dados técnicos das vulnerabilidades
               detetadas (identificador CVE, descrição, serviço afetado), não sendo transmitidos
-              dados pessoais da conta nem dados identificativos da organização.
+              dados pessoais da conta nem dados identificativos da organização. Nos termos do
+              acordo de tratamento de dados aplicável, a Anthropic atua exclusivamente como
+              subcontratante, não utilizando estes dados para outros fins que não a prestação do
+              serviço, nem os vendendo ou partilhando com terceiros.
             </li>
             <li>
               <strong>Shodan (InternetDB) e NVD/NIST</strong> — consulta de dados públicos sobre
@@ -181,11 +185,11 @@ export default function Privacidade() {
             dados pessoais para fora do Espaço Económico Europeu.
           </p>
           <p>
-            Estas transferências são realizadas ao abrigo dos mecanismos previstos no Capítulo V
-            do RGPD — designadamente o EU-U.S. Data Privacy Framework, quando o prestador se
-            encontre certificado, ou as Cláusulas Contratuais-Tipo aprovadas pela Comissão
-            Europeia (Decisão 2021/914), conforme previsto nos acordos de tratamento de dados
-            disponibilizados por cada prestador.
+            Estas transferências realizam-se ao abrigo de Cláusulas Contratuais-Tipo aprovadas
+            pela Comissão Europeia (Decisão de Execução (UE) 2021/914, Módulo Dois — Responsável
+            pelo Tratamento para Subcontratante), celebradas com cada prestador através dos
+            respetivos acordos de tratamento de dados, ou do EU-U.S. Data Privacy Framework
+            quando o prestador se encontre certificado.
           </p>
           <div className="legal-note">
             <p>
