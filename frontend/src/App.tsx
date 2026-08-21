@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Routes, Route, Navigate, NavLink, Outlet } from "react-router-dom";
 import {
   User, Compass, ClipboardList, Search, Wrench, FileText,
-  GraduationCap, History, CreditCard, type LucideIcon,
+  GraduationCap, History, CreditCard, BookOpen, type LucideIcon,
 } from "lucide-react";
 import { Icon } from "./components/ui/Icon";
 import { useAuth } from "./lib/auth";
@@ -27,6 +27,7 @@ import Course        from "./pages/Course";
 import Lesson        from "./pages/Lesson";
 import OrgProfile    from "./pages/OrgProfile";
 import Documentos    from "./pages/Documentos";
+import GuiaDocumentos from "./pages/GuiaDocumentos";
 import BemVindo      from "./pages/BemVindo";
 import Privacidade   from "./pages/Privacidade";
 import Termos        from "./pages/Termos";
@@ -69,6 +70,7 @@ const MAIN_ITEMS: NavItem[] = [
 ];
 
 const SECONDARY_ITEMS: NavItem[] = [
+  { to: "/guia-documentos", label: "Guia dos Documentos", icon: BookOpen },
   ...(ENABLE_COURSE ? [{ to: "/course", label: "Curso", icon: GraduationCap }] : []),
   { to: "/scan/history",  label: "Histórico", icon: History },
   { to: "/billing",       label: ENABLE_PRICING ? "Planos" : "Conta", icon: CreditCard },
@@ -212,6 +214,7 @@ export default function App() {
           <Route path="/enquadramento/:id"                  element={<EnquadramentoResult />} />
           <Route path="/remediation"                        element={<Remediation />} />
           <Route path="/documentos"               element={<Documentos />} />
+          <Route path="/guia-documentos"           element={<GuiaDocumentos />} />
           <Route path="/billing"                  element={<Billing />} />
           <Route path="/perfil"                   element={<OrgProfile />} />
           <Route path="/course"                   element={<Course />} />

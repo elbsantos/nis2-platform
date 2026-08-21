@@ -289,6 +289,9 @@ export default function Documentos() {
           <p className="text-xl text-dim mt-1">
             Todos os documentos de conformidade gerados automaticamente, num único sítio.
           </p>
+          <Link to="/guia-documentos" className="inline-block text-sm text-accent hover:underline mt-2">
+            Como preencher estes documentos →
+          </Link>
         </div>
 
         <InfoNote>
