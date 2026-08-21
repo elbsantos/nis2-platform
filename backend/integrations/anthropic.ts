@@ -281,6 +281,7 @@ O último passo de CADA secção deve ser SEMPRE uma verificação explícita. E
 - "Acede novamente ao serviço e confirma que a ligação é segura (cadeado verde)."
 
 **Bloco 4 — Metadados**
+Os metadados (Esforço e Artigo NIS2) devem aparecer em linhas próprias, DEPOIS do último passo numerado, nunca na mesma linha de um passo.
 Esforço: Baixo (< 1h) / Médio (1–4h) / Alto (> 4h)
 Artigo NIS2: Art. 21(2)(x)
 

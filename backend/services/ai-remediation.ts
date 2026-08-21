@@ -139,7 +139,13 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
       continue;
     }
 
-    // Effort line
+    // Separator-only line between the steps and the metadata block ("---", "___",
+    // "***"). Never a real instruction — always ignored, never appended to a step.
+    if (/^[-_*]{3,}$/.test(line)) continue;
+
+    // Effort line — e.g. "Esforço: Médio" or "--- Esforço: Médio (1–4 horas, incluindo
+    // testes)". Matches anywhere in the line, so it's caught even with extra text
+    // around it. Always consumed as metadata, never appended to a step.
     if (/esfor[cç]o[:\s]*(baixo|médio|medio|alto)/i.test(line)) {
       const m = line.match(/baixo|médio|medio|alto/i);
       if (m) {
@@ -149,10 +155,13 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
       continue;
     }
 
-    // NIS2 articles
-    const artMatch = line.match(/art\.\s*21\(2\)\([a-j]\)/gi);
-    if (artMatch) {
-      nis2Articles.push(...artMatch.map((a) => a.trim()));
+    // NIS2 articles — either a bare "Art. 21(2)(x)" code, or a label line ("Artigo(s)
+    // NIS2 relevante(s):"). The label must be consumed as metadata even when no code
+    // follows on the same line, otherwise it falls through to the multi-line
+    // continuation below and gets glued onto the last step's instruction.
+    if (/artigos?\s+nis2|art\.\s*21\(2\)\([a-j]\)/i.test(line)) {
+      const artMatch = line.match(/art\.\s*21\(2\)\([a-j]\)/gi);
+      if (artMatch) nis2Articles.push(...artMatch.map((a) => a.trim()));
       continue;
     }
 
@@ -171,6 +180,36 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
     // Sem passos e riskSummary já preenchido — linha ignorada, como antes
   }
 
+  // Fallback: por vezes o modelo cola o bloco de metadados na MESMA linha física do
+  // último passo numerado (ex.: "6. Verifica se a correção foi aplicada --- Esforço:
+  // Médio (1–4 horas) Artigos NIS2 relevantes: Art. 21(2)(e)"), pelo que as guardas
+  // acima nunca o veem como linha separada — o blob inteiro fica capturado no
+  // instruction do passo. Deteta e remove esse resíduo aqui, extraindo effort/artigos
+  // se ainda não tiverem sido capturados durante o loop.
+  if (steps.length > 0) {
+    const lastStep = steps[steps.length - 1];
+    const trailingMetaRe = /(?:-{2,}\s*)?\besfor[cç]o\s*:.*$|\bartigos?\s+nis2\s+relevantes?\s*:.*$/i;
+    const cutMatch = lastStep.instruction.match(trailingMetaRe);
+    if (cutMatch && cutMatch.index !== undefined) {
+      const trailing = lastStep.instruction.slice(cutMatch.index);
+      lastStep.instruction = lastStep.instruction
+        .slice(0, cutMatch.index)
+        .replace(/[\s\-–—_*]+$/, "")
+        .trim();
+
+      const effortInTrailing = trailing.match(/esfor[cç]o[:\s]*(baixo|médio|medio|alto)/i);
+      if (effortInTrailing) {
+        const v = effortInTrailing[1].toLowerCase();
+        effortRaw = v === "baixo" ? "low" : v.startsWith("m") ? "medium" : "high";
+      }
+
+      const articlesInTrailing = trailing.match(/art\.\s*21\(2\)\([a-j]\)/gi);
+      if (articlesInTrailing) {
+        nis2Articles.push(...articlesInTrailing.map((a) => a.trim()));
+      }
+    }
+  }
+
   return {
     title: vulnTitle,
     riskSummary: riskSummary || "Vulnerabilidade requer correção urgente.",
@@ -178,7 +217,7 @@ export function parseAIPlan(raw: string, vulnTitle: string): ParsedPlan {
       ? steps
       : [{ order: 1, instruction: "Consultar o aviso original do fabricante e aplicar o patch disponível.", platform: "all" }],
     effort: effortRaw as "low" | "medium" | "high",
-    nis2Articles: nis2Articles.length > 0 ? nis2Articles : ["Art. 21(2)(e)"],
+    nis2Articles: nis2Articles.length > 0 ? [...new Set(nis2Articles)] : ["Art. 21(2)(e)"],
   };
 }
 

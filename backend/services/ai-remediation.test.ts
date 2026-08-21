@@ -213,6 +213,50 @@ describe("parseAIPlan — multi-line step continuation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// parseAIPlan — metadados (Esforço / Artigos NIS2) colados ao último passo
+// (regressão: eram absorvidos pelo fallback de continuação multi-linha)
+// ---------------------------------------------------------------------------
+
+describe("parseAIPlan — metadados colados ao último passo (regressão)", () => {
+  it("remove Esforço/Artigos NIS2 do instruction do último passo quando vêm na MESMA linha física", () => {
+    const raw = [
+      "Risco: componente desatualizado com CVE conhecido.",
+      "1. Actualiza o pacote com apt-get upgrade.",
+      "2. Reinicia o serviço e confirma que arrancou --- Esforço: Médio (1–4 horas) Artigos NIS2 relevantes: Art. 21(2)(e)",
+    ].join("\n");
+    const plan = parseAIPlan(raw, "CVE-TESTE — glued");
+    const lastStep = plan.steps[plan.steps.length - 1];
+    expect(lastStep.instruction).not.toMatch(/esfor[cç]o/i);
+    expect(lastStep.instruction).not.toMatch(/artigos?\s+nis2/i);
+    expect(lastStep.instruction).toBe("Reinicia o serviço e confirma que arrancou");
+    expect(plan.effort).toBe("medium");
+    expect(plan.nis2Articles).toContain("Art. 21(2)(e)");
+  });
+
+  it("ignora uma linha separadora sozinha ('---') sem a colar ao passo anterior", () => {
+    const raw = [
+      "1. Actualiza o pacote.",
+      "---",
+      "Esforço: Alto",
+      "Artigos NIS2 relevantes:",
+      "Art. 21(2)(d)",
+    ].join("\n");
+    const plan = parseAIPlan(raw, "CVE-TESTE — separador");
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0].instruction).toBe("Actualiza o pacote.");
+    expect(plan.effort).toBe("high");
+    expect(plan.nis2Articles).toContain("Art. 21(2)(d)");
+  });
+
+  it("rótulo 'Artigos NIS2 relevantes:' sem código a seguir não fica colado ao passo anterior", () => {
+    const raw = ["1. Aplica a correção.", "Artigos NIS2 relevantes:"].join("\n");
+    const plan = parseAIPlan(raw, "CVE-TESTE — label-vazio");
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0].instruction).toBe("Aplica a correção.");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // normalizeOsKey
 // ---------------------------------------------------------------------------
 
