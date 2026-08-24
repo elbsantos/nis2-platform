@@ -602,7 +602,7 @@ export default function GuiaDocumentos() {
   );
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl mx-auto px-8 py-8 space-y-8">
       <SectionHeader
         eyebrow="Conformidade documental"
         title="Guia dos Documentos NIS2"

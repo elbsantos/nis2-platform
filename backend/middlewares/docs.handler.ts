@@ -10,6 +10,7 @@ import fs from "fs";
 import type { Application, Request, Response } from "express";
 import { jwtVerify } from "jose";
 import { ENV } from "../_core/env";
+import { COOKIE_NAME } from "../_core/oauth";
 import { getDocById, LESSON_DIR } from "../content/docs-catalog";
 import { getSubscriptionByOrgId } from "../db-subscriptions";
 import { db } from "../db";
@@ -29,7 +30,7 @@ export function registerDocsHandler(app: Application): void {
     try {
       // ── 1. Auth ──────────────────────────────────────────────────────────
       const token =
-        req.cookies?.["nis2_token"] ??
+        req.cookies?.[COOKIE_NAME] ??
         req.headers.authorization?.replace("Bearer ", "");
 
       if (!token) {

@@ -13,7 +13,7 @@ import { getUserByEmail, getUserById, registerUserAtomically, getOrCreateOrgForO
 import { sendPasswordReset } from "../integrations/resend";
 import { getJwtSecret } from "./env";
 
-const COOKIE_NAME = "auth_token";
+export const COOKIE_NAME = "auth_token";
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
