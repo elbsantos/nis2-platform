@@ -1,10 +1,11 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, AlertCircle, MinusCircle, Download, Lock, ArrowRight } from "lucide-react";
+import { CheckCircle2, AlertCircle, MinusCircle, Lock, ArrowRight } from "lucide-react";
 import { Icon } from "../components/ui/Icon";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { SectionHeader } from "../components/ui/SectionHeader";
+import { DocButton } from "../components/DocButton";
 import { trpc } from "../lib/trpc";
 
 // ---------------------------------------------------------------------------
@@ -480,10 +481,15 @@ function EstadoBadge({ estado }: { estado: DocState }) {
 }
 
 // ---------------------------------------------------------------------------
-// Botão de modelo — descarrega via /api/docs/download/:id (mesmo mecanismo do curso)
+// Botão de modelo — tRPC docs.downloadModel (base64), mesmo padrão do DocButton
+// usado em Documentos.tsx/ScanResults.tsx. Não usa /api/docs/download (Express):
+// esse endpoint depende de o cookie httpOnly chegar num <a href> cross-origin, o
+// que falhava em produção; o tRPC usa a mesma origem/mecanismo do resto da app.
 // ---------------------------------------------------------------------------
 
-function ModeloButton({ docId, filename, accessible }: { docId: string; filename: string; accessible: boolean | undefined }) {
+function ModeloButton({ docId, accessible }: { docId: string; accessible: boolean | undefined }) {
+  const modelo = trpc.docs.downloadModel.useQuery({ docId }, { enabled: false, retry: false });
+
   if (accessible === undefined) {
     return (
       <span className="inline-flex items-center gap-2 text-sm text-faint px-4 py-2.5">
@@ -504,13 +510,14 @@ function ModeloButton({ docId, filename, accessible }: { docId: string; filename
   }
 
   return (
-    <a
-      href={`/api/docs/download/${docId}`}
-      download
-      className="inline-flex items-center gap-2 border border-line text-text bg-surface hover:border-accent hover:text-accent text-sm font-medium px-4 py-2.5 rounded-[8px] transition-colors whitespace-nowrap"
-    >
-      <Icon as={Download} size={15} /> Descarregar modelo ({filename.split(".").pop()})
-    </a>
+    <DocButton
+      label="Descarregar modelo"
+      onDownload={async () => {
+        const r = await modelo.refetch();
+        if (!r.data) throw new Error(r.error?.message ?? "Erro ao obter o modelo");
+        return r.data;
+      }}
+    />
   );
 }
 
@@ -583,7 +590,6 @@ function DocCard({ doc, docsById }: { doc: GuiaDoc; docsById: Map<string, boolea
       {doc.estado === "empresa" && doc.modeloDocId && doc.modeloFilename && (
         <ModeloButton
           docId={doc.modeloDocId}
-          filename={doc.modeloFilename}
           accessible={docsById.get(doc.modeloDocId)}
         />
       )}
