@@ -368,7 +368,10 @@ const MODULOS: GuiaModulo[] = [
         baseLegal: "Art. 23.º NIS2",
         orientacao: "Só se aplica quando ocorre um incidente reportável. Quando acontecer: guardar o recibo de submissão do CNCS e os três formulários (24h / 72h / relatório final) numa pasta própria por incidente.",
         prazosLegais: "alerta inicial em 24 horas, notificação detalhada em 72 horas, relatório final em 1 mês.",
+        naoSeEsqueca: "em caso de indisponibilidade da plataforma: cert@cert.pt · (+351) 210 497 399 · emergência 24/7: (+351) 910 599 284.",
         arquivarEm: "/NIS2/Incidentes/[INC-XXX]/",
+        modeloDocId: "guia-06",
+        modeloFilename: "NIS2_Notificacao_Incidentes_CNCS.xlsx",
       },
       {
         code: "D24",
@@ -408,8 +411,8 @@ const MODULOS: GuiaModulo[] = [
           "Leve as conclusões à reunião de gestão (D04) e registe na ata.",
         ],
         arquivarEm: "/NIS2/Auditorias/AutoAuditoria_[Ano].pdf",
-        modeloDocId: "m2a3-04",
-        modeloFilename: "NIS2_Checklist_Auto_Auditoria_CNCS_EDITAVEL.pdf",
+        modeloDocId: "guia-05",
+        modeloFilename: "NIS2_Auto_Auditoria_CNCS.xlsx",
       },
       {
         code: "D26",
@@ -418,6 +421,8 @@ const MODULOS: GuiaModulo[] = [
         baseLegal: "Arts. 31.º–35.º DL 125/2025",
         orientacao: "Só se aplica perante uma não conformidade identificada (pelo CNCS ou na auto-auditoria). Um CAPA por não conformidade, com causa raiz e prazo de correção.",
         arquivarEm: "/NIS2/Auditorias/CAPA/",
+        modeloDocId: "m2a3-03",
+        modeloFilename: "NIS2_CAPA_Plano_Acao_Correctiva.docx",
       },
       {
         code: "D27",
@@ -587,7 +592,7 @@ function DocCard({ doc, docsById }: { doc: GuiaDoc; docsById: Map<string, boolea
         </Link>
       )}
 
-      {doc.estado === "empresa" && doc.modeloDocId && doc.modeloFilename && (
+      {doc.modeloDocId && doc.modeloFilename && (
         <ModeloButton
           docId={doc.modeloDocId}
           accessible={docsById.get(doc.modeloDocId)}

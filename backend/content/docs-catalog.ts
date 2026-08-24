@@ -65,7 +65,8 @@ export const DOCS_CATALOG: CourseDoc[] = [
   // ── Aula 2.3 ────────────────────────────────────────────────────────────────
   { id: "m2a3-01", lessonId: "2.3", filename: "NIS2_Calendario_Anual_Conformidade.xlsx",            label: "Calendário Anual de Conformidade (PDCA)",    type: "xlsx", plan: "free" },
   { id: "m2a3-02", lessonId: "2.3", filename: "NIS2_Dossier_Conformidade_Indice_Mestre.xlsx",       label: "Dossier de Conformidade — Índice Mestre",    type: "xlsx", plan: "pro" },
-  { id: "m2a3-03", lessonId: "2.3", filename: "NIS2_CAPA_Plano_Acao_Correctiva.docx",               label: "CAPA — Plano de Acção Correctiva",           type: "docx", plan: "pro" },
+  // 16.º modelo usado pelo Guia dos Documentos (D26) — "free" durante a fase de demonstração, como os outros 15.
+  { id: "m2a3-03", lessonId: "2.3", filename: "NIS2_CAPA_Plano_Acao_Correctiva.docx",               label: "CAPA — Plano de Acção Correctiva",           type: "docx", plan: "free" },
   { id: "m2a3-04", lessonId: "2.3", filename: "NIS2_Checklist_Auto_Auditoria_CNCS_EDITAVEL.pdf",    label: "Checklist Auto-Auditoria CNCS (34 itens)",   type: "pdf",  plan: "free" },
   { id: "m2a3-05", lessonId: "2.3", filename: "NIS2_Resumo_Executivo_Curso_Completo.pdf",           label: "Resumo Executivo — Curso Completo",          type: "pdf",  plan: "pro" },
 
@@ -75,6 +76,8 @@ export const DOCS_CATALOG: CourseDoc[] = [
   { id: "guia-02", lessonId: "guia", filename: "NIS2_Formacao_Lista_Presencas.xlsx",    label: "Lista de Presenças — Formação Anual",       type: "xlsx", plan: "free" },
   { id: "guia-03", lessonId: "guia", filename: "NIS2_Simulacao_Phishing_Registo.xlsx",  label: "Registo de Simulação de Phishing",          type: "xlsx", plan: "free" },
   { id: "guia-04", lessonId: "guia", filename: "NIS2_Tabletop_Exercise_Relatorio.xlsx", label: "Relatório de Tabletop Exercise",            type: "xlsx", plan: "free" },
+  { id: "guia-05", lessonId: "guia", filename: "NIS2_Auto_Auditoria_CNCS.xlsx",         label: "Auto-Auditoria NIS2 — Simulação de Vistoria CNCS", type: "xlsx", plan: "free" },
+  { id: "guia-06", lessonId: "guia", filename: "NIS2_Notificacao_Incidentes_CNCS.xlsx", label: "Notificação de Incidentes à Autoridade (24h/72h/final)", type: "xlsx", plan: "free" },
 ];
 
 /** Lesson ID → subdirectory name */
