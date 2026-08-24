@@ -8,7 +8,7 @@
     "dev": "concurrently \"tsx watch backend/_core/index.ts\" \"vite\"",
     "dev:api": "tsx watch backend/_core/index.ts",
     "dev:web": "vite",
-    "build": "tsc -p tsconfig.backend.json && copyfiles -u 1 \"backend/assets/**/*\" dist/backend/backend && vite build",
+    "build": "tsc -p tsconfig.backend.json && copyfiles -u 1 \"backend/assets/**/*\" \"backend/content/**/*\" dist/backend/backend && vite build",
     "start": "node dist/backend/backend/_core/index.js",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
