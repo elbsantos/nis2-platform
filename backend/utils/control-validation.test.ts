@@ -89,11 +89,14 @@ describe("validateControls — e-2 (gestão de patches)", () => {
     expect(r.evidence.some((e) => e.includes("CVE-2024-1234"))).toBe(true);
   });
 
-  it("respondeu 'no' sem CVEs críticos → self_declared (nada confirma a admissão)", async () => {
+  it("respondeu 'no' sem CVEs críticos → self_declared com inconclusiveReason (nada confirma a admissão)", async () => {
     const scan = emptyScan({ vulnerabilities: [{ cveId: "CVE-2024-0001", cvssScore: 3.1, affectedService: "nginx" }] });
     const r = await find({ "e-2": "no" }, scan, "e-2");
     expect(r.state).toBe("self_declared");
     expect(r.source).toBeNull();
+    expect(r.inconclusiveReason).toBe(
+      "Declarou não cumprir e a análise externa não encontrou problemas — pode referir-se a sistemas que não verificamos."
+    );
   });
 
   it("respondeu 'partial' com CVE crítico presente → verified_noncompliant (mesma lógica do 'no')", async () => {
@@ -110,6 +113,7 @@ describe("validateControls — e-2 (gestão de patches)", () => {
     });
     const r = await find({ "e-2": "na" }, scan, "e-2");
     expect(r.state).toBe("self_declared");
+    expect(r.inconclusiveReason).toBeUndefined(); // "na" é estrutural, não inconclusivo
   });
 });
 
@@ -201,10 +205,11 @@ describe("validateControls — h-2 (dados em trânsito)", () => {
     expect(r.evidence[0]).not.toMatch(/\(porta 443\).*\(porta 443\)/);
   });
 
-  it("no + tudo limpo → self_declared", async () => {
+  it("no + tudo limpo → self_declared com inconclusiveReason", async () => {
     const scan = emptyScan();
     const r = await find({ "h-2": "no" }, scan, "h-2");
     expect(r.state).toBe("self_declared");
+    expect(r.inconclusiveReason).toBeDefined();
   });
 });
 
@@ -271,11 +276,12 @@ describe("validateControls — i-5 (contas de administrador)", () => {
 });
 
 describe("validateControls — fallback e resumo", () => {
-  it("controlo sem regra técnica (ex.: a-1) fica sempre self_declared", async () => {
+  it("controlo sem regra técnica (ex.: a-1) fica sempre self_declared, sem inconclusiveReason (é estrutural)", async () => {
     const scan = emptyScan({ vulnerabilities: [{ cveId: "X", cvssScore: 9.9, affectedService: "y" }] });
     const r = await find({ "a-1": "yes" }, scan, "a-1");
     expect(r.state).toBe("self_declared");
     expect(r.source).toBeNull();
+    expect(r.inconclusiveReason).toBeUndefined();
   });
 
   it("scan === null → todos os 42 controlos ficam self_declared", async () => {
@@ -301,10 +307,31 @@ describe("validateControls — fallback e resumo", () => {
     expect(summary.contradicted).toBe(1);
     expect(summary.unconfirmed).toBe(1);
     expect(summary.verified).toBeGreaterThanOrEqual(1); // pelo menos f-2
+    expect(summary.inconclusive).toBeGreaterThanOrEqual(1); // j-5 "no" sem evidência
     expect(
       summary.contradicted + summary.unconfirmed + summary.verified +
       summary.verifiedNoncompliant + summary.selfDeclared
     ).toBe(42);
+  });
+
+  it("summarizeValidations.inconclusive distingue self_declared inconclusivo do estrutural", async () => {
+    const scan = emptyScan(); // sem evidência nenhuma
+    // e-2 "no" sem CVEs → self_declared COM inconclusiveReason.
+    // a-1 não tem regra técnica → self_declared SEM inconclusiveReason (estrutural).
+    const answers = { "e-2": "no" };
+    const validations = await validateControls(answers, scan);
+    const summary = summarizeValidations(validations);
+
+    const e2 = validations.find((v) => v.controlId === "e-2")!;
+    const a1 = validations.find((v) => v.controlId === "a-1")!;
+    expect(e2.state).toBe("self_declared");
+    expect(e2.inconclusiveReason).toBeDefined();
+    expect(a1.state).toBe("self_declared");
+    expect(a1.inconclusiveReason).toBeUndefined();
+
+    // inconclusive é subconjunto de selfDeclared, nunca maior.
+    expect(summary.inconclusive).toBeGreaterThan(0);
+    expect(summary.inconclusive).toBeLessThan(summary.selfDeclared);
   });
 
   it("summarizeValidations conta verifiedNoncompliant separadamente dos outros estados", async () => {

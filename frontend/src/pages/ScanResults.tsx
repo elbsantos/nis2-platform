@@ -416,6 +416,7 @@ interface ControlValidationRow {
   evidence:  string[];
   coverage:  string | null;
   source:    "scanner" | null;
+  inconclusiveReason?: string;
 }
 
 interface ControlMeta {
@@ -483,7 +484,14 @@ function MeasureSection({ slug, title, controls, metaById }: {
   );
 }
 
-function SelfDeclaredBlock({ controls, metaById }: { controls: ControlValidationRow[]; metaById: Map<string, ControlMeta> }) {
+/**
+ * Bloco colapsável genérico para os dois grupos de self_declared — os "analisados sem
+ * conclusão" (têm inconclusiveReason, mostrada por item) e os "sem fonte técnica"
+ * (estruturais, sem regra nenhuma — mostram só a pergunta).
+ */
+function CollapsibleControlGroup({ title, description, controls, metaById }: {
+  title: string; description?: string; controls: ControlValidationRow[]; metaById: Map<string, ControlMeta>;
+}) {
   const [open, setOpen] = useState(false);
   if (controls.length === 0) return null;
 
@@ -496,13 +504,10 @@ function SelfDeclaredBlock({ controls, metaById }: { controls: ControlValidation
         className="w-full flex items-start justify-between gap-4 text-left"
       >
         <div>
-          <p className="text-sm font-semibold text-text">
-            {controls.length} controlos apenas declarados — sem fonte técnica que os verifique
-          </p>
-          <p className="text-sm text-dim mt-1.5 max-w-[70ch]">
-            Estes controlos dependem da sua declaração. Nenhuma ferramenta de conformidade os verifica hoje —
-            nós dizemos-lhe quais são. O nosso roadmap leva a verificação técnica a 30 dos 42 controlos.
-          </p>
+          <p className="text-sm font-semibold text-text">{title}</p>
+          {description && (
+            <p className="text-sm text-dim mt-1.5 max-w-[70ch]">{description}</p>
+          )}
         </div>
         <Icon as={open ? ChevronUp : ChevronDown} className="shrink-0 mt-1 text-dim" />
       </button>
@@ -512,15 +517,18 @@ function SelfDeclaredBlock({ controls, metaById }: { controls: ControlValidation
           {MEASURE_ORDER.map((slug) => {
             const inMeasure = controls.filter((c) => metaById.get(c.controlId)?.articleSlug === slug);
             if (inMeasure.length === 0) return null;
-            const title = metaById.get(inMeasure[0].controlId)?.articleTitle ?? "";
+            const measureTitle = metaById.get(inMeasure[0].controlId)?.articleTitle ?? "";
             return (
               <div key={slug}>
-                <h4 className="text-xs font-semibold text-faint uppercase tracking-wide mb-1.5">{slug} · {title}</h4>
-                <ul className="space-y-1">
+                <h4 className="text-xs font-semibold text-faint uppercase tracking-wide mb-1.5">{slug} · {measureTitle}</h4>
+                <ul className="space-y-1.5">
                   {inMeasure.map((c) => (
                     <li key={c.controlId} className="text-sm text-dim">
                       <span className="font-mono text-faint mr-2">{c.controlId}</span>
                       {metaById.get(c.controlId)?.question}
+                      {c.inconclusiveReason && (
+                        <span className="block text-xs text-faint mt-0.5">{c.inconclusiveReason}</span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -540,7 +548,12 @@ function ControlValidationSection({ scanId }: { scanId: number }) {
   if (!data || !controlsData) return null;
 
   const metaById = new Map<string, ControlMeta>(controlsData.map((c) => [c.id, c]));
-  const selfDeclared = data.validations.filter((v) => v.state === "self_declared");
+  const selfDeclared  = data.validations.filter((v) => v.state === "self_declared");
+  // Dois grupos distintos: os "inconclusivos" têm regra técnica mas a resposta foi
+  // "não"/"parcial" sem evidência que a confirme (o número varia por alvo); os
+  // "estruturais" são os controlos sem regra técnica nenhuma (fixo, 36 hoje).
+  const inconclusive  = selfDeclared.filter((v) => v.inconclusiveReason);
+  const structural    = selfDeclared.filter((v) => !v.inconclusiveReason);
   const { summary } = data;
 
   return (
@@ -571,8 +584,18 @@ function ControlValidationSection({ scanId }: { scanId: number }) {
         })}
       </div>
 
-      <div className="mt-6">
-        <SelfDeclaredBlock controls={selfDeclared} metaById={metaById} />
+      <div className="mt-6 space-y-3">
+        <CollapsibleControlGroup
+          title={`${inconclusive.length} controlos analisados sem conclusão`}
+          controls={inconclusive}
+          metaById={metaById}
+        />
+        <CollapsibleControlGroup
+          title={`${structural.length} controlos sem fonte técnica`}
+          description="Estes controlos dependem da sua declaração. Nenhuma ferramenta de conformidade os verifica hoje — nós dizemos-lhe quais são. O nosso roadmap leva a verificação técnica a 30 dos 42 controlos."
+          controls={structural}
+          metaById={metaById}
+        />
       </div>
     </Card>
   );

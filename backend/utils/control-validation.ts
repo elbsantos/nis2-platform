@@ -37,6 +37,13 @@ export interface ControlValidation {
   evidence:  string[];        // frases curtas com o que foi observado
   coverage:  string | null;   // o que a fonte NÃO cobre (honestidade sobre limites)
   source:    "scanner" | null; // preparado para "m365" | "agent" depois
+  /**
+   * Só presente quando self_declared por resposta "no"/"partial" SEM evidência de
+   * falha (a empresa admite a lacuna, mas nada a confirma tecnicamente) — distingue
+   * este caso dos 36 controlos estruturalmente sem regra técnica, cujo número não
+   * varia de alvo para alvo. Ausente nesses e nos casos "na"/sem resposta.
+   */
+  inconclusiveReason?: string;
 }
 
 /**
@@ -59,9 +66,15 @@ export interface ScanResultData {
 // Fallback partilhado
 // ---------------------------------------------------------------------------
 
-function selfDeclared(controlId: string, answer: string | null): ControlValidation {
-  return { controlId, answer, state: "self_declared", evidence: [], coverage: null, source: null };
+function selfDeclared(controlId: string, answer: string | null, inconclusiveReason?: string): ControlValidation {
+  return { controlId, answer, state: "self_declared", evidence: [], coverage: null, source: null, inconclusiveReason };
 }
+
+// Texto fixo para o caso "no"/"partial" sem evidência de falha — a empresa admite a
+// lacuna, mas a análise externa não encontrou nada que a confirme (pode ser um sistema
+// que não verificamos, não uma prova de que a lacuna não existe).
+const INCONCLUSIVE_NO_EVIDENCE_REASON =
+  "Declarou não cumprir e a análise externa não encontrou problemas — pode referir-se a sistemas que não verificamos.";
 
 /**
  * Classifica um controlo com "evidência de falha" (e-2, e-3, h-2, j-5) cruzando a
@@ -111,7 +124,7 @@ function validateE2(answer: string | null, scan: ScanResultData): ControlValidat
     .sort((a, b) => b.cvssScore - a.cvssScore);
   const hasFailureEvidence = highCves.length > 0;
   const state = classify(answer, hasFailureEvidence);
-  if (state === "self_declared") return selfDeclared("e-2", answer);
+  if (state === "self_declared") return selfDeclared("e-2", answer, INCONCLUSIVE_NO_EVIDENCE_REASON);
 
   let evidence: string[];
   if (hasFailureEvidence) {
@@ -149,7 +162,7 @@ async function validateE3(answer: string | null, scan: ScanResultData): Promise<
   }
   const hasFailureEvidence = failureEvidence.length > 0;
   const state = classify(answer, hasFailureEvidence);
-  if (state === "self_declared") return selfDeclared("e-3", answer);
+  if (state === "self_declared") return selfDeclared("e-3", answer, INCONCLUSIVE_NO_EVIDENCE_REASON);
 
   const evidence = hasFailureEvidence
     ? capEvidence(failureEvidence)
@@ -182,7 +195,7 @@ function validateH2(answer: string | null, scan: ScanResultData): ControlValidat
 
   const hasFailureEvidence = failureEvidence.length > 0;
   const state = classify(answer, hasFailureEvidence);
-  if (state === "self_declared") return selfDeclared("h-2", answer);
+  if (state === "self_declared") return selfDeclared("h-2", answer, INCONCLUSIVE_NO_EVIDENCE_REASON);
 
   const evidence = hasFailureEvidence ? capEvidence(failureEvidence) : ["Sem problemas de TLS detetados e HSTS ativo."];
 
@@ -206,7 +219,7 @@ function validateJ5(answer: string | null, scan: ScanResultData): ControlValidat
 
   const hasFailureEvidence = failureEvidence.length > 0;
   const state = classify(answer, hasFailureEvidence);
-  if (state === "self_declared") return selfDeclared("j-5", answer);
+  if (state === "self_declared") return selfDeclared("j-5", answer, INCONCLUSIVE_NO_EVIDENCE_REASON);
 
   const evidence = hasFailureEvidence ? capEvidence(failureEvidence) : ["Portas de email em claro fechadas e SPF/DMARC configurados."];
 
@@ -282,11 +295,14 @@ export interface ValidationSummary {
   contradicted:         number;
   unconfirmed:          number;
   selfDeclared:         number;
+  /** Subconjunto de selfDeclared com inconclusiveReason — "no"/"partial" sem evidência
+   *  de falha. Os restantes selfDeclared são estruturais (sem regra técnica nenhuma). */
+  inconclusive:         number;
 }
 
 export function summarizeValidations(validations: ControlValidation[]): ValidationSummary {
   const summary: ValidationSummary = {
-    verified: 0, verifiedNoncompliant: 0, contradicted: 0, unconfirmed: 0, selfDeclared: 0,
+    verified: 0, verifiedNoncompliant: 0, contradicted: 0, unconfirmed: 0, selfDeclared: 0, inconclusive: 0,
   };
   for (const v of validations) {
     if (v.state === "verified") summary.verified++;
@@ -294,6 +310,8 @@ export function summarizeValidations(validations: ControlValidation[]): Validati
     else if (v.state === "contradicted") summary.contradicted++;
     else if (v.state === "unconfirmed") summary.unconfirmed++;
     else summary.selfDeclared++;
+
+    if (v.inconclusiveReason) summary.inconclusive++;
   }
   return summary;
 }
