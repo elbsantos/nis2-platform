@@ -664,6 +664,7 @@ export async function getLatestCompletedQuestionnaireForOrg(orgId: number) {
     .select({
       id:           questionnaireSessions.id,
       articleScores: questionnaireSessions.articleScores,
+      answers:      questionnaireSessions.answers,
       completedAt:  questionnaireSessions.completedAt,
     })
     .from(questionnaireSessions)

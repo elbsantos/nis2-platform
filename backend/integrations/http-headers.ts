@@ -30,6 +30,9 @@ export interface HttpHeadersResult {
   score: number | null;
   url: string;
   serverBanner?: string; // value of the Server: response header, e.g. "Apache/2.4.7 (Ubuntu)"
+  /** Se http://target redireciona para https://. null = não foi possível determinar
+   *  (porta 80 inacessível/timeout) — nunca inferir a partir de null. */
+  httpRedirectsToHttps: boolean | null;
 }
 
 function fetchHeaders(url: string, redirectsLeft = 3): Promise<IncomingHttpHeaders> {
@@ -64,6 +67,50 @@ function fetchHeaders(url: string, redirectsLeft = 3): Promise<IncomingHttpHeade
     );
     req.on("error", reject);
     req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+  });
+}
+
+/**
+ * Segue http://target (independentemente do que o fluxo principal usou) e verifica se
+ * a cadeia de redirects chega a acabar em https://. Não reaproveita fetchHeaders porque
+ * essa só devolve headers, não o URL final resolvido depois dos redirects.
+ *
+ * true  = a cadeia terminou (ou passou) em https:// — porta 80 só serve de entrada.
+ * false = terminou em http:// (sem redirect, ou redirect só entre paths/hosts http).
+ * null  = não foi possível determinar (porta 80 inacessível, timeout, erro de rede) —
+ *         nunca deve ser lido como "sem problema", só como "sem dados".
+ */
+function checkHttpToHttps(url: string, redirectsLeft = 3): Promise<boolean | null> {
+  return new Promise((resolve) => {
+    const req = http.get(
+      url,
+      {
+        timeout: 8000,
+        headers: { "User-Agent": "Mozilla/5.0 NIS2-Scanner/1.0 (+https://nis2.pt)" },
+        lookup: safeLookup,
+      },
+      (res) => {
+        const location = res.headers["location"];
+        const status   = res.statusCode;
+        res.destroy();
+
+        if ((status === 301 || status === 302 || status === 307 || status === 308) && location && redirectsLeft > 0) {
+          const next = location.startsWith("http") ? location : new URL(location, url).href;
+          if (next.startsWith("https://")) {
+            resolve(true);
+            return;
+          }
+          assertSafeRedirect(next)
+            .then(() => checkHttpToHttps(next, redirectsLeft - 1).then(resolve))
+            .catch(() => resolve(null));
+          return;
+        }
+
+        resolve(false); // respondeu em http://, sem (mais) redirect
+      }
+    );
+    req.on("error", () => resolve(null));
+    req.on("timeout", () => { req.destroy(); resolve(null); });
   });
 }
 
@@ -220,6 +267,9 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
   let usedUrl = httpsUrl;
   let isHttps = true;
 
+  // Independente do fluxo https/http acima — verifica sempre para onde a porta 80 aponta.
+  const httpRedirectsToHttps = await checkHttpToHttps(httpUrl);
+
   try {
     headers = await fetchHeaders(httpsUrl);
   } catch {
@@ -228,7 +278,7 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
       usedUrl = httpUrl;
       isHttps = false;
     } catch {
-      return { checks: UNREACHABLE_CHECKS, score: null, url: httpsUrl };
+      return { checks: UNREACHABLE_CHECKS, score: null, url: httpsUrl, httpRedirectsToHttps };
     }
   }
 
@@ -253,5 +303,5 @@ export async function checkHttpHeaders(target: string): Promise<HttpHeadersResul
     else if (check.status === "warn") deduction += 5;
   }
 
-  return { checks, score: Math.max(0, 100 - deduction), url: usedUrl, serverBanner };
+  return { checks, score: Math.max(0, 100 - deduction), url: usedUrl, serverBanner, httpRedirectsToHttps };
 }

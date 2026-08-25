@@ -10,6 +10,7 @@ import { freeProcedure, checkScanLimit } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback, isIpAddress, buildVerificationToken } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan, getLatestCompletedQuestionnaireForOrg } from "../db";
 import { combinedNis2Scores, overallCombinedScore, threeScores } from "../utils/combined-score";
+import { validateControls, summarizeValidations, type ScanResultData } from "../utils/control-validation";
 import type { NIS2ArticleScore } from "../services/scan-executor";
 import { getRedisClient } from "../middlewares/rateLimit";
 import { isSafeTarget } from "../middlewares/security";
@@ -434,6 +435,50 @@ export const scanRouter = {
         threeScores: threeScores(combined),
         hasQuestionnaire: qScores !== null,
         questionnaireCompletedAt: qSession?.completedAt ?? null,
+      };
+    }),
+
+  /**
+   * Control Validation — cruza as respostas do questionário com evidência técnica
+   * do scanner para os 42 controlos do Art. 21(2). Só 6 têm regra técnica hoje
+   * (ver backend/utils/control-validation.ts); os restantes ficam "self_declared".
+   */
+  controlValidation: freeProcedure
+    .input(z.object({ scanId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const scan = await getScanById(input.scanId);
+      if (!scan) throw new TRPCError({ code: "NOT_FOUND", message: "Scan não encontrado" });
+      if (scan.organizationId !== ctx.org.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão" });
+      }
+
+      const qSession   = await getLatestCompletedQuestionnaireForOrg(ctx.org.id);
+      const answersArr = (qSession?.answers as Array<{ controlId: string; answer: string }> | null) ?? [];
+      const answers    = Object.fromEntries(answersArr.map((a) => [a.controlId, a.answer]));
+
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+      const recentScans = await getScansByOrgId(ctx.org.id, 200);
+      const scansLast12Months = recentScans.filter(
+        (s) => s.status === "completed" && s.completedAt && new Date(s.completedAt) >= twelveMonthsAgo
+      ).length;
+
+      const results  = (scan.results as any) ?? {};
+      const scanData: ScanResultData = {
+        vulnerabilities:     results.vulnerabilities ?? [],
+        tlsIssues:           results.tlsIssues ?? [],
+        openPorts:           results.openPorts ?? [],
+        httpHeaderChecks:    results.httpHeaders?.checks ?? [],
+        emailSecurityChecks: results.emailSecurity?.checks ?? [],
+        httpRedirectsToHttps: results.httpHeaders?.httpRedirectsToHttps ?? null,
+        scansLast12Months,
+      };
+
+      const validations = await validateControls(answers, scanData);
+
+      return {
+        validations,
+        summary: summarizeValidations(validations),
       };
     }),
 };
