@@ -50,13 +50,33 @@ describe("validateControls — e-2 (gestão de patches)", () => {
     const r = await find({ "e-2": "yes" }, scan, "e-2");
     expect(r.state).toBe("contradicted");
     expect(r.source).toBe("scanner");
-    expect(r.evidence[0]).toContain("CVE-2024-1234");
+    expect(r.evidence[0]).toContain("1 vulnerabilidade de severidade alta ou crítica");
+    expect(r.evidence.some((e) => e.includes("CVE-2024-1234"))).toBe(true);
   });
 
   it("yes + zero CVEs ≥7 → verified", async () => {
     const scan = emptyScan({ vulnerabilities: [{ cveId: "CVE-2024-0001", cvssScore: 3.1, affectedService: "nginx" }] });
     const r = await find({ "e-2": "yes" }, scan, "e-2");
     expect(r.state).toBe("verified");
+  });
+
+  it("30 CVEs críticos → evidence.length <= 5, agregado + top 3 por CVSS + 'e mais 27'", async () => {
+    const vulnerabilities = Array.from({ length: 30 }, (_, i) => ({
+      cveId: `CVE-2024-${1000 + i}`,
+      cvssScore: 7 + (i % 3), // 7, 8, 9 a rodar — o de CVSS 9 (índices 2,5,8,...) deve ficar no topo
+      affectedService: "openssh",
+    }));
+    // Garante um CVSS claramente mais alto que todos os outros, para confirmar a ordenação.
+    vulnerabilities[15] = { cveId: "CVE-2024-9999", cvssScore: 9.8, affectedService: "openssh" };
+
+    const scan = emptyScan({ vulnerabilities });
+    const r = await find({ "e-2": "yes" }, scan, "e-2");
+
+    expect(r.state).toBe("contradicted");
+    expect(r.evidence.length).toBeLessThanOrEqual(5);
+    expect(r.evidence[0]).toBe("30 vulnerabilidades de severidade alta ou crítica em serviços expostos");
+    expect(r.evidence[1]).toContain("CVE-2024-9999"); // CVSS 9.8 — o mais alto, deve vir primeiro
+    expect(r.evidence.at(-1)).toBe("... e mais 27. Ver a secção Vulnerabilidades para a lista completa.");
   });
 
   it("respondeu 'no' com CVE crítico presente → NÃO contradiz, é verified_noncompliant", async () => {
@@ -66,7 +86,7 @@ describe("validateControls — e-2 (gestão de patches)", () => {
     const r = await find({ "e-2": "no" }, scan, "e-2");
     expect(r.state).toBe("verified_noncompliant");
     expect(r.source).toBe("scanner");
-    expect(r.evidence[0]).toContain("CVE-2024-1234");
+    expect(r.evidence.some((e) => e.includes("CVE-2024-1234"))).toBe(true);
   });
 
   it("respondeu 'no' sem CVEs críticos → self_declared (nada confirma a admissão)", async () => {

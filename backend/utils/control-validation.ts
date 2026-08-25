@@ -80,6 +80,20 @@ function classify(answer: string | null, hasFailureEvidence: boolean): Validatio
   return "self_declared";
 }
 
+/**
+ * Garante no máximo `max` linhas de evidência — nenhuma regra deve produzir uma parede
+ * de texto (a lista completa já existe na secção Vulnerabilidades). Quando há mais
+ * achados do que cabem, mantém os primeiros e agrega o resto numa última linha.
+ * e-2 tem o seu próprio formato agregado (conta + top 3 por CVSS); esta função serve
+ * as restantes regras, cuja lista de achados não tem uma ordenação natural por severidade.
+ */
+function capEvidence(lines: string[], max = 5): string[] {
+  if (lines.length <= max) return lines;
+  const kept = lines.slice(0, max - 1);
+  const rest = lines.length - kept.length;
+  return [...kept, `... e mais ${rest} achado${rest === 1 ? "" : "s"}.`];
+}
+
 // ---------------------------------------------------------------------------
 // As 6 regras — e-2, e-3, h-2, j-5 avaliam evidência de falha e classificam via
 // classify() acima (só reagem a "yes"/"no"/"partial" — "na"/ausente ficam
@@ -92,16 +106,31 @@ function validateE2(answer: string | null, scan: ScanResultData): ControlValidat
   const coverage = "Apenas software exposto à internet. Sistemas internos não verificados.";
   if (answer !== "yes" && answer !== "no" && answer !== "partial") return selfDeclared("e-2", answer);
 
-  const highCves = scan.vulnerabilities.filter((v) => v.cvssScore >= 7);
+  const highCves = scan.vulnerabilities
+    .filter((v) => v.cvssScore >= 7)
+    .sort((a, b) => b.cvssScore - a.cvssScore);
   const hasFailureEvidence = highCves.length > 0;
   const state = classify(answer, hasFailureEvidence);
   if (state === "self_declared") return selfDeclared("e-2", answer);
 
-  const evidence = hasFailureEvidence
-    ? highCves.map(
+  let evidence: string[];
+  if (hasFailureEvidence) {
+    const n = highCves.length;
+    // Agregado + top 3 por CVSS — nunca a lista completa (pode ter dezenas). O detalhe
+    // integral já vive na secção Vulnerabilidades; aqui é só o suficiente para justificar
+    // o estado do controlo.
+    evidence = [`${n} vulnerabilidade${n === 1 ? "" : "s"} de severidade alta ou crítica em serviços expostos`];
+    evidence.push(
+      ...highCves.slice(0, 3).map(
         (v) => `${v.cveId} (CVSS ${v.cvssScore.toFixed(1)}) em ${v.affectedService}${v.port ? ` (porta ${v.port})` : ""}`
       )
-    : ["Nenhuma vulnerabilidade crítica/alta (CVSS ≥ 7) detetada nos serviços expostos."];
+    );
+    if (n > 3) {
+      evidence.push(`... e mais ${n - 3}. Ver a secção Vulnerabilidades para a lista completa.`);
+    }
+  } else {
+    evidence = ["Nenhuma vulnerabilidade crítica/alta (CVSS ≥ 7) detetada nos serviços expostos."];
+  }
 
   return { controlId: "e-2", answer, state, source: "scanner", coverage, evidence };
 }
@@ -123,7 +152,7 @@ async function validateE3(answer: string | null, scan: ScanResultData): Promise<
   if (state === "self_declared") return selfDeclared("e-3", answer);
 
   const evidence = hasFailureEvidence
-    ? failureEvidence
+    ? capEvidence(failureEvidence)
     : ["Nenhum serviço em fim de vida (EOL) confirmado pelo endoflife.date nos sistemas expostos."];
 
   return { controlId: "e-3", answer, state, source: "scanner", coverage, evidence };
@@ -155,7 +184,7 @@ function validateH2(answer: string | null, scan: ScanResultData): ControlValidat
   const state = classify(answer, hasFailureEvidence);
   if (state === "self_declared") return selfDeclared("h-2", answer);
 
-  const evidence = hasFailureEvidence ? failureEvidence : ["Sem problemas de TLS detetados e HSTS ativo."];
+  const evidence = hasFailureEvidence ? capEvidence(failureEvidence) : ["Sem problemas de TLS detetados e HSTS ativo."];
 
   return { controlId: "h-2", answer, state, source: "scanner", coverage, evidence };
 }
@@ -179,7 +208,7 @@ function validateJ5(answer: string | null, scan: ScanResultData): ControlValidat
   const state = classify(answer, hasFailureEvidence);
   if (state === "self_declared") return selfDeclared("j-5", answer);
 
-  const evidence = hasFailureEvidence ? failureEvidence : ["Portas de email em claro fechadas e SPF/DMARC configurados."];
+  const evidence = hasFailureEvidence ? capEvidence(failureEvidence) : ["Portas de email em claro fechadas e SPF/DMARC configurados."];
 
   return { controlId: "j-5", answer, state, source: "scanner", coverage, evidence };
 }
@@ -205,7 +234,7 @@ function validateI5(answer: string | null, scan: ScanResultData): ControlValidat
     // Nunca "contradicted" — pode haver VPN legítima à frente destas portas.
     return {
       controlId: "i-5", answer, state: "unconfirmed", source: "scanner", coverage,
-      evidence: exposed.map((p) => `Serviço de administração remota exposto (porta ${p.port}). Confirme se está protegido por VPN.`),
+      evidence: capEvidence(exposed.map((p) => `Serviço de administração remota exposto (porta ${p.port}). Confirme se está protegido por VPN.`)),
     };
   }
   return {
