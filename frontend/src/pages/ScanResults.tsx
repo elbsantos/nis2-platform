@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import Nis2ScoreChart from "../components/Nis2ScoreChart";
@@ -7,8 +8,11 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Icon } from "../components/ui/Icon";
-import { Shield, AlertTriangle, Check } from "lucide-react";
-import { sevCardClass, sevBadgeClass, sevLabel } from "../lib/remediationTones";
+import {
+  Shield, AlertTriangle, Check, CheckCircle2, XCircle, HelpCircle,
+  FileQuestion, ChevronDown, ChevronUp,
+} from "lucide-react";
+import { sevCardClass, sevBadgeClass, sevLabel, toneClasses } from "../lib/remediationTones";
 
 const POLL_INTERVAL = 4_000;
 
@@ -196,6 +200,9 @@ export default function ScanResults() {
           <SummaryCard label="Duração"  value={scan.completedAt ? elapsedLabel(scan.startedAt, scan.completedAt) : "—"} />
         </div>
 
+        {/* Três scores — Security / Compliance / Risk (substitui o score único como métrica de topo) */}
+        {combinedData?.threeScores && <ThreeScoreCards scores={combinedData.threeScores} />}
+
         {/* NIS2 Score chart */}
         <Card as="section" className="p-6">
           <h2 className="text-2xl font-semibold text-text mb-4">Score NIS2 por Artigo</h2>
@@ -211,6 +218,9 @@ export default function ScanResults() {
             <p className="text-xl text-dim">Dados de score não disponíveis para este scan.</p>
           )}
         </Card>
+
+        {/* Control Validation — cruzamento questionário × evidência técnica, controlo a controlo */}
+        {scanDone && <ControlValidationSection scanId={scan.id} />}
 
         {/* TLS & Certificates */}
         {results?.directTls && (
@@ -316,6 +326,251 @@ function SummaryCard({
     <Card className="p-5 text-center">
       <p className={`text-4xl font-bold ${color}`}>{value}</p>
       <p className="text-lg text-dim mt-1">{label}</p>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Três scores — Security / Compliance / Risk (backend/utils/combined-score.ts)
+// ---------------------------------------------------------------------------
+
+type Tone = "ok" | "warn" | "bad" | "neutral";
+
+function scoreTone(value: number | null): Tone {
+  if (value === null) return "neutral";
+  if (value >= 80) return "ok";
+  if (value >= 60) return "warn";
+  return "bad";
+}
+
+const RISK_LABEL_TONE: Record<string, Tone> = {
+  "Baixo":   "ok",
+  "Médio":   "warn",
+  "Alto":    "bad",
+  "Crítico": "bad",
+};
+
+interface ThreeScoresData {
+  security:          number | null;
+  compliance:        number | null;
+  risk:              number;
+  riskLabel:         "Baixo" | "Médio" | "Alto" | "Crítico";
+  divergence:        number;
+  divergentMeasures: string[];
+}
+
+function ScoreCard({ label, value, tone, description }: { label: string; value: string; tone: Tone; description: string }) {
+  return (
+    <div className={`rounded-[12px] p-5 ${toneClasses[tone]}`}>
+      <p className="text-sm font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="text-4xl font-bold mt-1">{value}</p>
+      <p className="text-sm mt-2 opacity-80">{description}</p>
+    </div>
+  );
+}
+
+function ThreeScoreCards({ scores }: { scores: ThreeScoresData }) {
+  return (
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <ScoreCard
+          label="Security Score"
+          value={scores.security !== null ? String(scores.security) : "—"}
+          tone={scoreTone(scores.security)}
+          description="Quanto a superfície técnica está protegida"
+        />
+        <ScoreCard
+          label="Compliance Score"
+          value={scores.compliance !== null ? String(scores.compliance) : "—"}
+          tone={scoreTone(scores.compliance)}
+          description="Quanto dos controlos aplicáveis foram declarados"
+        />
+        <ScoreCard
+          label="Risk Score"
+          value={scores.riskLabel}
+          tone={RISK_LABEL_TONE[scores.riskLabel] ?? "neutral"}
+          description={`${scores.risk}/100`}
+        />
+      </div>
+      {scores.security !== null && scores.compliance !== null &&
+       scores.compliance > scores.security && scores.divergence > 15 && (
+        <p className="text-sm text-warn mt-3 flex items-center gap-2">
+          <Icon as={AlertTriangle} size={15} />
+          A autoavaliação declara mais conformidade do que a evidência técnica mostra.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Control Validation — cruzamento questionário × evidência técnica (42 controlos)
+// ---------------------------------------------------------------------------
+
+type ValidationState = "verified" | "contradicted" | "unconfirmed" | "self_declared";
+
+interface ControlValidationRow {
+  controlId: string;
+  answer:    string | null;
+  state:     ValidationState;
+  evidence:  string[];
+  coverage:  string | null;
+  source:    "scanner" | null;
+}
+
+interface ControlMeta {
+  id:            string;
+  articleSlug:   string;
+  articleTitle:  string;
+  question:      string;
+}
+
+const STATE_META: Record<ValidationState, { label: string; tone: Tone; icon: typeof CheckCircle2 }> = {
+  verified:      { label: "Verificado",    tone: "ok",      icon: CheckCircle2 },
+  contradicted:  { label: "Contraditado",  tone: "bad",     icon: XCircle },
+  unconfirmed:   { label: "A confirmar",   tone: "warn",    icon: HelpCircle },
+  self_declared: { label: "Autodeclarado", tone: "neutral", icon: FileQuestion },
+};
+
+const MEASURE_ORDER = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+
+function ControlRow({ control, meta }: { control: ControlValidationRow; meta?: ControlMeta }) {
+  const stateMeta = STATE_META[control.state];
+  return (
+    <div className={`border rounded-[10px] p-4 ${control.state === "contradicted" ? "border-bad/30 bg-bad/5" : "border-line"}`}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <p className="text-sm text-text font-medium flex-1">
+          <span className="font-mono text-faint mr-2">{control.controlId}</span>
+          {meta?.question ?? "—"}
+        </p>
+        <Badge tone={stateMeta.tone}>
+          <Icon as={stateMeta.icon} size={13} />
+          {stateMeta.label}
+        </Badge>
+      </div>
+      {control.evidence.length > 0 && (
+        <ul className="space-y-1 mb-2">
+          {control.evidence.map((e, i) => (
+            <li key={i} className="text-sm text-dim flex items-start gap-2">
+              <Icon as={stateMeta.icon} size={13} className="mt-0.5 shrink-0 opacity-70" />
+              {e}
+            </li>
+          ))}
+        </ul>
+      )}
+      {control.coverage && (
+        <p className="text-xs text-faint">O que não é verificado: {control.coverage}</p>
+      )}
+    </div>
+  );
+}
+
+function MeasureSection({ slug, title, controls, metaById }: {
+  slug: string; title: string; controls: ControlValidationRow[]; metaById: Map<string, ControlMeta>;
+}) {
+  const visible = controls.filter((c) => c.state !== "self_declared");
+  if (visible.length === 0) return null;
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-faint uppercase tracking-wide mb-2">
+        {slug} · {title}
+      </h3>
+      <div className="space-y-2">
+        {visible.map((c) => <ControlRow key={c.controlId} control={c} meta={metaById.get(c.controlId)} />)}
+      </div>
+    </div>
+  );
+}
+
+function SelfDeclaredBlock({ controls, metaById }: { controls: ControlValidationRow[]; metaById: Map<string, ControlMeta> }) {
+  const [open, setOpen] = useState(false);
+  if (controls.length === 0) return null;
+
+  return (
+    <div className="border border-line rounded-[12px] p-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-start justify-between gap-4 text-left"
+      >
+        <div>
+          <p className="text-sm font-semibold text-text">
+            {controls.length} controlos apenas declarados — sem fonte técnica que os verifique
+          </p>
+          <p className="text-sm text-dim mt-1.5 max-w-[70ch]">
+            Estes controlos dependem da sua declaração. Nenhuma ferramenta de conformidade os verifica hoje —
+            nós dizemos-lhe quais são. O nosso roadmap leva a verificação técnica a 30 dos 42 controlos.
+          </p>
+        </div>
+        <Icon as={open ? ChevronUp : ChevronDown} className="shrink-0 mt-1 text-dim" />
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-4 border-t border-line pt-4">
+          {MEASURE_ORDER.map((slug) => {
+            const inMeasure = controls.filter((c) => metaById.get(c.controlId)?.articleSlug === slug);
+            if (inMeasure.length === 0) return null;
+            const title = metaById.get(inMeasure[0].controlId)?.articleTitle ?? "";
+            return (
+              <div key={slug}>
+                <h4 className="text-xs font-semibold text-faint uppercase tracking-wide mb-1.5">{slug} · {title}</h4>
+                <ul className="space-y-1">
+                  {inMeasure.map((c) => (
+                    <li key={c.controlId} className="text-sm text-dim">
+                      <span className="font-mono text-faint mr-2">{c.controlId}</span>
+                      {metaById.get(c.controlId)?.question}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ControlValidationSection({ scanId }: { scanId: number }) {
+  const { data } = trpc.scan.controlValidation.useQuery({ scanId });
+  const { data: controlsData } = trpc.questionnaire.controls.useQuery();
+
+  if (!data || !controlsData) return null;
+
+  const metaById = new Map<string, ControlMeta>(controlsData.map((c) => [c.id, c]));
+  const selfDeclared = data.validations.filter((v) => v.state === "self_declared");
+  const { summary } = data;
+
+  return (
+    <Card as="section" className="p-6">
+      <h2 className="text-2xl font-semibold text-text mb-1">Control Validation</h2>
+      <p className="text-dim mb-4">
+        Cruzamos a sua declaração no questionário com a evidência técnica do scan, controlo a controlo.
+      </p>
+
+      <p className="text-lg mb-6">
+        <span className="text-ok font-semibold">{summary.verified} verificados</span>
+        <span className="text-dim"> · </span>
+        <span className="text-bad font-semibold">{summary.contradicted} contraditados</span>
+        <span className="text-dim"> · </span>
+        <span className="text-warn font-semibold">{summary.unconfirmed} a confirmar</span>
+        <span className="text-dim"> · </span>
+        <span className="text-text font-semibold">{summary.selfDeclared} autodeclarados</span>
+        <span className="text-faint"> (de 42)</span>
+      </p>
+
+      <div className="space-y-6">
+        {MEASURE_ORDER.map((slug) => {
+          const inMeasure = data.validations.filter((v) => metaById.get(v.controlId)?.articleSlug === slug);
+          const title = metaById.get(inMeasure[0]?.controlId)?.articleTitle ?? "";
+          return <MeasureSection key={slug} slug={slug} title={title} controls={inMeasure} metaById={metaById} />;
+        })}
+      </div>
+
+      <div className="mt-6">
+        <SelfDeclaredBlock controls={selfDeclared} metaById={metaById} />
+      </div>
     </Card>
   );
 }
