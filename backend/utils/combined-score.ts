@@ -134,3 +134,86 @@ export function overallCombinedScore(combined: CombinedArticleScore[]): number {
   const sum = scored.reduce((acc, s) => acc + s.combinedScore!, 0);
   return Math.round(sum / scored.length);
 }
+
+// ---------------------------------------------------------------------------
+// threeScores — separa o score único em três dimensões: Security / Compliance / Risk
+// ---------------------------------------------------------------------------
+
+export interface ThreeScores {
+  security:          number | null;   // média dos scanScore das medidas com scan
+  compliance:        number | null;   // média dos questionnaireScore das medidas respondidas
+  risk:              number;          // 0-100, ver regra abaixo — nunca a média dos outros dois
+  riskLabel:         "Baixo" | "Médio" | "Alto" | "Crítico";
+  divergence:        number;          // |security - compliance|, 0 se faltar uma fonte
+  divergentMeasures: string[];        // slugs das medidas com CombinedArticleScore.divergent
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+}
+
+function riskLabelFor(risk: number): ThreeScores["riskLabel"] {
+  if (risk < 25) return "Baixo";
+  // Limiar <= 50 (e não < 50) para que a posição neutra de "sem dados" (risk=50) apareça como
+  // "Médio" e não "Alto" — presumir risco alto sem evidência é tão errado quanto presumir baixo.
+  if (risk <= 50) return "Médio";
+  if (risk < 75) return "Alto";
+  return "Crítico";
+}
+
+/**
+ * Separa o score único (overallCombinedScore) em três dimensões:
+ *   - security:   média dos scanScore das medidas com scan — exposição técnica OBSERVADA.
+ *   - compliance: média dos questionnaireScore das medidas respondidas — o que a empresa
+ *                 DECLARA sobre si própria.
+ *   - risk:       o risco NÃO é a média dos outros dois. Parte da exposição técnica e é
+ *                 AGRAVADO pela divergência quando a empresa declara melhor do que a
+ *                 exposição real mostra — uma organização que se autoavalia bem mas tem
+ *                 exposição técnica alta opera com uma imagem falsa de si própria, e isso
+ *                 é risco acrescido, não neutro. O inverso (declarar pior do que é) não é
+ *                 penalizado — é apenas prudência, não uma falha de perceção perigosa.
+ *
+ *   base          = 100 - security
+ *   penalização   = compliance > security ? (compliance - security) * 0.5 : 0
+ *   risk          = min(100, base + penalização)
+ *
+ * Sem scan (security === null): o risco baseia-se só no compliance (100 - compliance), sem
+ * penalização — não há exposição técnica observada com que comparar a autoavaliação, logo
+ * não há "declarar melhor do que a realidade" a detetar. Mas NUNCA se assume risco baixo só
+ * por falta de scan.
+ *
+ * Sem scan NEM questionário: risco totalmente desconhecido. Assume-se "Médio" (50) como
+ * posição neutra deliberada — nem otimista (inventar "Baixo" por ausência de dados seria
+ * exatamente o erro que esta função existe para evitar) nem alarmista sem fundamento.
+ */
+export function threeScores(scores: CombinedArticleScore[]): ThreeScores {
+  const securityValues   = scores.filter((s) => s.scanScore !== null).map((s) => s.scanScore as number);
+  const complianceValues = scores.filter((s) => s.questionnaireScore !== null).map((s) => s.questionnaireScore as number);
+
+  const security   = average(securityValues);
+  const compliance = average(complianceValues);
+
+  let risk: number;
+  if (security !== null) {
+    const base        = 100 - security;
+    const penalizacao = compliance !== null && compliance > security ? (compliance - security) * 0.5 : 0;
+    risk = Math.round(Math.min(100, base + penalizacao));
+  } else if (compliance !== null) {
+    risk = 100 - compliance;
+  } else {
+    risk = 50;
+  }
+
+  const divergence = security !== null && compliance !== null ? Math.abs(security - compliance) : 0;
+  const divergentMeasures = scores.filter((s) => s.divergent).map((s) => s.slug);
+
+  return {
+    security,
+    compliance,
+    risk,
+    riskLabel: riskLabelFor(risk),
+    divergence,
+    divergentMeasures,
+  };
+}

@@ -9,7 +9,7 @@ import { TRPCError } from "@trpc/server";
 import { freeProcedure, checkScanLimit } from "../middlewares/planGuard";
 import { executeAgentlessScan, verifyOwnership, verifyOwnershipWithRootFallback, isIpAddress, buildVerificationToken } from "../services/scan-executor";
 import { createScan, getScanById, getScansByOrgId, getScansByBatchId, getRecentCompletedScan, getLatestCompletedQuestionnaireForOrg } from "../db";
-import { combinedNis2Scores, overallCombinedScore } from "../utils/combined-score";
+import { combinedNis2Scores, overallCombinedScore, threeScores } from "../utils/combined-score";
 import type { NIS2ArticleScore } from "../services/scan-executor";
 import { getRedisClient } from "../middlewares/rateLimit";
 import { isSafeTarget } from "../middlewares/security";
@@ -431,6 +431,7 @@ export const scanRouter = {
       return {
         combined,
         overallCombined,
+        threeScores: threeScores(combined),
         hasQuestionnaire: qScores !== null,
         questionnaireCompletedAt: qSession?.completedAt ?? null,
       };
