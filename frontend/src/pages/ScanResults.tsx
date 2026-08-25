@@ -10,7 +10,7 @@ import { Badge } from "../components/ui/Badge";
 import { Icon } from "../components/ui/Icon";
 import {
   Shield, AlertTriangle, Check, CheckCircle2, XCircle, HelpCircle,
-  FileQuestion, ChevronDown, ChevronUp,
+  FileQuestion, ChevronDown, ChevronUp, AlertCircle,
 } from "lucide-react";
 import { sevCardClass, sevBadgeClass, sevLabel, toneClasses } from "../lib/remediationTones";
 
@@ -407,7 +407,7 @@ function ThreeScoreCards({ scores }: { scores: ThreeScoresData }) {
 // Control Validation — cruzamento questionário × evidência técnica (42 controlos)
 // ---------------------------------------------------------------------------
 
-type ValidationState = "verified" | "contradicted" | "unconfirmed" | "self_declared";
+type ValidationState = "verified" | "verified_noncompliant" | "contradicted" | "unconfirmed" | "self_declared";
 
 interface ControlValidationRow {
   controlId: string;
@@ -426,10 +426,11 @@ interface ControlMeta {
 }
 
 const STATE_META: Record<ValidationState, { label: string; tone: Tone; icon: typeof CheckCircle2 }> = {
-  verified:      { label: "Verificado",    tone: "ok",      icon: CheckCircle2 },
-  contradicted:  { label: "Contraditado",  tone: "bad",     icon: XCircle },
-  unconfirmed:   { label: "A confirmar",   tone: "warn",    icon: HelpCircle },
-  self_declared: { label: "Autodeclarado", tone: "neutral", icon: FileQuestion },
+  verified:              { label: "Verificado",              tone: "ok",      icon: CheckCircle2 },
+  verified_noncompliant: { label: "Verificado — não conforme", tone: "warn",  icon: AlertCircle },
+  contradicted:          { label: "Contraditado",             tone: "bad",     icon: XCircle },
+  unconfirmed:           { label: "A confirmar",              tone: "warn",    icon: HelpCircle },
+  self_declared:         { label: "Autodeclarado",            tone: "neutral", icon: FileQuestion },
 };
 
 const MEASURE_ORDER = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
@@ -551,6 +552,8 @@ function ControlValidationSection({ scanId }: { scanId: number }) {
 
       <p className="text-lg mb-6">
         <span className="text-ok font-semibold">{summary.verified} verificados</span>
+        <span className="text-dim"> · </span>
+        <span className="text-warn font-semibold">{summary.verifiedNoncompliant} não conformes</span>
         <span className="text-dim"> · </span>
         <span className="text-bad font-semibold">{summary.contradicted} contraditados</span>
         <span className="text-dim"> · </span>

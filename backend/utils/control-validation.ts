@@ -24,10 +24,11 @@ import { isEol } from "../integrations/endoflife";
 // ---------------------------------------------------------------------------
 
 export type ValidationState =
-  | "verified"        // evidência técnica confirma a resposta
-  | "contradicted"    // evidência técnica contraria a resposta
-  | "unconfirmed"      // sinal presente mas não conclusivo — mostra evidência, sem veredicto
-  | "self_declared";   // sem fonte técnica que o verifique
+  | "verified"               // afirma cumprir + evidência confirma
+  | "verified_noncompliant"  // afirma NÃO cumprir + evidência confirma que não cumpre
+  | "contradicted"           // afirma cumprir + evidência contraria
+  | "unconfirmed"             // sinal presente mas não conclusivo — mostra evidência, sem veredicto
+  | "self_declared";          // sem fonte técnica que o verifique
 
 export interface ControlValidation {
   controlId: string;          // "e-2"
@@ -62,105 +63,125 @@ function selfDeclared(controlId: string, answer: string | null): ControlValidati
   return { controlId, answer, state: "self_declared", evidence: [], coverage: null, source: null };
 }
 
+/**
+ * Classifica um controlo com "evidência de falha" (e-2, e-3, h-2, j-5) cruzando a
+ * resposta com a presença ou ausência dessa evidência:
+ *   - "yes"              + evidência de falha     → contradicted
+ *   - "yes"              + sem evidência de falha  → verified
+ *   - "no"/"partial"     + evidência de falha      → verified_noncompliant (a empresa
+ *     admitiu a lacuna E a evidência confirma-a — é verificação, não só declaração)
+ *   - "no"/"partial"     + sem evidência de falha   → self_declared (a empresa diz que
+ *     não cumpre, mas nada o confirma tecnicamente — não há prova, só a palavra dela)
+ *   - "na"/null                                     → self_declared
+ */
+function classify(answer: string | null, hasFailureEvidence: boolean): ValidationState {
+  if (answer === "yes") return hasFailureEvidence ? "contradicted" : "verified";
+  if (answer === "no" || answer === "partial") return hasFailureEvidence ? "verified_noncompliant" : "self_declared";
+  return "self_declared";
+}
+
 // ---------------------------------------------------------------------------
-// As 6 regras — só avaliam tecnicamente quando a empresa respondeu "yes"
-// (exceto f-2, que não depende da resposta). "Só quem afirma pode ser
-// contraditado": respostas "no"/"partial"/"na"/ausentes ficam self_declared
-// nestes 6 controlos, tal como nos outros 36 — não há regra definida para
-// confirmar tecnicamente uma admissão de lacuna.
+// As 6 regras — e-2, e-3, h-2, j-5 avaliam evidência de falha e classificam via
+// classify() acima (só reagem a "yes"/"no"/"partial" — "na"/ausente ficam
+// self_declared sem gastar trabalho a computar evidência). f-2 e i-5 não seguem
+// este padrão: f-2 é auto-evidência (não depende da resposta), i-5 usa sinal
+// indireto e nunca é conclusivo (nunca gera verified_noncompliant nem contradicted).
 // ---------------------------------------------------------------------------
 
 function validateE2(answer: string | null, scan: ScanResultData): ControlValidation {
   const coverage = "Apenas software exposto à internet. Sistemas internos não verificados.";
-  if (answer !== "yes") return selfDeclared("e-2", answer);
+  if (answer !== "yes" && answer !== "no" && answer !== "partial") return selfDeclared("e-2", answer);
 
   const highCves = scan.vulnerabilities.filter((v) => v.cvssScore >= 7);
-  if (highCves.length > 0) {
-    return {
-      controlId: "e-2", answer, state: "contradicted", source: "scanner", coverage,
-      evidence: highCves.map(
+  const hasFailureEvidence = highCves.length > 0;
+  const state = classify(answer, hasFailureEvidence);
+  if (state === "self_declared") return selfDeclared("e-2", answer);
+
+  const evidence = hasFailureEvidence
+    ? highCves.map(
         (v) => `${v.cveId} (CVSS ${v.cvssScore.toFixed(1)}) em ${v.affectedService}${v.port ? ` (porta ${v.port})` : ""}`
-      ),
-    };
-  }
-  return {
-    controlId: "e-2", answer, state: "verified", source: "scanner", coverage,
-    evidence: ["Nenhuma vulnerabilidade crítica/alta (CVSS ≥ 7) detetada nos serviços expostos."],
-  };
+      )
+    : ["Nenhuma vulnerabilidade crítica/alta (CVSS ≥ 7) detetada nos serviços expostos."];
+
+  return { controlId: "e-2", answer, state, source: "scanner", coverage, evidence };
 }
 
 async function validateE3(answer: string | null, scan: ScanResultData): Promise<ControlValidation> {
   const coverage = "Verifica produtos expostos com versão detetável. Sistemas internos e produtos sem dados públicos de fim de suporte não são verificados.";
-  if (answer !== "yes") return selfDeclared("e-3", answer);
+  if (answer !== "yes" && answer !== "no" && answer !== "partial") return selfDeclared("e-3", answer);
 
-  const evidence: string[] = [];
+  const failureEvidence: string[] = [];
   for (const p of scan.openPorts) {
     if (!p.product || !p.version) continue;
     const result = await isEol(p.product, p.version);
     if (result.eol) {
-      evidence.push(`${p.product} ${p.version} — suporte terminou em ${result.eolDate ?? "data não especificada"} (porta ${p.port})`);
+      failureEvidence.push(`${p.product} ${p.version} — suporte terminou em ${result.eolDate ?? "data não especificada"} (porta ${p.port})`);
     }
   }
+  const hasFailureEvidence = failureEvidence.length > 0;
+  const state = classify(answer, hasFailureEvidence);
+  if (state === "self_declared") return selfDeclared("e-3", answer);
 
-  if (evidence.length > 0) {
-    return { controlId: "e-3", answer, state: "contradicted", source: "scanner", coverage, evidence };
-  }
-  return {
-    controlId: "e-3", answer, state: "verified", source: "scanner", coverage,
-    evidence: ["Nenhum serviço em fim de vida (EOL) confirmado pelo endoflife.date nos sistemas expostos."],
-  };
+  const evidence = hasFailureEvidence
+    ? failureEvidence
+    : ["Nenhum serviço em fim de vida (EOL) confirmado pelo endoflife.date nos sistemas expostos."];
+
+  return { controlId: "e-3", answer, state, source: "scanner", coverage, evidence };
 }
 
 function validateH2(answer: string | null, scan: ScanResultData): ControlValidation {
   const coverage = "Apenas a superfície web pública. VPN e comunicações internas não verificadas.";
-  if (answer !== "yes") return selfDeclared("h-2", answer);
+  if (answer !== "yes" && answer !== "no" && answer !== "partial") return selfDeclared("h-2", answer);
 
-  const evidence: string[] = [];
+  const failureEvidence: string[] = [];
   // A porta 80 só conta como evidência quando SABEMOS que não redireciona para HTTPS.
   // Se redireciona (true), é boa prática, não problema. Se for null (não foi possível
   // determinar), não se usa o sinal — não inventar contradição por falta de dados.
   if (scan.openPorts.some((p) => p.port === 80) && scan.httpRedirectsToHttps === false) {
-    evidence.push("Porta 80 (HTTP em claro) aberta e sem redirecionamento para HTTPS.");
+    failureEvidence.push("Porta 80 (HTTP em claro) aberta e sem redirecionamento para HTTPS.");
   }
+  // issue.port é sempre 443 (único endpoint TLS verificado) e o texto do issue já é
+  // autoexplicativo — não repetir a porta aqui (ficava "... (porta 443)" duplicado
+  // quando o próprio issue já a menciona).
   for (const issue of scan.tlsIssues) {
-    evidence.push(`${issue.issue} (porta ${issue.port})`);
+    failureEvidence.push(issue.issue);
   }
   const hsts = scan.httpHeaderChecks.find((c) => c.name === "HSTS");
   if (hsts && hsts.status === "fail") {
-    evidence.push("Header HSTS ausente ou mal configurado.");
+    failureEvidence.push("Header HSTS ausente ou mal configurado.");
   }
 
-  if (evidence.length > 0) {
-    return { controlId: "h-2", answer, state: "contradicted", source: "scanner", coverage, evidence };
-  }
-  return {
-    controlId: "h-2", answer, state: "verified", source: "scanner", coverage,
-    evidence: ["Sem problemas de TLS detetados e HSTS ativo."],
-  };
+  const hasFailureEvidence = failureEvidence.length > 0;
+  const state = classify(answer, hasFailureEvidence);
+  if (state === "self_declared") return selfDeclared("h-2", answer);
+
+  const evidence = hasFailureEvidence ? failureEvidence : ["Sem problemas de TLS detetados e HSTS ativo."];
+
+  return { controlId: "h-2", answer, state, source: "scanner", coverage, evidence };
 }
 
 function validateJ5(answer: string | null, scan: ScanResultData): ControlValidation {
   const coverage = "Apenas correio e protocolos expostos. Mensagens internas não verificadas.";
-  if (answer !== "yes") return selfDeclared("j-5", answer);
+  if (answer !== "yes" && answer !== "no" && answer !== "partial") return selfDeclared("j-5", answer);
 
-  const evidence: string[] = [];
+  const failureEvidence: string[] = [];
   for (const port of [25, 110, 143]) {
     if (scan.openPorts.some((p) => p.port === port)) {
-      evidence.push(`Porta ${port} aberta sem confirmação de encriptação TLS.`);
+      failureEvidence.push(`Porta ${port} aberta sem confirmação de encriptação TLS.`);
     }
   }
   const spf = scan.emailSecurityChecks.find((c) => c.name === "SPF");
-  if (spf && spf.status === "fail") evidence.push("Registo SPF ausente ou inválido.");
+  if (spf && spf.status === "fail") failureEvidence.push("Registo SPF ausente ou inválido.");
   const dmarc = scan.emailSecurityChecks.find((c) => c.name === "DMARC");
-  if (dmarc && dmarc.status === "fail") evidence.push("Registo DMARC ausente ou inválido.");
+  if (dmarc && dmarc.status === "fail") failureEvidence.push("Registo DMARC ausente ou inválido.");
 
-  if (evidence.length > 0) {
-    return { controlId: "j-5", answer, state: "contradicted", source: "scanner", coverage, evidence };
-  }
-  return {
-    controlId: "j-5", answer, state: "verified", source: "scanner", coverage,
-    evidence: ["Portas de email em claro fechadas e SPF/DMARC configurados."],
-  };
+  const hasFailureEvidence = failureEvidence.length > 0;
+  const state = classify(answer, hasFailureEvidence);
+  if (state === "self_declared") return selfDeclared("j-5", answer);
+
+  const evidence = hasFailureEvidence ? failureEvidence : ["Portas de email em claro fechadas e SPF/DMARC configurados."];
+
+  return { controlId: "j-5", answer, state, source: "scanner", coverage, evidence };
 }
 
 function validateF2(answer: string | null, scan: ScanResultData): ControlValidation {
@@ -227,16 +248,20 @@ export async function validateControls(
 // ---------------------------------------------------------------------------
 
 export interface ValidationSummary {
-  verified:      number;
-  contradicted:  number;
-  unconfirmed:   number;
-  selfDeclared:  number;
+  verified:             number;
+  verifiedNoncompliant: number;
+  contradicted:         number;
+  unconfirmed:          number;
+  selfDeclared:         number;
 }
 
 export function summarizeValidations(validations: ControlValidation[]): ValidationSummary {
-  const summary: ValidationSummary = { verified: 0, contradicted: 0, unconfirmed: 0, selfDeclared: 0 };
+  const summary: ValidationSummary = {
+    verified: 0, verifiedNoncompliant: 0, contradicted: 0, unconfirmed: 0, selfDeclared: 0,
+  };
   for (const v of validations) {
     if (v.state === "verified") summary.verified++;
+    else if (v.state === "verified_noncompliant") summary.verifiedNoncompliant++;
     else if (v.state === "contradicted") summary.contradicted++;
     else if (v.state === "unconfirmed") summary.unconfirmed++;
     else summary.selfDeclared++;

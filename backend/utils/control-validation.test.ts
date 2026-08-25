@@ -59,13 +59,37 @@ describe("validateControls — e-2 (gestão de patches)", () => {
     expect(r.state).toBe("verified");
   });
 
-  it("respondeu 'no' com CVE crítico presente → NÃO contradiz (self_declared)", async () => {
+  it("respondeu 'no' com CVE crítico presente → NÃO contradiz, é verified_noncompliant", async () => {
     const scan = emptyScan({
       vulnerabilities: [{ cveId: "CVE-2024-1234", cvssScore: 9.1, affectedService: "OpenSSH" }],
     });
     const r = await find({ "e-2": "no" }, scan, "e-2");
+    expect(r.state).toBe("verified_noncompliant");
+    expect(r.source).toBe("scanner");
+    expect(r.evidence[0]).toContain("CVE-2024-1234");
+  });
+
+  it("respondeu 'no' sem CVEs críticos → self_declared (nada confirma a admissão)", async () => {
+    const scan = emptyScan({ vulnerabilities: [{ cveId: "CVE-2024-0001", cvssScore: 3.1, affectedService: "nginx" }] });
+    const r = await find({ "e-2": "no" }, scan, "e-2");
     expect(r.state).toBe("self_declared");
     expect(r.source).toBeNull();
+  });
+
+  it("respondeu 'partial' com CVE crítico presente → verified_noncompliant (mesma lógica do 'no')", async () => {
+    const scan = emptyScan({
+      vulnerabilities: [{ cveId: "CVE-2024-1234", cvssScore: 9.1, affectedService: "OpenSSH" }],
+    });
+    const r = await find({ "e-2": "partial" }, scan, "e-2");
+    expect(r.state).toBe("verified_noncompliant");
+  });
+
+  it("respondeu 'na' com CVE crítico presente → self_declared (na nunca é avaliado)", async () => {
+    const scan = emptyScan({
+      vulnerabilities: [{ cveId: "CVE-2024-1234", cvssScore: 9.1, affectedService: "OpenSSH" }],
+    });
+    const r = await find({ "e-2": "na" }, scan, "e-2");
+    expect(r.state).toBe("self_declared");
   });
 });
 
@@ -95,9 +119,17 @@ describe("validateControls — e-3 (sistemas EOL, via endoflife.date)", () => {
     expect(r.state).toBe("verified");
   });
 
-  it("respondeu 'no' com produto EOL presente → NÃO contradiz (self_declared), nem chama isEol", async () => {
+  it("respondeu 'no' com produto EOL presente → verified_noncompliant (a admissão é confirmada)", async () => {
+    mockIsEol.mockResolvedValueOnce({ eol: true, eolDate: "2015-07-14", cycle: "6.0" });
     const scan = emptyScan({ openPorts: [{ port: 21, service: "ftp", product: "Microsoft-IIS", version: "6.0" }] });
     const r = await find({ "e-3": "no" }, scan, "e-3");
+    expect(r.state).toBe("verified_noncompliant");
+    expect(mockIsEol).toHaveBeenCalledWith("Microsoft-IIS", "6.0");
+  });
+
+  it("respondeu 'na' → self_declared, nem chama isEol (poupa a chamada externa)", async () => {
+    const scan = emptyScan({ openPorts: [{ port: 21, service: "ftp", product: "Microsoft-IIS", version: "6.0" }] });
+    const r = await find({ "e-3": "na" }, scan, "e-3");
     expect(r.state).toBe("self_declared");
     expect(mockIsEol).not.toHaveBeenCalled();
   });
@@ -140,6 +172,20 @@ describe("validateControls — h-2 (dados em trânsito)", () => {
     const r = await find({ "h-2": "yes" }, scan, "h-2");
     expect(r.state).toBe("verified");
   });
+
+  it("no + tlsIssue presente → verified_noncompliant, sem repetir a porta no texto", async () => {
+    const scan = emptyScan({ tlsIssues: [{ port: 443, issue: "Porta 443 (HTTPS) não acessível — sem encriptação TLS." }] });
+    const r = await find({ "h-2": "no" }, scan, "h-2");
+    expect(r.state).toBe("verified_noncompliant");
+    expect(r.evidence[0]).toBe("Porta 443 (HTTPS) não acessível — sem encriptação TLS.");
+    expect(r.evidence[0]).not.toMatch(/\(porta 443\).*\(porta 443\)/);
+  });
+
+  it("no + tudo limpo → self_declared", async () => {
+    const scan = emptyScan();
+    const r = await find({ "h-2": "no" }, scan, "h-2");
+    expect(r.state).toBe("self_declared");
+  });
 });
 
 describe("validateControls — j-5 (comunicações seguras)", () => {
@@ -165,6 +211,12 @@ describe("validateControls — j-5 (comunicações seguras)", () => {
     const scan = emptyScan({ emailSecurityChecks: [{ name: "SPF", status: "pass" }, { name: "DMARC", status: "pass" }] });
     const r = await find({ "j-5": "yes" }, scan, "j-5");
     expect(r.state).toBe("verified");
+  });
+
+  it("no + SPF fail → verified_noncompliant", async () => {
+    const scan = emptyScan({ emailSecurityChecks: [{ name: "SPF", status: "fail" }] });
+    const r = await find({ "j-5": "no" }, scan, "j-5");
+    expect(r.state).toBe("verified_noncompliant");
   });
 });
 
@@ -216,19 +268,35 @@ describe("validateControls — fallback e resumo", () => {
     expect(await validateControls({}, emptyScan())).toHaveLength(42);
   });
 
-  it("summarizeValidations conta corretamente os 4 estados", async () => {
+  it("summarizeValidations conta corretamente os 5 estados", async () => {
     const scan = emptyScan({
-      vulnerabilities: [{ cveId: "X", cvssScore: 9, affectedService: "y" }], // e-2 → contradicted
+      vulnerabilities: [{ cveId: "X", cvssScore: 9, affectedService: "y" }], // e-2 → contradicted (yes)
       openPorts:       [{ port: 3389, service: "rdp" }],                     // i-5 → unconfirmed
       scansLast12Months: 1,                                                  // f-2 → verified
     });
-    const answers = { "e-2": "yes", "i-5": "yes" };
+    const answers = { "e-2": "yes", "i-5": "yes", "j-5": "no" }; // j-5 sem evidência de falha → self_declared
     const validations = await validateControls(answers, scan);
     const summary = summarizeValidations(validations);
 
     expect(summary.contradicted).toBe(1);
     expect(summary.unconfirmed).toBe(1);
     expect(summary.verified).toBeGreaterThanOrEqual(1); // pelo menos f-2
-    expect(summary.contradicted + summary.unconfirmed + summary.verified + summary.selfDeclared).toBe(42);
+    expect(
+      summary.contradicted + summary.unconfirmed + summary.verified +
+      summary.verifiedNoncompliant + summary.selfDeclared
+    ).toBe(42);
+  });
+
+  it("summarizeValidations conta verifiedNoncompliant separadamente dos outros estados", async () => {
+    const scan = emptyScan({
+      vulnerabilities: [{ cveId: "X", cvssScore: 9, affectedService: "y" }], // e-2
+      tlsIssues:       [{ port: 443, issue: "Certificado expirado" }],       // h-2
+    });
+    const answers = { "e-2": "no", "h-2": "no" }; // ambos admitem a falha, ambos confirmados
+    const validations = await validateControls(answers, scan);
+    const summary = summarizeValidations(validations);
+
+    expect(summary.verifiedNoncompliant).toBe(2);
+    expect(summary.contradicted).toBe(0); // "no" nunca é contradicted, só quem afirma "yes" pode ser
   });
 });

@@ -369,7 +369,7 @@ export async function checkDirectTls(domain: string): Promise<DirectTlsResult> {
       certificate: null,
       tlsIssues: [
         {
-          issue: "Porto 443 (HTTPS) não acessível — sem encriptação TLS",
+          issue: "Porta 443 (HTTPS) não acessível — sem encriptação TLS.",
           cvssScore: 8.0,
           severity: "critical",
           nis2Article: "Art. 21(2)(h)",

@@ -465,7 +465,7 @@ function calculateNIS2Scores(
       if (openPortSet.has(riskPort) && !seenPorts.has(riskPort)) {
         seenPorts.add(riskPort);
         const svc = ports.find((p) => p.port === riskPort);
-        findings.push(`Porto ${riskPort} (${svc?.service ?? "unknown"}) exposto — aumenta superfície de ataque`);
+        findings.push(`Porta ${riskPort} (${svc?.service ?? "unknown"}) exposto — aumenta superfície de ataque`);
         deduction += 15;
       }
     }
@@ -683,7 +683,7 @@ export async function executeAgentlessScan(
             if (matchCpe) {
               p.cves = [...hostCves];
               bannerEnrichedPorts.add(p.port);
-              console.log(`[CVE] Porto ${p.port} (${p.service} ${p.version}): ${hostCves.length} CVEs candidatos via CPE ${matchCpe}`);
+              console.log(`[CVE] Porta ${p.port} (${p.service} ${p.version}): ${hostCves.length} CVEs candidatos via CPE ${matchCpe}`);
             }
           }
         }
@@ -705,7 +705,7 @@ export async function executeAgentlessScan(
         p.service = vp.split(":")[1] ?? hint;
         const cpeVer = parseCpeVersion(cpe);
         if (cpeVer && !p.version) p.version = cpeVer;
-        console.log(`[Scanner] Porto ${p.port}: CPE → ${p.service} ${p.version ?? "(versão desconhecida)"}`);
+        console.log(`[Scanner] Porta ${p.port}: CPE → ${p.service} ${p.version ?? "(versão desconhecida)"}`);
         break;
       }
     }
@@ -773,7 +773,7 @@ export async function executeAgentlessScan(
 
       if (hasCves && !hasVersion) {
         const svcName = portFinding.service !== "unknown" ? portFinding.service : `serviço na porta ${portFinding.port}`;
-        console.log(`[CVE filter] Porto ${portFinding.port}: versão desconhecida com ${portFinding.cves.length} CVEs → NIS2-SVC-UNKNOWN`);
+        console.log(`[CVE filter] Porta ${portFinding.port}: versão desconhecida com ${portFinding.cves.length} CVEs → NIS2-SVC-UNKNOWN`);
         const nis2Unknown = ["Art. 21(2)(e)"];
         {
           const svcUnknownDescription = `${svcName} (porto ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`;

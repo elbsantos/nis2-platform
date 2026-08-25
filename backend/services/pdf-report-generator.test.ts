@@ -48,7 +48,7 @@ describe("enrichFinding — guard: descrições NVD não são reescritas", () =>
 
 describe("enrichFinding — findings sintéticos continuam enriquecidos", () => {
   it("deducao de porto 21 (FTP) sintetica recebe texto amigavel", () => {
-    const synthetic = "Porto 21 (ftp) exposto — aumenta superfície de ataque";
+    const synthetic = "Porta 21 (ftp) exposto — aumenta superfície de ataque";
     const result = enrichFinding(synthetic); // sem cveId: é sintético, não tem CVE ID
     expect(result.text).toContain("Porta 21");
     expect(result.text).toContain("FTP");
@@ -56,7 +56,7 @@ describe("enrichFinding — findings sintéticos continuam enriquecidos", () => 
   });
 
   it("deducao de porto 23 (Telnet) sintetica recebe texto amigavel", () => {
-    const synthetic = "Porto 23 (telnet) exposto — aumenta superfície de ataque";
+    const synthetic = "Porta 23 (telnet) exposto — aumenta superfície de ataque";
     const result = enrichFinding(synthetic);
     expect(result.text).toContain("Porta 23");
     expect(result.text).toContain("Telnet");
