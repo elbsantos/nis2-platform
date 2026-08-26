@@ -38,7 +38,7 @@ describe("enrichFinding — guard: descrições NVD não são reescritas", () =>
     // Quando description é vazia, o caller usa cveId como raw.
     // O guard não deve disparar (raw === structuralCveId).
     const result = enrichFinding("CVE-2021-41773", "CVE-2021-41773");
-    // Não é reescrito para nenhum texto de porto (nenhum regex de porto corresponde)
+    // Não é reescrito para nenhum texto de porta (nenhum regex de porta corresponde)
     expect(result.text).not.toContain("Porta 23");
     expect(result.text).not.toContain("Telnet");
     // Pode ser o próprio cveId (fallback de enrichFinding)
@@ -47,7 +47,7 @@ describe("enrichFinding — guard: descrições NVD não são reescritas", () =>
 });
 
 describe("enrichFinding — findings sintéticos continuam enriquecidos", () => {
-  it("deducao de porto 21 (FTP) sintetica recebe texto amigavel", () => {
+  it("deducao de porta 21 (FTP) sintetica recebe texto amigavel", () => {
     const synthetic = "Porta 21 (ftp) exposto — aumenta superfície de ataque";
     const result = enrichFinding(synthetic); // sem cveId: é sintético, não tem CVE ID
     expect(result.text).toContain("Porta 21");
@@ -55,7 +55,7 @@ describe("enrichFinding — findings sintéticos continuam enriquecidos", () => 
     expect(result.text).not.toBe(synthetic); // foi enriquecido
   });
 
-  it("deducao de porto 23 (Telnet) sintetica recebe texto amigavel", () => {
+  it("deducao de porta 23 (Telnet) sintetica recebe texto amigavel", () => {
     const synthetic = "Porta 23 (telnet) exposto — aumenta superfície de ataque";
     const result = enrichFinding(synthetic);
     expect(result.text).toContain("Porta 23");

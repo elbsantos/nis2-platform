@@ -392,7 +392,7 @@ export default function Landing() {
               evidência.</strong>
             </p>
             <div className="solution-features">
-              <div className="sf-item">Scanner agentless — portos, CVEs, TLS, email e headers HTTP</div>
+              <div className="sf-item">Scanner agentless — portas, CVEs, TLS, email e headers HTTP</div>
               <div className="sf-item">Score NIS2 0–100 por artigo, com lacunas identificadas</div>
               <div className="sf-item">Descoberta automática de subdomínios via CT logs + DNS</div>
               <div className="sf-item">13 documentos de conformidade gerados automaticamente dos seus dados</div>
@@ -457,7 +457,7 @@ export default function Landing() {
             <ul className="feature-list">
               <li>
                 <strong>Exposição Digital Completa</strong>
-                <span>Portos abertos, CVEs públicos, TLS, SPF/DKIM/DMARC, headers HTTP</span>
+                <span>Portas abertas, CVEs públicos, TLS, SPF/DKIM/DMARC, headers HTTP</span>
               </li>
               <li>
                 <strong>Descoberta de Subdomínios</strong>
@@ -498,7 +498,7 @@ export default function Landing() {
                   <div className="layer-row">
                     <div className="layer-icon green"></div>
                     <div className="layer-info">
-                      <strong>Portos &amp; Serviços</strong>
+                      <strong>Portas &amp; Serviços</strong>
                       <span>Shodan</span>
                     </div>
                     <span className="layer-status">✓</span>
@@ -901,7 +901,7 @@ export default function Landing() {
             </div>
             <ul className="price-features">
               <li className="yes">1 scan NIS2 por mês</li>
-              <li className="yes">Score por artigo — portos, CVEs, TLS</li>
+              <li className="yes">Score por artigo — portas, CVEs, TLS</li>
               <li className="yes">Email security check (SPF/DKIM/DMARC)</li>
               <li className="yes">Módulo 1 do curso (4 aulas)</li>
               <li className="yes">10 perguntas do questionário NIS2</li>

@@ -1,7 +1,7 @@
 /**
  * backend/integrations/ssh-check.ts
  *
- * Lê o banner SSH do porto 22, extrai a versão OpenSSH e sinaliza CVEs
+ * Lê o banner SSH da porta 22, extrai a versão OpenSSH e sinaliza CVEs
  * conhecidos com base em limiares de versão.
  * Não requer API key — usa TCP directo.
  */

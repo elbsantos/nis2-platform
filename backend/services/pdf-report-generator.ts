@@ -286,7 +286,7 @@ export async function buildExecutiveReport(
       const sevLbl = secCount === 1 ? secSingular[sev] : secPlural[sev];
       const sshTitle = group.service.match(/^SSH \(OpenSSH_(\S+)/i);
       const displayTitle = sshTitle
-        ? `Software OpenSSH ${sshTitle[1]} desatualizado${group.port !== null ? ` (porto ${group.port})` : ""}`
+        ? `Software OpenSSH ${sshTitle[1]} desatualizado${group.port !== null ? ` (porta ${group.port})` : ""}`
         : group.title;
       const titleLine = `${displayTitle} — ${secCount} ${sevLbl} (${group.counts.total} no total)`;
       const titleH   = doc.fontSize(8).font("Sans-Bold").heightOfString(titleLine,     { width: CONTENT_W - 28 });
@@ -357,7 +357,7 @@ export async function buildExecutiveReport(
         const sColor   = severityColor(g.topSeverity);
         const sshT     = g.service.match(/^SSH \(OpenSSH_(\S+)/i);
         const dTitle   = sshT
-          ? `Software OpenSSH ${sshT[1]} desatualizado${g.port !== null ? ` (porto ${g.port})` : ""}`
+          ? `Software OpenSSH ${sshT[1]} desatualizado${g.port !== null ? ` (porta ${g.port})` : ""}`
           : g.title;
         const titleH   = doc.fontSize(8).font("Sans-Bold").heightOfString(dTitle,           { width: CONTENT_W - 20 });
         const actionH  = doc.fontSize(7.5).font("Sans")    .heightOfString(`→ ${g.action}`, { width: CONTENT_W - 20 });
@@ -397,7 +397,7 @@ export async function buildExecutiveReport(
         const sevLbl = secCount === 1 ? secSingular[sev] : secPlural[sev];
         const sshT = group.service.match(/^SSH \(OpenSSH_(\S+)/i);
         const dTitle = sshT
-          ? `Software OpenSSH ${sshT[1]} desatualizado${group.port !== null ? ` (porto ${group.port})` : ""}`
+          ? `Software OpenSSH ${sshT[1]} desatualizado${group.port !== null ? ` (porta ${group.port})` : ""}`
           : group.title;
         const cLine = `${dTitle} — ${secCount} ${sevLbl} (${group.counts.total} no total) — ver secção ${topSevSection[group.topSeverity]}`;
         const cH = doc.fontSize(8).font("Sans").heightOfString(cLine, { width: CONTENT_W - 28 });
@@ -548,7 +548,7 @@ export async function buildExecutiveReport(
 //
 // PRINCÍPIO: enrichFinding NUNCA reescreve descrições NVD reais.
 // Uma descrição vinda do NVD é a verdade final. O enriquecimento existe
-// apenas para findings SINTÉTICOS nossos (NIS2-*, deduções de porto,
+// apenas para findings SINTÉTICOS nossos (NIS2-*, deduções de porta,
 // headers, email) que não têm descrição de utilizador.
 // ---------------------------------------------------------------------------
 
@@ -683,7 +683,7 @@ async function buildTechnicalReport(
     doc.addPage({ size: "A4", margin: 0 });
     drawCoverPage(doc, scan, overall, "RELATÓRIO TÉCNICO NIS2", "CONFIDENCIAL — USO RESTRITO");
 
-    // ── PAGE 2: METADADOS + PORTOS & SERVIÇOS ─────────────────────────────
+    // ── PAGE 2: METADADOS + PORTAS & SERVIÇOS ─────────────────────────────
     doc.addPage({ size: "A4", margin: 0 });
     drawRunningHeader(doc, scan?.target ?? "—", "Técnico");
     let y = 90;
@@ -722,11 +722,11 @@ async function buildTechnicalReport(
     y += 14;
 
     // openPorts.cves já foi filtrado pelo scan-executor (apenas CVEs NVD-confirmados).
-    // Mostrar TODOS os portos: badge vermelho com contagem para os que têm CVEs; "—" para os limpos.
+    // Mostrar TODAS as portas: badge vermelho com contagem para as que têm CVEs; "—" para as limpas.
     const withCvesCount    = openPorts.filter(p => (p.cves ?? []).length > 0).length;
     const withoutCvesCount = openPorts.length - withCvesCount;
 
-    y = drawSectionTitle(doc, "Portos Analisados", y);
+    y = drawSectionTitle(doc, "Portas Analisadas", y);
     if (openPorts.length > 0) {
       // Summary line
       doc.fontSize(7.5).font("Sans").fillColor(C.muted)
@@ -738,7 +738,7 @@ async function buildTechnicalReport(
       // Table header
       doc.rect(MARGIN, y, CONTENT_W, 18).fillColor(C.navy).fill();
       doc.fontSize(8).font("Sans-Bold").fillColor(C.white);
-      doc.text("Porto",            MARGIN + 6,   y + 5, { width: 50 });
+      doc.text("Porta",            MARGIN + 6,   y + 5, { width: 50 });
       doc.text("Protocolo",        MARGIN + 60,  y + 5, { width: 60 });
       doc.text("Serviço",          MARGIN + 125, y + 5, { width: 100 });
       doc.text("Produto / Versão", MARGIN + 230, y + 5, { width: 160 });
@@ -767,13 +767,13 @@ async function buildTechnicalReport(
       });
       if (openPorts.length > 20) {
         doc.fontSize(8).font("Sans").fillColor(C.muted)
-           .text(`+ ${openPorts.length - 20} porto(s) adicionais — ver detalhe completo na plataforma.`, MARGIN, y + 4);
+           .text(`+ ${openPorts.length - 20} porta(s) adicionais — ver detalhe completo na plataforma.`, MARGIN, y + 4);
         y += 18;
       }
     } else {
       doc.rect(MARGIN, y, CONTENT_W, 30).fillColor(C.bg).fill();
       doc.fontSize(9).font("Sans").fillColor(C.success)
-         .text("✓ Nenhum porto exposto detetado nas fontes consultadas.", MARGIN + 10, y + 10);
+         .text("✓ Nenhuma porta exposta detetada nas fontes consultadas.", MARGIN + 10, y + 10);
       y += 30;
     }
     y += 6;
@@ -794,7 +794,7 @@ async function buildTechnicalReport(
           const sshM = g.service.match(/^SSH \(OpenSSH_(\S+)/i);
           const dispSvc = sshM ? `OpenSSH ${sshM[1]}` : g.service;
           const dispVer = sshM ? null : g.version;
-          const line = `${dispSvc}${dispVer ? ` ${dispVer}` : ""}${g.port !== null ? ` (porto ${g.port})` : ""}: ` +
+          const line = `${dispSvc}${dispVer ? ` ${dispVer}` : ""}${g.port !== null ? ` (porta ${g.port})` : ""}: ` +
             `${g.counts.total} CVEs — ` +
             [
               g.counts.critical > 0 ? `${g.counts.critical} crít.` : "",

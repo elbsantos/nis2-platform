@@ -425,7 +425,7 @@ export async function generateInventarioAtivos(scanId: number, orgId: number): P
     // B (col 2): ID pré-definido (EXT001…) — NÃO sobrescrever
     row.getCell(3).value  = cell(scan.target, "");             // C: Domínio / Host
     row.getCell(4).value  = resolvedIp;                        // D: Endereço IP (vazio se ausente)
-    row.getCell(5).value  = p.port;                            // E: Porto
+    row.getCell(5).value  = p.port;                            // E: Porta
     row.getCell(6).value  = cell(p.service ?? "");             // F: Serviço Detetado
     row.getCell(7).value  = cell(banner);                      // G: Versão / Banner
     row.getCell(8).value  = cvesSummary;                       // H: Vulnerabilidades (CVEs)

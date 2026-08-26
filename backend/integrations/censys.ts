@@ -109,7 +109,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
     if (isExpired) {
       issues.push({
         port: svc.port,
-        issue: `Certificado TLS expirado no porto ${svc.port}`,
+        issue: `Certificado TLS expirado na porta ${svc.port}`,
         cvssScore: 8.0,
         nis2Article: "Art. 21(2)(h)",
         severity: "critical",
@@ -119,7 +119,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
     if (isSelfSigned) {
       issues.push({
         port: svc.port,
-        issue: `Certificado auto-assinado no porto ${svc.port} — não é de confiança para clientes`,
+        issue: `Certificado auto-assinado na porta ${svc.port} — não é de confiança para clientes`,
         cvssScore: 7.4,
         nis2Article: "Art. 21(2)(h)",
         severity: "high",
@@ -129,7 +129,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
     if (/RC4|DES|3DES|EXPORT|NULL|anon/i.test(cipher)) {
       issues.push({
         port: svc.port,
-        issue: `Cifra fraca "${cipher}" activa no porto ${svc.port}`,
+        issue: `Cifra fraca "${cipher}" activa na porta ${svc.port}`,
         cvssScore: 7.5,
         nis2Article: "Art. 21(2)(h)",
         severity: "high",
@@ -139,7 +139,7 @@ function analyseTlsIssues(services: CensysService[]): TlsIssue[] {
     if (/TLSv1\.0|TLSv1\.1|SSLv2|SSLv3/.test(tlsVersion)) {
       issues.push({
         port: svc.port,
-        issue: `Protocolo obsoleto "${tlsVersion}" no porto ${svc.port} — vulnerável a ataques BEAST/POODLE`,
+        issue: `Protocolo obsoleto "${tlsVersion}" na porta ${svc.port} — vulnerável a ataques BEAST/POODLE`,
         cvssScore: 7.4,
         nis2Article: "Art. 21(2)(h)",
         severity: "high",

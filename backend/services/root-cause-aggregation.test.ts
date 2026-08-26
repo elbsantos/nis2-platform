@@ -45,7 +45,7 @@ const OPEN_PORTS_SCANME = [
 // ---------------------------------------------------------------------------
 
 describe("aggregateByRootCause — (a) grupo grande apache:80", () => {
-  it("106 CVEs apache porto 80 formam 1 grupo com contagens correctas", () => {
+  it("106 CVEs apache porta 80 formam 1 grupo com contagens correctas", () => {
     const criticals = makeApacheCves(24, "critical");
     const highs     = makeApacheCves(47, "high").map((v, i) => ({ ...v, cveId: `CVE-2015-${i}` }));
     const mediums   = makeApacheCves(34, "medium").map((v, i) => ({ ...v, cveId: `CVE-2016-${i}` }));
@@ -86,7 +86,7 @@ describe("aggregateByRootCause — (a) grupo grande apache:80", () => {
 // ---------------------------------------------------------------------------
 
 describe("aggregateByRootCause — (b) grupo pequeno fica individual", () => {
-  it(`${MIN_GROUP_SIZE - 1} CVEs do mesmo produto/porto ficam em individuals`, () => {
+  it(`${MIN_GROUP_SIZE - 1} CVEs do mesmo produto/porta ficam em individuals`, () => {
     const twoApache = makeApacheCves(MIN_GROUP_SIZE - 1);
     const { groups, individuals } = aggregateByRootCause(twoApache, OPEN_PORTS_SCANME);
     expect(groups.length).toBe(0);

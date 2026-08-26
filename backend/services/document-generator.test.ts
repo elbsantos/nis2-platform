@@ -672,7 +672,7 @@ describe("generateRegistoRiscos — riskSummary da biblioteca (C15)", () => {
 // C16 — generateInventarioAtivos: mapeamento de openPorts + resolvedIp
 // ===========================================================================
 
-describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
+describe("generateInventarioAtivos — mapeamento de portas (C16)", () => {
   const PORT_HTTP = {
     port: 80, protocol: "tcp", service: "http",
     product: "nginx", version: "1.18.0", cves: ["CVE-2021-1234"],
@@ -719,22 +719,22 @@ describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
     expect(f3).toContain("Preenchido automaticamente");
   });
 
-  it("1 linha por porto — target, IP, porto, serviço, versão, CVEs mapeados", async () => {
+  it("1 linha por porta — target, IP, porta, serviço, versão, CVEs mapeados", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getScanById).mockResolvedValue(SCAN_WITH_PORTS);
     vi.mocked(db.getOrganizationById).mockResolvedValue(FAKE_ORG);
 
     await generateInventarioAtivos(1, 1);
 
-    // Linha 6 — primeiro porto (HTTP)
+    // Linha 6 — primeira porta (HTTP)
     expect(_cellWrites.get("6:3")).toBe("exemplo.pt");    // C: Domínio/Host
     expect(_cellWrites.get("6:4")).toBe("1.2.3.4");       // D: IP
-    expect(_cellWrites.get("6:5")).toBe(80);              // E: Porto
+    expect(_cellWrites.get("6:5")).toBe(80);              // E: Porta
     expect(_cellWrites.get("6:6")).toBe("http");          // F: Serviço
     expect(_cellWrites.get("6:7")).toBe("nginx 1.18.0");  // G: Versão/Banner
     expect(_cellWrites.get("6:8")).toBe("CVE-2021-1234"); // H: CVEs
 
-    // Linha 7 — segundo porto (SSH)
+    // Linha 7 — segunda porta (SSH)
     expect(_cellWrites.get("7:5")).toBe(22);
     expect(_cellWrites.get("7:6")).toBe("ssh");
     expect(_cellWrites.get("7:8")).toBe("—");              // 0 CVEs → "—"
@@ -792,7 +792,7 @@ describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
     expect(_cellWrites.get("6:10")).toBeNull(); // J: Responsável
   });
 
-  it("sem portos — nenhuma linha de dados escrita", async () => {
+  it("sem portas — nenhuma linha de dados escrita", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getScanById).mockResolvedValue({
       ...FAKE_SCAN,
@@ -807,7 +807,7 @@ describe("generateInventarioAtivos — mapeamento de portos (C16)", () => {
 });
 
 // ===========================================================================
-// C16-fix — CVEs resumidos, fullCalcOnLoad, portos unknown
+// C16-fix — CVEs resumidos, fullCalcOnLoad, portas unknown
 // ===========================================================================
 
 describe("generateInventarioAtivos — CVEs resumidos (C16-fix)", () => {
@@ -854,7 +854,7 @@ describe("generateInventarioAtivos — CVEs resumidos (C16-fix)", () => {
     expect(_cellWrites.get("6:8")).toBe("—");
   });
 
-  it("porto com serviço 'unknown' consta na saída (sem filtro por serviço)", async () => {
+  it("porta com serviço 'unknown' consta na saída (sem filtro por serviço)", async () => {
     vi.spyOn(fs, "existsSync").mockReturnValue(true);
     vi.mocked(db.getScanById).mockResolvedValue({
       ...FAKE_SCAN,
@@ -869,7 +869,7 @@ describe("generateInventarioAtivos — CVEs resumidos (C16-fix)", () => {
 
     await generateInventarioAtivos(1, 1);
 
-    expect(_cellWrites.get("6:5")).toBe(4444);       // porto presente
+    expect(_cellWrites.get("6:5")).toBe(4444);       // porta presente
     expect(_cellWrites.get("6:6")).toBe("unknown");  // serviço registado
   });
 });

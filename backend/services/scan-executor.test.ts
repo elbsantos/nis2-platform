@@ -463,7 +463,7 @@ describe("executeAgentlessScan", () => {
     const port22 = result.openPorts.find((p) => p.port === 22);
     expect(port22).toBeDefined();
 
-    // Tabela de portos conta apenas os 4 CVEs reais
+    // Tabela de portas conta apenas os 4 CVEs reais
     expect(port22!.cves).toHaveLength(4);
     expect(port22!.cves).not.toContain("NIS2-SSH-OUTDATED");
     expect(port22!.cves).toContain("CVE-2023-51385");
@@ -513,7 +513,7 @@ describe("executeAgentlessScan", () => {
     expect(result.resolvedIp).toBeUndefined();
   });
 
-  it("enriquece porto 80 com banner Server e CVEs via CPE quando InternetDB nao tem versao", async () => {
+  it("enriquece porta 80 com banner Server e CVEs via CPE quando InternetDB nao tem versao", async () => {
     vi.mocked(resolveTxt).mockResolvedValue([["nis2pt-verify=1"]]);
 
     // InternetDB: port 80 without product/version/vulns; host-level CVE + Apache CPE
@@ -854,7 +854,7 @@ describe("executeAgentlessScan", () => {
       tags: [],
       cpes: ["cpe:/a:apache:http_server:2.4.7"],
       vulns: ["CVE-DESC-REAL"],
-      ports: [{ port: 443, transport: "tcp" }], // porto 443 — não interfere com regex porta.*80
+      ports: [{ port: 443, transport: "tcp" }], // porta 443 — não interfere com regex porta.*80
     });
     vi.mocked(checkHttpHeaders).mockResolvedValue({
       checks: [], score: 50, url: "https://example.com",

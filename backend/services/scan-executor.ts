@@ -377,7 +377,7 @@ function mapCveToNIS2Articles(cveId: string, description: string): string[] {
 //   • Artigos não scannáveis (scannable=false) → score=null, findings=[].
 //     Não entram na média ponderada (score global reflete só o avaliável).
 //   • Dedup por CVE dentro de cada artigo — o mesmo CVE não conta mais de uma vez.
-//   • Dedup por porto dentro de cada artigo — porto não deduzido duas vezes.
+//   • Dedup por porta dentro de cada artigo — porta não deduzida duas vezes.
 // ---------------------------------------------------------------------------
 
 interface ExtraDeduction {
@@ -413,7 +413,7 @@ function tlsIssueToVulnFinding(tls: TlsIssueFinding): VulnFinding {
     remediationHint = "Remove cifras fracas (RC4, DES, 3DES, EXPORT, NULL) da configuração TLS do servidor.";
   } else if (/não acessível/i.test(issue)) {
     slug = "PORT-CLOSED";
-    remediationHint = "Instala certificado TLS e abre o porto 443 (HTTPS).";
+    remediationHint = "Instala certificado TLS e abre a porta 443 (HTTPS).";
   } else {
     slug = "ISSUE";
     remediationHint = "Verifica a configuração TLS do servidor.";
@@ -627,7 +627,7 @@ export async function executeAgentlessScan(
     if (isSharedInfra) {
       console.log(
         `[Scanner] ${options.target} → PaaS/CDN partilhado detectado (${sharedInfraMatch}) — ` +
-        `portos podem ser da plataforma; CVEs avaliados normalmente pelo filtro CPE`
+        `portas podem ser da plataforma; CVEs avaliados normalmente pelo filtro CPE`
       );
     }
 
@@ -731,7 +731,7 @@ export async function executeAgentlessScan(
         cves: [],
       }));
 
-    // Dedup by port number: Shodan e Censys podem ambos reportar o mesmo porto.
+    // Dedup by port number: Shodan e Censys podem ambos reportar a mesma porta.
     // Shodan tem prioridade (pode ter CVEs/versão); Censys/direct apenas preenchem gaps.
     const _rawAllPorts = [...openPorts, ...censysPorts, ...directPorts];
     const _seenPortNums = new Set<number>();
@@ -776,7 +776,7 @@ export async function executeAgentlessScan(
         console.log(`[CVE filter] Porta ${portFinding.port}: versão desconhecida com ${portFinding.cves.length} CVEs → NIS2-SVC-UNKNOWN`);
         const nis2Unknown = ["Art. 21(2)(e)"];
         {
-          const svcUnknownDescription = `${svcName} (porto ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`;
+          const svcUnknownDescription = `${svcName} (porta ${portFinding.port}) expõe ${portFinding.cves.length} CVE(s) conhecidos mas a versão não foi detectada — actualiza ou identifica o serviço para avaliar a exposição real.`;
           const svcUnknownRemediation = `Identifica a versão do ${svcName} e actualiza para eliminar as vulnerabilidades conhecidas.`;
           vulns.push({
             cveId: "NIS2-SVC-UNKNOWN",
@@ -837,13 +837,13 @@ export async function executeAgentlessScan(
           continue;
         }
 
-        // Gate 1 — Strict mode para portos banner-enriched (CVEs vêm do Shodan host-level,
-        // não por porto). Sem confirmação de produto pelo NVD não podemos verificar que o
+        // Gate 1 — Strict mode para portas banner-enriched (CVEs vêm do Shodan host-level,
+        // não por porta). Sem confirmação de produto pelo NVD não podemos verificar que o
         // CVE se aplica a este serviço. "Conservative include" reintroduziria a regressão
         // dos 120 CVEs; exigimos confirmação explícita.
         if (bannerEnrichedPorts.has(portFinding.port)) {
           if (!nvdInfo || nvdInfo.affectedProducts.length === 0) {
-            console.log(`[CVE filter] ${cveId} — excluído (sem dados NVD de produto; porto banner ${portFinding.port})`);
+            console.log(`[CVE filter] ${cveId} — excluído (sem dados NVD de produto; porta banner ${portFinding.port})`);
             continue;
           }
           const productMatch = nvdInfo.affectedProducts.some(
@@ -862,7 +862,7 @@ export async function executeAgentlessScan(
           // hasRangeData=true garantido — gate 2 (version range) corre abaixo
         }
 
-        // Gate 2 — Confirmação por intervalo de versão. Aplica-se a todos os portos com
+        // Gate 2 — Confirmação por intervalo de versão. Aplica-se a todas as portas com
         // versão conhecida. Banner-enriched já exigiu hasRangeData=true no gate 1.
         if (hasVersion) {
           if (!nvdInfo?.hasRangeData) {
@@ -944,7 +944,7 @@ export async function executeAgentlessScan(
       }).catch((e) => console.error("[Scanner] DB persist error for NIS2-TLS-001:", e));
     }
 
-    // ── 5b. SSH version check — quando porto 22 está aberto ───────────────
+    // ── 5b. SSH version check — quando a porta 22 está aberta ───────────────
     const sshOpen = allPorts.some((p) => p.port === 22);
     if (sshOpen) {
       const sshTarget = shodanData?.ip ?? options.target;
@@ -991,7 +991,7 @@ export async function executeAgentlessScan(
 
         // Propaga os IDs dos CVEs SSH para port22.cves em allPorts.
         // allPorts é guardado em results.openPorts (linha updateScanStatus).
-        // Sem isto, a tabela de portos filtra exposedPorts = cves.length > 0
+        // Sem isto, a tabela de portas filtra exposedPorts = cves.length > 0
         // e porta 22 aparece limpa mesmo com CVEs SSH na lista de vulnerabilidades.
         if (sshResult.vulns.length > 0 && port22) {
           const sshCveIds = sshResult.vulns
@@ -1163,7 +1163,7 @@ export async function executeAgentlessScan(
     // ── 8b. Converter TlsIssueFindings em VulnFindings (CORREÇÃO 5) ──────────
     // TLS issues afectam o score de Art. 21(2)(h) mas ficavam invisíveis na lista
     // de achados. Convertê-los em VulnFindings garante coerência: o cliente vê a
-    // causa do score baixar. Os IDs são estáveis (porto+condição) — o dedup abaixo
+    // causa do score baixar. Os IDs são estáveis (porta+condição) — o dedup abaixo
     // elimina duplicados se Censys e direct-tls reportarem a mesma condição.
     for (const tls of tlsIssues) {
       const tlsVuln = tlsIssueToVulnFinding(tls);

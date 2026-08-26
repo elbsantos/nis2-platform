@@ -140,9 +140,9 @@ export default function ScanResults() {
   const eligibleCount = (results?.vulnerabilities as Array<{ cveId?: string; description?: string }> | undefined)
     ?.filter((v) => v.cveId?.trim() && v.description?.trim())
     .length ?? 0;
-  // Portos/serviços detetados — é a fonte real de generateInventarioAtivos
+  // Portas/serviços detetados — é a fonte real de generateInventarioAtivos
   // (lê results.openPorts, não results.vulnerabilities). Um scan "limpo"
-  // (eligibleCount=0) pode ter portos abertos sem CVEs conhecidos — o
+  // (eligibleCount=0) pode ter portas abertas sem CVEs conhecidos — o
   // Inventário de Ativos continua a ter conteúdo válido nesse caso.
   const portsCount = (results?.openPorts as unknown[] | undefined)?.length ?? 0;
   const critical  = results?.criticalCount ?? 0;
@@ -233,7 +233,7 @@ export default function ScanResults() {
         {/* Ports & Services */}
         {results?.openPorts && results.openPorts.length > 0 && (
           <Card as="section" className="p-6">
-            <h2 className="text-2xl font-semibold text-text mb-4">Portos &amp; Serviços</h2>
+            <h2 className="text-2xl font-semibold text-text mb-4">Portas &amp; Serviços</h2>
             <PortsSection ports={results.openPorts} cdn={results.directTls?.cdn} />
           </Card>
         )}
@@ -1038,7 +1038,7 @@ function TlsSection({ directTls }: { directTls: DirectTlsData }) {
           <div>
             <p className="text-xl font-semibold text-accent">Protegido por {cdn.provider}</p>
             <p className="text-lg text-accent mt-1">
-              O servidor está atrás de um CDN/proxy. Portos internos não são expostos directamente — é uma boa prática de segurança.
+              O servidor está atrás de um CDN/proxy. Portas internas não são expostas directamente — é uma boa prática de segurança.
               A análise TLS foi feita directamente ao domínio.
             </p>
           </div>
@@ -1142,12 +1142,12 @@ function PortsSection({ ports, cdn }: { ports: PortEntry[]; cdn?: { detected: bo
     <div className="space-y-4">
       {cdn?.detected && (
         <p className="text-lg text-dim italic">
-          Domínio atrás de {cdn.provider} — apenas portos 80/443 expostos publicamente.
+          Domínio atrás de {cdn.provider} — apenas portas 80/443 expostas publicamente.
         </p>
       )}
       <div className="border border-line rounded-lg overflow-hidden">
         <div className="grid grid-cols-4 bg-surface-2 px-5 py-3 border-b border-line">
-          {["Porto", "Protocolo", "Serviço", "CVEs"].map((h) => (
+          {["Porta", "Protocolo", "Serviço", "CVEs"].map((h) => (
             <p key={h} className="text-lg font-semibold text-dim uppercase tracking-wide">{h}</p>
           ))}
         </div>

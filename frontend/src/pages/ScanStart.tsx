@@ -544,7 +544,7 @@ function SubdomainScanTab() {
 // ---------------------------------------------------------------------------
 
 const CAPABILITIES: { icon: LucideIcon; title: string; desc: string; tag: string }[] = [
-  { icon: Radar,       title: "Portos & Serviços",         desc: "Portos TCP/UDP abertos, serviços expostos, banners de versão", tag: "Shodan" },
+  { icon: Radar,       title: "Portas & Serviços",         desc: "Portas TCP/UDP abertas, serviços expostos, banners de versão", tag: "Shodan" },
   { icon: Bug,         title: "Vulnerabilidades (CVE)",     desc: "CVEs públicos associados a versões de software detectadas",     tag: "NVD + Shodan" },
   { icon: Lock,        title: "TLS & Certificados",         desc: "Expiração, algoritmos fracos, self-signed, protocolos obsoletos (SSLv3, TLS 1.0)", tag: "Censys" },
   { icon: Mail,        title: "Segurança de Email",         desc: "SPF, DKIM (10 selectores), DMARC — conformidade Art. 21(2)(j)", tag: "DNS" },

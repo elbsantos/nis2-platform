@@ -72,7 +72,7 @@ function fmtCounts(counts: RootCauseCounts): string {
 
 function buildTitle(service: string, version: string | null, port: number | null): string {
   const ver  = version ? ` ${version}` : "";
-  const prt  = port !== null ? ` (porto ${port})` : "";
+  const prt  = port !== null ? ` (porta ${port})` : "";
   return `Software ${service}${ver} desatualizado${prt}`;
 }
 
