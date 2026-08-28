@@ -225,6 +225,7 @@ const MODULOS: GuiaModulo[] = [
         estado: "gerado",
         baseLegal: "Art. 21.º §2(b) NIS2",
         orientacao: "Gerado automaticamente pela CISPLAN — **página Documentos**, botão \"Tracker de Patches e Vulnerabilidades\" (acompanhamento) + \"PDF Técnico\" (detalhe completo), a partir do scan de segurança.",
+        naoSeEsqueca: "esta linha conta como 1 no índice, mas gera 2 ficheiros: o tracker de acompanhamento (.xlsx) e o PDF Técnico com o detalhe completo.",
         arquivarEm: "/NIS2/Técnico/Patches/",
       },
       {
@@ -447,6 +448,7 @@ const MODULOS: GuiaModulo[] = [
         estado: "gerado",
         baseLegal: "Art. 20.º NIS2",
         orientacao: "Gerado automaticamente pela CISPLAN — **página Documentos**, botão \"Relatório Executivo para a Gestão\" + \"PDF Executivo\" do scan, como suporte adicional. Resumo executivo anual: score, medidas, scan, declaração de supervisão da gestão.",
+        naoSeEsqueca: "esta linha conta como 1 no índice, mas gera 2 ficheiros: o Relatório Executivo (.docx) e o PDF Executivo do scan.",
         arquivarEm: "/NIS2/Auditorias/",
       },
     ],
@@ -631,7 +633,8 @@ export default function GuiaDocumentos() {
           A CISPLAN <strong className="text-text font-semibold">gera automaticamente 11 desses
           documentos</strong> a partir dos dados que já introduziu: o perfil da empresa, o
           enquadramento, o questionário de autoavaliação e o scan de segurança. Basta rever, assinar e
-          arquivar.
+          arquivar. (Duas dessas 11 linhas — D14 e D28 — incluem também um PDF complementar gerado
+          junto com o documento principal, o que totaliza 13 ficheiros.)
         </p>
         <p className="text-sm text-dim leading-relaxed mb-3">
           Os restantes <strong className="text-text font-semibold">dependem de atos da sua

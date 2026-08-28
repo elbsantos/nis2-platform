@@ -209,7 +209,7 @@ export default function Landing() {
             </p>
             <div className="hero-stats">
               <div><strong>42</strong><span>Controlos NIS2</span></div>
-              <div><strong>13</strong><span>Documentos gerados</span></div>
+              <div><strong>11</strong><span>Documentos gerados</span></div>
               <div><strong>Scanner</strong><span>Passivo</span></div>
               <div><strong>0</strong><span>Consultores</span></div>
             </div>
@@ -395,7 +395,7 @@ export default function Landing() {
               <div className="sf-item">Scanner agentless — portas, CVEs, TLS, email e headers HTTP</div>
               <div className="sf-item">Score NIS2 0–100 por artigo, com lacunas identificadas</div>
               <div className="sf-item">Descoberta automática de subdomínios via CT logs + DNS</div>
-              <div className="sf-item">13 documentos de conformidade gerados automaticamente dos seus dados</div>
+              <div className="sf-item">11 documentos de conformidade gerados automaticamente dos seus dados</div>
               <div className="sf-item">Remediação guiada por IA com plano personalizado</div>
             </div>
           </div>
