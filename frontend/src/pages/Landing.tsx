@@ -263,7 +263,7 @@ export default function Landing() {
                     <polygon points="150,90 180,110 170,140 130,140 120,110"
                              fill="none" stroke="#2a4470" strokeWidth="1" opacity="0.4"/>
                     <polygon points="150,35 235,92 218,178 82,178 65,92"
-                             fill="rgba(240,192,64,0.15)" stroke="#f0c040" strokeWidth="2"/>
+                             fill="rgba(91,156,255,0.15)" stroke="#5b9cff" strokeWidth="2"/>
                     <text x="150" y="22" fill="#94a3b8" fontSize="9" textAnchor="middle">Art. 21(2)(a)</text>
                     <text x="248" y="96" fill="#94a3b8" fontSize="9">(b)</text>
                     <text x="222" y="196" fill="#94a3b8" fontSize="9">(c)</text>
@@ -289,7 +289,7 @@ export default function Landing() {
                   </div>
                   <div className="article-row">
                     <span className="art-label">Art. 21(2)(d)</span>
-                    <div className="art-bar"><div className="art-fill" style={{ width: "88%", background: "#f0c040" }}></div></div>
+                    <div className="art-bar"><div className="art-fill" style={{ width: "88%", background: "#10b981" }}></div></div>
                     <span className="art-score">88</span>
                   </div>
                   <div className="article-row">
@@ -422,8 +422,8 @@ export default function Landing() {
                 <span className="lesson-pill">Aula 2.3 · Auditorias CNCS</span>
               </div>
             </div>
-            <div className="module-card full-width" style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}>
-              <div className="module-tag" style={{ color: "#d4a017" }}>Incluído no Curso · 35 Templates</div>
+            <div className="module-card full-width" style={{ background: "rgba(29,78,216,0.06)", border: "1px solid rgba(29,78,216,0.2)" }}>
+              <div className="module-tag" style={{ color: "#1d4ed8" }}>Incluído no Curso · 35 Templates</div>
               <h3 style={{ color: "#ffffff" }}>Biblioteca de Templates do Curso</h3>
               <p style={{ color: "#94a3b8", fontSize: "0.95rem", lineHeight: 1.6, margin: "8px 0 14px" }}>
                 O curso de formação inclui 35 templates editáveis (Excel, Word, PDF) que cobrem todos
@@ -776,7 +776,7 @@ export default function Landing() {
           plataforma mostra-lhe exatamente o que precisa — com a obrigação legal de cada um — e a
           formação ensina-o a produzi-los. Nunca geramos evidência de algo que não aconteceu.
         </p>
-        <p className="materials-intro" style={{ marginTop: 16, color: "#d4a017", fontWeight: 700 }}>
+        <p className="materials-intro" style={{ marginTop: 16, color: "#1d4ed8", fontWeight: 700 }}>
           Biblioteca de templates do curso · 35 documentos
         </p>
         <div className="materials-grid">
@@ -885,7 +885,7 @@ export default function Landing() {
       {ENABLE_PRICING && (
       <section className="pricing" id="precos">
         <div className="pricing-header fade-in">
-          <div className="section-label" style={{ color: "#f0c040" }}>Preços e Planos</div>
+          <div className="section-label" style={{ color: "#5b9cff" }}>Preços e Planos</div>
           <h2>Escolha o plano para a sua empresa</h2>
           <p>Todos os planos pagos incluem acesso ao curso, documentos editáveis e actualizações legislativas.</p>
         </div>
@@ -953,12 +953,12 @@ export default function Landing() {
             <Link to="/register?plan=mssp" className="price-btn gold-btn">Começar MSSP →</Link>
           </div>
 
-          <div className="price-card" style={{ background: "rgba(15,30,56,0.95)", border: "1px solid rgba(212,160,23,0.35)" }}>
-            <div className="price-tier" style={{ color: "#d4a017" }}>Grande Organização</div>
+          <div className="price-card" style={{ background: "rgba(15,30,56,0.95)", border: "1px solid rgba(29,78,216,0.35)" }}>
+            <div className="price-tier" style={{ color: "#1d4ed8" }}>Grande Organização</div>
             <h3 style={{ color: "#ffffff" }}>Enterprise</h3>
             <p className="tagline" style={{ color: "#94a3b8" }}>Para grandes empresas, organismos públicos e contratos anuais personalizados.</p>
             <div className="price-amount">
-              <span className="currency" style={{ color: "#d4a017" }}>€</span>
+              <span className="currency" style={{ color: "#1d4ed8" }}>€</span>
               <span className="value" style={{ color: "#ffffff", fontSize: "2rem" }}>499</span>
               <div className="period" style={{ color: "#94a3b8" }}>/ mês + IVA · a partir de</div>
             </div>
@@ -970,7 +970,7 @@ export default function Landing() {
               <li className="yes">API access completa</li>
               <li className="yes">Gestor de conta dedicado</li>
             </ul>
-            <a href="mailto:geral@cisplan.com?subject=Plano Enterprise CISPLAN" className="price-btn" style={{ background: "#d4a017", color: "#0f1e38", borderColor: "#d4a017", textAlign: "center", display: "block" }}>Falar Connosco →</a>
+            <a href="mailto:geral@cisplan.com?subject=Plano Enterprise CISPLAN" className="price-btn" style={{ background: "#1d4ed8", color: "#ffffff", borderColor: "#1d4ed8", textAlign: "center", display: "block" }}>Falar Connosco →</a>
           </div>
         </div>
 
