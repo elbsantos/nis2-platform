@@ -205,7 +205,7 @@ export default function ScanResults() {
 
         {/* NIS2 Score chart */}
         <Card as="section" className="p-6">
-          <h2 className="text-2xl font-semibold text-text mb-4">Score NIS2 por Artigo</h2>
+          <h2 className="text-2xl font-semibold text-text mb-4">Declaração vs Evidência por Artigo</h2>
           {results?.nis2Scores ? (
             <Nis2ScoreChart
               scores={results.nis2Scores}

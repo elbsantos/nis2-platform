@@ -1,13 +1,4 @@
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  Radar,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
-
-// Valores das cores do sistema (recharts não lê CSS vars — espelhadas aqui).
+// Valores das cores do sistema (mantidos aqui para reuso nos elementos SVG/JSX abaixo).
 const C = {
   accent:   "#5b9cff",  // --color-accent
   ok:       "#10b981",  // --color-ok
@@ -111,14 +102,6 @@ export default function Nis2ScoreChart({
     ? combined.filter((s) => s.combinedScore !== null)
     : scores.filter((s) => s.score !== null && s.scannable !== false);
 
-  const radarData = radarItems.map((s) => ({
-    subject:  shortLabel(useCombined ? s.article : (s as ArticleScore).article),
-    score:    useCombined
-      ? (s as CombinedArticleScore).combinedScore as number
-      : (s as ArticleScore).score as number,
-    fullMark: 100,
-  }));
-
   // Barra de score para cada artigo (sempre 10 artigos)
   const barItems = useCombined
     ? combined
@@ -135,43 +118,44 @@ export default function Nis2ScoreChart({
         findings:           s.findings,
       }));
 
+  // Divergência declarado (questionário) vs observado (scan), por medida
+  const dumbbellItems = (barItems as CombinedArticleScore[]).filter(
+    (s) => s.scanScore !== null && s.questionnaireScore !== null
+  );
+  const betterCount = dumbbellItems.filter(
+    (s) => (s.scanScore as number) >= (s.questionnaireScore as number)
+  ).length;
+  const worseCount = dumbbellItems.length - betterCount;
+
   return (
     <div className="space-y-8">
       {/* Score global + legenda de fonte */}
-      <div className="flex items-center gap-6">
-        <div
-          className="w-28 h-28 rounded-full flex items-center justify-center text-white font-bold shadow-lg shrink-0"
-          style={{ backgroundColor: scoreColor(displayOverall), fontSize: "2rem" }}
-        >
-          {displayOverall}
-        </div>
-        <div>
-          {useCombined ? (
-            <>
-              <p className="text-xl text-slate-400">Score de Conformidade NIS2</p>
-              <p className="text-2xl font-semibold text-white mt-1">{conformanceLabel(displayOverall)}</p>
-              <p className="text-lg text-slate-400 mt-1">
-                {radarItems.length} de 10 medidas avaliadas
-              </p>
-              <p className="text-sm text-slate-500 mt-1">
-                Questionário + Scan · {combined.filter((s) => s.divergent).length > 0 && (
-                  <span className="text-amber-400 font-medium">
-                    {combined.filter((s) => s.divergent).length} divergência{combined.filter((s) => s.divergent).length > 1 ? "s" : ""} detectada{combined.filter((s) => s.divergent).length > 1 ? "s" : ""}
-                  </span>
-                )}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-xl text-slate-400">Score técnico (scan)</p>
-              <p className="text-2xl font-semibold text-white mt-1">{conformanceLabel(displayOverall)}</p>
-              <p className="text-lg text-slate-400 mt-1">{radarItems.length} artigos avaliados por scan</p>
-              <p className="text-sm text-slate-500 mt-1">
-                Avaliação parcial — medidas organizacionais requerem questionário
-              </p>
-            </>
-          )}
-        </div>
+      <div>
+        {useCombined ? (
+          <>
+            <p className="text-xl text-slate-400">Score de Conformidade NIS2</p>
+            <p className="text-2xl font-semibold text-white mt-1">{conformanceLabel(displayOverall)}</p>
+            <p className="text-lg text-slate-400 mt-1">
+              {radarItems.length} de 10 medidas avaliadas
+            </p>
+            <p className="text-sm text-slate-500 mt-1">
+              Questionário + Scan · {combined.filter((s) => s.divergent).length > 0 && (
+                <span className="text-amber-400 font-medium">
+                  {combined.filter((s) => s.divergent).length} divergência{combined.filter((s) => s.divergent).length > 1 ? "s" : ""} detectada{combined.filter((s) => s.divergent).length > 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-xl text-slate-400">Score técnico (scan)</p>
+            <p className="text-2xl font-semibold text-white mt-1">{conformanceLabel(displayOverall)}</p>
+            <p className="text-lg text-slate-400 mt-1">{radarItems.length} artigos avaliados por scan</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Avaliação parcial — medidas organizacionais requerem questionário
+            </p>
+          </>
+        )}
       </div>
 
       {/* Convite a completar questionário quando não existe */}
@@ -187,37 +171,83 @@ export default function Nis2ScoreChart({
         </div>
       )}
 
-      {/* Radar */}
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={radarData} margin={{ top: 16, right: 30, bottom: 16, left: 30 }}>
-            <PolarGrid stroke={C.line} />
-            <PolarAngleAxis
-              dataKey="subject"
-              tick={{ fontSize: 16, fill: C.dim, fontWeight: 600 }}
-            />
-            <Radar
-              name="Score"
-              dataKey="score"
-              stroke={C.accent}
-              fill={C.accent}
-              fillOpacity={0.12}
-              strokeWidth={2}
-            />
-            <Tooltip
-              formatter={(value: number) => [`${value}/100`, "Pontuação"]}
-              contentStyle={{
-                fontSize: 16,
-                backgroundColor: C.surface2,
-                border: `1px solid ${C.line}`,
-                borderRadius: "8px",
-                color: C.text,
-              }}
-              labelStyle={{ color: C.accent, fontWeight: 700 }}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Divergência declarado vs observado */}
+      {dumbbellItems.length === 0 ? (
+        <p className="text-lg text-slate-500 italic">
+          Sem comparação declarado-vs-observado: este scan não tem questionário
+          associado. Responda ao questionário para cruzar a sua declaração com a
+          evidência técnica.
+        </p>
+      ) : (
+        <div
+          role="img"
+          aria-label={`Divergência declarado vs observado em ${dumbbellItems.length} medida${dumbbellItems.length > 1 ? "s" : ""}: ${betterCount} com observação igual ou melhor que a declaração, ${worseCount} com declaração mais otimista que a evidência técnica.`}
+          className="space-y-4"
+        >
+          {dumbbellItems.map((s) => {
+            const declared = s.questionnaireScore as number;
+            const observed = s.scanScore as number;
+            const better   = observed >= declared;
+            const lineColor = better ? C.ok : C.bad;
+            const left  = Math.min(declared, observed);
+            const width = Math.max(Math.abs(observed - declared), 0.5);
+
+            return (
+              <div key={s.article} className="flex items-center gap-3">
+                <span className="text-base text-slate-400 font-mono w-36 shrink-0">
+                  {s.article}
+                </span>
+                <div className="relative flex-1 h-3">
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-px"
+                    style={{ backgroundColor: C.line }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 h-0.5 rounded-full"
+                    style={{ left: `${left}%`, width: `${width}%`, backgroundColor: lineColor }}
+                  />
+                  <span
+                    title={`Declarado: ${declared}`}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full border-2"
+                    style={{ left: `${declared}%`, backgroundColor: C.dim, borderColor: C.dim }}
+                  />
+                  <span
+                    title={`Observado: ${observed}`}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full"
+                    style={{ left: `${observed}%`, backgroundColor: C.accent }}
+                  />
+                </div>
+                <span className="text-sm text-slate-400 w-32 text-right shrink-0">
+                  {declared} → <span style={{ color: C.accent }}>{observed}</span>
+                </span>
+              </div>
+            );
+          })}
+
+          {/* Legenda */}
+          <div
+            className="flex flex-wrap gap-x-6 gap-y-2 text-sm pt-2 border-t"
+            style={{ color: C.dim, borderColor: C.line }}
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full inline-block border-2" style={{ backgroundColor: C.dim, borderColor: C.dim }} />
+              Declarado
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: C.accent }} />
+              Observado
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: C.ok }} />
+              Observado melhor — tranquilizador
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: C.bad }} />
+              Declarado melhor — risco
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Lista de artigos */}
       <div className="space-y-3">
