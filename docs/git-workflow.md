@@ -16,8 +16,8 @@ main          ← produção (deploy automático via CI/CD)
 
 | Branch | Quem pode fazer push directo | Deploy automático |
 |--------|------------------------------|-------------------|
-| `main` | Ninguém — só merge de `develop` | Sim → Hetzner produção |
-| `develop` | Merge de `feat/*`, `fix/*`, `chore/*` | Não |
+| `main` | Ninguém — só merge de `develop` | Não |
+| `develop` | Merge de `feat/*`, `fix/*`, `chore/*` | Sim → Railway (produção, cisplan.com) |
 | `feat/*` | Dev directamente | Não |
 | `fix/*` | Dev directamente | Não |
 
@@ -50,7 +50,7 @@ git push origin feat/shodan-integration
 git checkout main
 git merge develop
 git push origin main
-# → CI/CD faz deploy automático para Hetzner
+# → Railway já fez deploy automático a partir do push anterior para develop
 ```
 
 ## Mensagens de commit
@@ -79,15 +79,12 @@ refactor(services): extrair cálculo NIS2 score para ficheiro separado
 docs(arch): actualizar diagrama com camada Redis
 ```
 
-## GitHub Secrets necessários
+## Deploy
 
-Configurar em: `Settings > Secrets and variables > Actions`
-
-| Secret | Descrição |
-|--------|-----------|
-| `HETZNER_HOST` | IP público do servidor Hetzner |
-| `HETZNER_USER` | Utilizador SSH (normalmente `ubuntu` ou `root`) |
-| `HETZNER_SSH_KEY` | Chave privada SSH (conteúdo completo do ficheiro) |
+O deploy é automático via integração nativa da Railway com o GitHub — cada
+push para `develop` é implementado diretamente pela Railway, sem passar
+pelo GitHub Actions. O CI (`ci.yml`) faz apenas testes e typecheck; não
+há nenhum secret de deploy a configurar no GitHub.
 
 ## Protecção de branches (configurar no GitHub)
 

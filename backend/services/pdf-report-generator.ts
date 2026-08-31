@@ -7,7 +7,6 @@
 
 import PDFDocument from "pdfkit";
 import path from "path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getScanById, getOrganizationById, getLatestCompletedQuestionnaireForOrg } from "../db";
 import {
   combinedNis2Scores,
@@ -29,24 +28,6 @@ const sev = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 // path.join(__dirname, …) é resolvido relativamente ao módulo, não ao cwd — seguro no Railway.
 const FONT_REGULAR = path.join(__dirname, "..", "assets", "fonts", "DejaVuSans.ttf");
 const FONT_BOLD    = path.join(__dirname, "..", "assets", "fonts", "DejaVuSans-Bold.ttf");
-
-// ---------------------------------------------------------------------------
-// S3 / Hetzner Object Storage client
-// ---------------------------------------------------------------------------
-
-function getS3Client(): S3Client {
-  return new S3Client({
-    region:   process.env.STORAGE_REGION   ?? "eu-central-1",
-    endpoint: process.env.STORAGE_ENDPOINT ?? "https://fsn1.your-objectstorage.com",
-    credentials: {
-      accessKeyId:     process.env.STORAGE_ACCESS_KEY ?? "",
-      secretAccessKey: process.env.STORAGE_SECRET_KEY ?? "",
-    },
-    forcePathStyle: true,
-  });
-}
-
-const BUCKET = process.env.STORAGE_BUCKET ?? "nis2pt-reports";
 
 // ---------------------------------------------------------------------------
 // Design tokens
@@ -147,15 +128,6 @@ function fmtFull(d: Date | null | undefined): string {
 // ---------------------------------------------------------------------------
 // Public entry points
 // ---------------------------------------------------------------------------
-
-export async function generateReport(options: {
-  scanId: number;
-  organizationId: number;
-  type: "executive" | "technical";
-}): Promise<string> {
-  const buffer = await generateReportBuffer(options);
-  return uploadToStorage(buffer, options.organizationId, options.scanId, options.type);
-}
 
 export async function generateReportBuffer(options: {
   scanId: number;
@@ -1344,22 +1316,3 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
-// ---------------------------------------------------------------------------
-// S3 upload
-// ---------------------------------------------------------------------------
-
-async function uploadToStorage(
-  buffer: Buffer, orgId: number, scanId: number, type: string
-): Promise<string> {
-  const key = `reports/${orgId}/${scanId}-${type}.pdf`;
-  if (!process.env.STORAGE_ACCESS_KEY) {
-    console.warn(`[PDF] Storage not configured — key would be: ${key}`);
-    return `https://storage.cisplan.pt/${key}`;
-  }
-  const client = getS3Client();
-  await client.send(new PutObjectCommand({
-    Bucket: BUCKET, Key: key, Body: buffer,
-    ContentType: "application/pdf", ACL: "public-read",
-  }));
-  return `${process.env.STORAGE_PUBLIC_URL ?? "https://storage.cisplan.pt"}/${key}`;
-}

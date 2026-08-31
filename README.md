@@ -8,7 +8,7 @@ Plataforma SaaS para apoio de PMEs portuguesas na conformidade com a Directiva N
 - **Backend**: Node.js + Express + tRPC v11
 - **ORM**: Drizzle ORM + MySQL 8
 - **Cache / Rate limiting**: Redis
-- **Infra**: Hetzner CPX31 + Cloudflare CDN/WAF
+- **Infra**: Railway (EU-West, Amesterdão)
 - **Integrações**: Shodan API, Censys API, Anthropic API, Stripe, Resend
 
 ## Desenvolvimento local

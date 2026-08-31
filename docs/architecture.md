@@ -10,7 +10,7 @@ serem extraídos para microserviços na v2 sem reescrever a lógica.
 ## Camadas
 
 ```
-Cloudflare CDN + WAF
+Railway (EU-West, Amesterdão)
         ↓
   Express + tRPC
         ↓
@@ -28,16 +28,15 @@ Cloudflare CDN + WAF
 │    shodan.ts    censys.ts            │
 │    anthropic.ts stripe.ts resend.ts  │
 ├──────────────────────────────────────┤
-│  MySQL 8 + Redis + Hetzner S3        │
+│  MySQL 8 + Redis                     │
 └──────────────────────────────────────┘
 ```
 
 ## Infra produção
 
-- **Servidor**: Hetzner CPX31 (4 vCPU, 8 GB, Falkenstein EU)
-- **CDN/WAF**: Cloudflare free tier
-- **Storage**: Hetzner Object Storage (S3-compat) para PDFs
-- **Custo estimado**: ~€45/mês
+- **Plataforma**: Railway (região EU-West, Amesterdão)
+- **PDFs/documentos**: gerados em memória por pedido, devolvidos em base64 (sem storage persistente)
+- **Custo**: plano Railway conforme uso
 
 ## Tiers de plano
 
