@@ -37,6 +37,7 @@ import {
   lookupLibrary,
   generateRemediationForScan,
   countEligibleVulns,
+  isOrgSpecificCve,
   REMEDIATION_PROMPT_VERSION,
 } from "./ai-remediation";
 import { chat } from "../integrations/anthropic";
@@ -556,5 +557,182 @@ describe("countEligibleVulns", () => {
     mockGetScan.mockResolvedValue(SCAN_GAPS);
     const count = await countEligibleVulns(1);
     expect(count).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isOrgSpecificCve — filtro por prefixo, não por enumeração
+// ---------------------------------------------------------------------------
+
+describe("isOrgSpecificCve", () => {
+  it("true para NIS2-EMAIL-SPF", () => {
+    expect(isOrgSpecificCve("NIS2-EMAIL-SPF")).toBe(true);
+  });
+  it("true para NIS2-EMAIL-DMARC", () => {
+    expect(isOrgSpecificCve("NIS2-EMAIL-DMARC")).toBe(true);
+  });
+  it("true para NIS2-EMAIL-DKIM (hoje não gerado pelo scanner, mas o prefixo cobre-o)", () => {
+    expect(isOrgSpecificCve("NIS2-EMAIL-DKIM")).toBe(true);
+  });
+  it("false para NIS2-HEADER-HSTS", () => {
+    expect(isOrgSpecificCve("NIS2-HEADER-HSTS")).toBe(false);
+  });
+  it("false para CVE-2024-9999", () => {
+    expect(isOrgSpecificCve("CVE-2024-9999")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateRemediationForScan — CVEs org-specific (NIS2-EMAIL-*) nunca usam
+// a remediation_library partilhada (fuga cross-tenant de domínio)
+// ---------------------------------------------------------------------------
+
+function emailScan(cveId: string, target = "example.pt", organizationId = 42) {
+  return {
+    id: 1,
+    organizationId,
+    target,
+    results: {
+      vulnerabilities: [
+        {
+          cveId,
+          severity: "high",
+          cvssScore: 5,
+          description: "Sem registo SPF — qualquer servidor pode enviar email em nome do domínio.",
+          affectedService: "email",
+          port: null,
+          remediationHint: `Configura SPF no DNS do domínio ${target}.`,
+        },
+      ],
+    },
+  };
+}
+
+describe("generateRemediationForScan — CVEs org-specific não usam a library partilhada", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupCommonMocks();
+  });
+
+  it("NIS2-EMAIL-SPF — MISS gera plano mas NÃO grava na library partilhada", async () => {
+    mockGetScan.mockResolvedValue(emailScan("NIS2-EMAIL-SPF"));
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+
+    const result = await generateRemediationForScan(1, 42, "pro");
+
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(result.created).toBe(1);
+  });
+
+  it("NIS2-EMAIL-SPF — mesmo com entrada EXISTENTE na library, não é usada; IA é chamada na mesma", async () => {
+    mockGetScan.mockResolvedValue(emailScan("NIS2-EMAIL-SPF"));
+    // Entrada "contaminada" já existente na library, de uma organização anterior
+    mockGetLibrary.mockResolvedValue({ ...LIBRARY_ENTRY_V2, cveId: "NIS2-EMAIL-SPF" });
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+
+    await generateRemediationForScan(1, 42, "pro");
+
+    // lookupLibrary não chega a consultar getLibraryByCveIdAndOsKey — bloqueado antes
+    expect(mockGetLibrary).not.toHaveBeenCalled();
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
+  it("NIS2-EMAIL-DKIM (hoje não gerado pelo scanner) — mesmo comportamento, prova filtro por prefixo", async () => {
+    mockGetScan.mockResolvedValue(emailScan("NIS2-EMAIL-DKIM"));
+    mockGetLibrary.mockResolvedValue({ ...LIBRARY_ENTRY_V2, cveId: "NIS2-EMAIL-DKIM" });
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+
+    await generateRemediationForScan(1, 42, "pro");
+
+    expect(mockGetLibrary).not.toHaveBeenCalled();
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
+  it("regressão — CVE-2024-9999 (não é org-specific) continua a usar e a escrever na library normalmente", async () => {
+    mockGetLibrary.mockResolvedValue(null);
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+
+    await generateRemediationForScan(1, 42, "pro");
+
+    expect(mockGetLibrary).toHaveBeenCalled();
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ cveId: "CVE-2024-9999" })
+    );
+  });
+
+  it("regressão — NIS2-HEADER-HSTS (não é org-specific) continua a usar e a escrever na library normalmente", async () => {
+    const SCAN_HEADER = {
+      ...FAKE_SCAN,
+      results: {
+        vulnerabilities: [
+          {
+            cveId: "NIS2-HEADER-HSTS",
+            severity: "medium",
+            cvssScore: 6.5,
+            description: "HSTS ausente",
+            affectedService: "http",
+            port: 443,
+            remediationHint: null,
+          },
+        ],
+      },
+    };
+    mockGetScan.mockResolvedValue(SCAN_HEADER);
+    mockGetLibrary.mockResolvedValue(null);
+    mockChat.mockResolvedValue({ text: FULL_RAW, stopReason: "end_turn" });
+
+    await generateRemediationForScan(1, 42, "pro");
+
+    expect(mockGetLibrary).toHaveBeenCalled();
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ cveId: "NIS2-HEADER-HSTS" })
+    );
+  });
+
+  it("cross-tenant — org A e org B com o mesmo cveId NIS2-EMAIL-SPF recebem planos gerados de novo, sem o domínio um do outro", async () => {
+    const rawWithDomain = (domain: string) => `
+Falha na configuração de segurança de email para ${domain}.
+
+1. Publica o registo DNS TXT SPF no domínio raiz de ${domain}: v=spf1 mx ~all
+2. Verifica a propagação com "dig TXT ${domain}"
+
+Esforço: Baixo
+Art. 21(2)(j)
+`;
+
+    // Org A — domínio dominio-a.pt
+    mockGetScan.mockResolvedValueOnce(emailScan("NIS2-EMAIL-SPF", "dominio-a.pt"));
+    mockGetOrg.mockResolvedValueOnce({ id: 42, name: "Org A" });
+    mockChat.mockResolvedValueOnce({ text: rawWithDomain("dominio-a.pt"), stopReason: "end_turn" });
+    await generateRemediationForScan(1, 42, "pro");
+
+    // Org B — mesmo cveId, organização e domínio diferentes
+    mockGetScan.mockResolvedValueOnce(emailScan("NIS2-EMAIL-SPF", "dominio-b.pt", 99));
+    mockGetOrg.mockResolvedValueOnce({ id: 99, name: "Org B" });
+    mockChat.mockResolvedValueOnce({ text: rawWithDomain("dominio-b.pt"), stopReason: "end_turn" });
+    await generateRemediationForScan(2, 99, "pro");
+
+    // A IA foi chamada 2x — org B nunca foi servida a partir de cache da org A
+    expect(mockChat).toHaveBeenCalledTimes(2);
+    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockGetLibrary).not.toHaveBeenCalled();
+
+    const orgBCall = mockCreate.mock.calls.find((c) => c[0].organizationId === 99)!;
+    const orgACall = mockCreate.mock.calls.find((c) => c[0].organizationId === 42)!;
+
+    const orgBText = JSON.stringify(orgBCall[0].steps);
+    const orgAText = JSON.stringify(orgACall[0].steps);
+
+    expect(orgBText).not.toContain("dominio-a.pt");
+    expect(orgBText).toContain("dominio-b.pt");
+    expect(orgAText).toContain("dominio-a.pt");
   });
 });

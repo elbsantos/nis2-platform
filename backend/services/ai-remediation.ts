@@ -28,6 +28,23 @@ export const REMEDIATION_PROMPT_VERSION = 3;
 const MAX_NEW_CVES_PER_RUN = parseInt(process.env.MAX_NEW_CVES_PER_RUN ?? "50", 10);
 
 // ---------------------------------------------------------------------------
+// CVEs org-specific — nunca partilhados entre organizações
+//
+// remediation_library é chaveada só por (cveId, osKey), sem organizationId.
+// cveId sintéticos com este prefixo têm o domínio da organização injetado no
+// prompt (ver buildEmailContext) e portanto no plano gerado — gravá-los na
+// library serviria o domínio de uma organização a outra. Filtro por prefixo,
+// não por enumeração dos checks atuais (SPF/DMARC), para cobrir também DKIM
+// (ou qualquer novo check de email) no dia em que passar a gerar "fail".
+// ---------------------------------------------------------------------------
+
+export const ORG_SPECIFIC_CVE_PREFIX = "NIS2-EMAIL-";
+
+export function isOrgSpecificCve(cveId: string): boolean {
+  return cveId.startsWith(ORG_SPECIFIC_CVE_PREFIX);
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -447,8 +464,12 @@ export async function generateRemediationForScan(
         skipped += 1;
         continue;
       }
-      // Two-step library lookup: (cveId, osKey) then (cveId, 'generic') fallback
-      const libraryEntry = await lookupLibrary(vuln.cveId, osKey);
+      // Two-step library lookup: (cveId, osKey) then (cveId, 'generic') fallback.
+      // CVEs org-specific (NIS2-EMAIL-*) nunca consultam a library partilhada —
+      // defesa em profundidade contra entradas contaminadas já existentes em BD.
+      const libraryEntry = isOrgSpecificCve(vuln.cveId)
+        ? null
+        : await lookupLibrary(vuln.cveId, osKey);
 
       let itemPlan: ParsedPlan;
 
@@ -472,17 +493,22 @@ export async function generateRemediationForScan(
         }
         newGenerated += 1;
 
-        // MISS or outdated version — generate via API and save/update library
+        // MISS or outdated version — generate via API and save/update library.
+        // CVEs org-specific (NIS2-EMAIL-*) nunca são gravados na library
+        // partilhada — o prompt injeta o domínio da organização e a library
+        // é chaveada só por (cveId, osKey), sem organizationId.
         itemPlan = await generatePlanForVuln(vuln, orgContext);
-        await upsertLibraryEntry({
-          cveId:         vuln.cveId,
-          osKey,
-          steps:         itemPlan.steps,
-          riskSummary:   itemPlan.riskSummary,
-          effort:        itemPlan.effort,
-          nis2Articles:  itemPlan.nis2Articles,
-          promptVersion: REMEDIATION_PROMPT_VERSION,
-        });
+        if (!isOrgSpecificCve(vuln.cveId)) {
+          await upsertLibraryEntry({
+            cveId:         vuln.cveId,
+            osKey,
+            steps:         itemPlan.steps,
+            riskSummary:   itemPlan.riskSummary,
+            effort:        itemPlan.effort,
+            nis2Articles:  itemPlan.nis2Articles,
+            promptVersion: REMEDIATION_PROMPT_VERSION,
+          });
+        }
       }
 
       await createRemediationItem({
