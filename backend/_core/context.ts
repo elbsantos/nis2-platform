@@ -25,7 +25,17 @@ async function getUserFromCookie(req: CreateExpressContextOptions["req"]): Promi
     const userId = typeof payload.sub === "string" ? parseInt(payload.sub, 10) : null;
     if (!userId || isNaN(userId)) return null;
 
-    return getUserById(userId);
+    const user = await getUserById(userId);
+    if (!user) return null;
+
+    // Revogação de sessão: um token assinado antes do claim existir (sem
+    // sessionVersion) é tratado como versão 0 — retrocompatível, não desloga
+    // sessões existentes no deploy. Reset de password incrementa a coluna,
+    // invalidando todos os tokens anteriores do utilizador.
+    const tokenVersion = Number(payload.sessionVersion ?? 0);
+    if (tokenVersion !== (user.sessionVersion ?? 0)) return null;
+
+    return user;
   } catch {
     return null;
   }

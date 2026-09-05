@@ -68,6 +68,7 @@ export const users = mysqlTable(
     resetTokenHash:       varchar("resetTokenHash", { length: 64 }),
     resetTokenExpiresAt:  timestamp("resetTokenExpiresAt"),
     deletedAt:            timestamp("deletedAt"),
+    sessionVersion:       int("sessionVersion").notNull().default(0),
     createdAt:            timestamp("createdAt").notNull().defaultNow(),
     updatedAt:            timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
   },

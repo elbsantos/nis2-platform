@@ -326,6 +326,19 @@ const MIGRATIONS: Migration[] = [
       return "applied";
     },
   },
+
+  // ── Revogação de sessão (P1-1) ────────────────────────────────────────────
+
+  {
+    name: "users.sessionVersion",
+    run: async (db) => {
+      if (await columnExists(db, "users", "sessionVersion")) return "skipped";
+      await db.execute(sql.raw(
+        "ALTER TABLE `users` ADD COLUMN `sessionVersion` INT NOT NULL DEFAULT 0"
+      ));
+      return "applied";
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

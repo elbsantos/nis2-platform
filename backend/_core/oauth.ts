@@ -77,8 +77,8 @@ function verifyPassword(password: string, stored: string): boolean {
 // JWT
 // ---------------------------------------------------------------------------
 
-async function signToken(userId: number): Promise<string> {
-  return new SignJWT({ sub: String(userId) })
+async function signToken(userId: number, sessionVersion: number): Promise<string> {
+  return new SignJWT({ sub: String(userId), sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
@@ -109,7 +109,7 @@ export function registerOAuthRoutes(app: Application): void {
       const passwordHash = hashPassword(password);
       const { userId, orgId } = await registerUserAtomically({ email, name, passwordHash, orgName });
 
-      const token = await signToken(userId);
+      const token = await signToken(userId, 0);
       res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
       res.json({ id: userId, email, name, orgId });
     } catch (err) {
@@ -140,7 +140,7 @@ export function registerOAuthRoutes(app: Application): void {
         return;
       }
 
-      const token = await signToken(user.id);
+      const token = await signToken(user.id, user.sessionVersion);
       res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
       res.json({ id: user.id, email: user.email, name: user.name });
     } catch (err) {

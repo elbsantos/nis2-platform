@@ -33,9 +33,11 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import express from "express";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
+import { scryptSync, randomBytes } from "crypto";
 import * as db from "../db";
 import { registerOAuthRoutes } from "./oauth";
+import { getJwtSecret } from "./env";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,6 +60,24 @@ async function makeToken(userId: number): Promise<string> {
     .setIssuedAt()
     .setExpirationTime("7d")
     .sign(secret);
+}
+
+/** Replica hashPassword() de oauth.ts (não exportada) para produzir um hash válido em testes. */
+function fakeHash(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+/** Extrai e descodifica o cookie auth_token de uma resposta supertest. */
+async function tokenPayloadFromResponse(res: request.Response) {
+  const cookies = res.headers["set-cookie"] as string[] | string;
+  const cookieStr = Array.isArray(cookies) ? cookies.join("; ") : cookies;
+  const match = cookieStr.match(/auth_token=([^;]+)/);
+  expect(match).not.toBeNull();
+  const token = decodeURIComponent(match![1]);
+  const { payload } = await jwtVerify(token, getJwtSecret());
+  return payload;
 }
 
 afterEach(() => {
@@ -143,3 +163,44 @@ describe("POST /api/auth/register — register atómico (B3 commit-1)", () => {
 });
 
 // Testes GET /api/auth/me adicionados no commit 2 (B3 commit-2).
+
+// ---------------------------------------------------------------------------
+// P1-1 — signToken inclui o claim sessionVersion no payload emitido
+// ---------------------------------------------------------------------------
+
+describe("signToken — claim sessionVersion (P1-1)", () => {
+  it("POST /api/auth/register emite um token com sessionVersion=0 (utilizador novo)", async () => {
+    vi.mocked(db.getUserByEmail).mockResolvedValue(null as any);
+    vi.mocked(db.registerUserAtomically).mockResolvedValue({ userId: 77, orgId: 9 });
+
+    const res = await request(makeApp())
+      .post("/api/auth/register")
+      .send({ email: "fresh@test.com", password: "password123", orgName: "Org" });
+
+    expect(res.status).toBe(200);
+    const payload = await tokenPayloadFromResponse(res);
+    expect(payload.sub).toBe("77");
+    expect(payload.sessionVersion).toBe(0);
+  });
+
+  it("POST /api/auth/login emite um token cujo claim sessionVersion reflete o do utilizador", async () => {
+    const password = "password123";
+    vi.mocked(db.getUserByEmail).mockResolvedValue({
+      id: 55,
+      email: "versioned@test.com",
+      name: "Versioned",
+      passwordHash: fakeHash(password),
+      sessionVersion: 3,
+      deletedAt: null,
+    } as any);
+
+    const res = await request(makeApp())
+      .post("/api/auth/login")
+      .send({ email: "versioned@test.com", password });
+
+    expect(res.status).toBe(200);
+    const payload = await tokenPayloadFromResponse(res);
+    expect(payload.sub).toBe("55");
+    expect(payload.sessionVersion).toBe(3);
+  });
+});

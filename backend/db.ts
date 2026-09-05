@@ -118,7 +118,15 @@ export async function clearResetToken(userId: number) {
 export async function resetUserPassword(userId: number, passwordHash: string) {
   await getDb()
     .update(users)
-    .set({ passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, updatedAt: new Date() })
+    .set({
+      passwordHash,
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+      // Revoga todas as sessões existentes do utilizador — incremento atómico
+      // via SQL (não round-trip get-then-set), evita race condition.
+      sessionVersion: sql`${users.sessionVersion} + 1`,
+      updatedAt: new Date(),
+    })
     .where(eq(users.id, userId));
 }
 
