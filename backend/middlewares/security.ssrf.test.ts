@@ -7,6 +7,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import dns from "dns";
 import http from "http";
+import https from "https";
+import { EventEmitter } from "events";
+import { checkHttpHeaders } from "../integrations/http-headers";
 
 // Importar após qualquer mock de módulo (vi.mock é hoisted automaticamente pelo Vitest)
 import { isPrivateOrBlockedIp, safeLookup, assertSafeRedirect } from "./security";
@@ -264,6 +267,55 @@ describe("safeLookup", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // DNS rebinding — safeLookup valida TODOS os IPs devolvidos, não só o
+  // primeiro (formaliza o que o commit 2a770dd corrigiu, agora com IPv6
+  // mapeado misturado na lista, não só IPv4 puro).
+  // ---------------------------------------------------------------------------
+
+  it("bloqueia se o ÚLTIMO IP da lista for IPv4-mapeado privado, mesmo com públicos antes", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(dns, "lookup").mockImplementation(((h: string, o: unknown, cb: any) => {
+      cb(null, [
+        { address: "93.184.216.34",           family: 4 }, // público
+        { address: "2606:4700:4700::1111",    family: 6 }, // público (IPv6 legítimo)
+        { address: "::ffff:169.254.169.254",  family: 6 }, // metadata mapeado — deve bloquear tudo
+      ]);
+    }) as any);
+    const cb = vi.fn();
+    safeLookup("rebind.example.com", { all: true }, cb);
+    const [err] = cb.mock.calls[0] as [NodeJS.ErrnoException, string, number];
+    expect(err).not.toBeNull();
+    expect((err as NodeJS.ErrnoException).code).toBe("SSRF_BLOCKED");
+  });
+
+  it("todos os IPs públicos (IPv4 + IPv6 legítimo) → passa, e dns.lookup só é chamado UMA vez (sem segunda resolução)", () => {
+    const lookupSpy = vi.spyOn(dns, "lookup").mockImplementation(((h: string, o: unknown, cb: any) => {
+      cb(null, [
+        { address: "93.184.216.34",        family: 4 },
+        { address: "2606:4700:4700::1111", family: 6 },
+      ]);
+    }) as any);
+    const cb = vi.fn();
+    safeLookup("all-public.example.com", { all: true }, cb);
+
+    expect(lookupSpy).toHaveBeenCalledTimes(1); // uma resolução só — sem re-lookup entre validar e ligar
+    const [err, addresses] = cb.mock.calls[0] as [NodeJS.ErrnoException | null, dns.LookupAddress[], number];
+    expect(err).toBeNull();
+    // O endereço devolvido para ligação tem de ser um dos que foram validados na mesma lista.
+    const returned = addresses[0].address;
+    expect(["93.184.216.34", "2606:4700:4700::1111"]).toContain(returned);
+  });
+
+  it("fast-path: hostname literal já em forma IPv4-mapeada privada → bloqueia ANTES de chamar dns.lookup", () => {
+    const lookupSpy = vi.spyOn(dns, "lookup");
+    const cb = vi.fn();
+    safeLookup("::ffff:127.0.0.1", {}, cb);
+    expect(lookupSpy).not.toHaveBeenCalled(); // confirma que não houve DNS — bloqueado no literal
+    const [err] = cb.mock.calls[0] as [NodeJS.ErrnoException, string, number];
+    expect((err as NodeJS.ErrnoException).code).toBe("SSRF_BLOCKED");
+  });
+
+  // ---------------------------------------------------------------------------
   // Contrato all:true — Node.js >=22 com autoSelectFamily (Happy Eyeballs)
   //
   // Node chama o lookup com { all: true } e espera callback(null, LookupAddress[]).
@@ -380,5 +432,93 @@ describe("assertSafeRedirect", () => {
       [{ address: "93.184.216.34", family: 4 }] as any
     );
     await expect(assertSafeRedirect("https://example.com/page")).resolves.toBeUndefined();
+  });
+
+  it("rejeita redirect para [::ffff:127.0.0.1] com parênteses (forma literal de URL — fix 2a770dd)", async () => {
+    await expect(assertSafeRedirect("http://[::ffff:127.0.0.1]/secret")).rejects.toThrow("SSRF bloqueado");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multi-salto — assertSafeRedirect corre em CADA salto, não só no primeiro.
+  //
+  // fetchHeaders/checkHttpToHttps (http-headers.ts) chamam assertSafeRedirect
+  // uma vez por salto, recursivamente. Como qualquer alvo em loopback é
+  // sempre privado independentemente do número do salto (não há forma de
+  // representar "salto intermédio seguro" só com servidores locais), a prova
+  // de que a validação corre em CADA chamada — não só na primeira — é feita
+  // invocando assertSafeRedirect em sequência, exactamente como o loop real
+  // faz: 1º salto para um destino público (passa), 2º salto para um destino
+  // privado (bloqueia). Se assertSafeRedirect só validasse a primeira
+  // invocação do processo (bug hipotético de "corre só uma vez"), o 2º salto
+  // passaria incorrectamente.
+  // ---------------------------------------------------------------------------
+
+  it("2º salto é validado de forma independente do 1º — 1º público passa, 2º privado bloqueia", async () => {
+    const lookupSpy = vi.spyOn(dns.promises, "lookup");
+    lookupSpy.mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }] as any);
+
+    // 1º salto — destino público, tem de passar
+    await expect(assertSafeRedirect("https://public-hop.example.com/")).resolves.toBeUndefined();
+
+    // 2º salto — destino privado, tem de bloquear, MESMO tendo acabado de
+    // validar um salto anterior com sucesso (prova que não há cache/bypass
+    // entre chamadas sucessivas na mesma cadeia de redirects).
+    await expect(assertSafeRedirect("http://127.0.0.1/internal")).rejects.toThrow("SSRF bloqueado");
+    // 3º salto — reafirma que continua a validar (não "desliga" depois do bloqueio anterior)
+    await expect(assertSafeRedirect("http://[::ffff:169.254.169.254]/latest/meta-data/")).rejects.toThrow(
+      "SSRF bloqueado"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Limite de redirects — a cadeia pára ao fim de 3 saltos (redirectsLeft)
+//
+// Testado via checkHttpHeaders (a função exportada real) com http.get mockado
+// para gerar uma cadeia de redirects "infinita" entre hosts que passam
+// isSafeTarget/isPrivateOrBlockedIp (não podem ser loopback — um alvo privado
+// bloquearia no 1º salto por essa razão, mascarando a propriedade do limite
+// de contagem, que é ortogonal à validação de destino). dns.lookup/dns.promises.lookup
+// são mockados para devolver sempre um IP público, para isolar exclusivamente
+// o comportamento do contador de saltos.
+// ---------------------------------------------------------------------------
+
+describe("checkHttpHeaders — limite de redirects (redirectsLeft)", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it("cadeia de redirects que excede 3 saltos é interrompida (não segue indefinidamente)", async () => {
+    vi.spyOn(dns, "lookup").mockImplementation(((h: string, o: unknown, cb: any) => {
+      cb(null, [{ address: "203.0.113.10", family: 4 }]);
+    }) as any);
+    vi.spyOn(dns.promises, "lookup").mockResolvedValue([{ address: "203.0.113.10", family: 4 }] as any);
+
+    // checkHttpHeaders chama tanto checkHttpToHttps (sempre via http.get, porta
+    // 80) como fetchHeaders (https.get para o alvo https://) — as duas fazem
+    // o seu próprio "redirectsLeft", por isso ambas têm de estar mockadas para
+    // não cair em rede real (DNS de "*.example.test" nunca resolve de verdade).
+    let httpCalls = 0;
+    let httpsCalls = 0;
+    const makeFakeGet = (onCall: () => number) => ((url: any, opts: any, cb: any) => {
+      const n = onCall();
+      const fakeRes: any = new EventEmitter();
+      fakeRes.statusCode = 302;
+      fakeRes.headers = { location: `https://hop${n + 1}.example.test/` };
+      fakeRes.destroy = () => {};
+      const fakeReq: any = new EventEmitter();
+      fakeReq.on = fakeReq.on.bind(fakeReq);
+      process.nextTick(() => cb(fakeRes));
+      return fakeReq;
+    });
+    vi.spyOn(http, "get").mockImplementation(makeFakeGet(() => ++httpCalls) as any);
+    const httpsGetSpy = vi.spyOn(https, "get").mockImplementation(makeFakeGet(() => ++httpsCalls) as any);
+
+    await checkHttpHeaders("hop0.example.test");
+
+    // fetchHeaders arranca em https:// com redirectsLeft=3: pedido inicial +
+    // no máximo 3 redirects seguidos = 4 chamadas a https.get. Se o limite não
+    // fosse respeitado, httpsCalls cresceria sem parar (a resposta é sempre
+    // 302 com um novo Location) até o teste rebentar por timeout.
+    expect(httpsGetSpy).toHaveBeenCalled();
+    expect(httpsCalls).toBeLessThanOrEqual(4);
   });
 });

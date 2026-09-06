@@ -111,4 +111,40 @@ describe("SSRF — regressão A2: duas metades da defesa", () => {
     },
     10_000
   );
+
+  it(
+    "Metade 3 — assertSafeRedirect bloqueia redirect 302 → ::ffff:127.0.0.1 (IPv4-mapeado, fix 2a770dd exercido end-to-end)",
+    async () => {
+      let portAReached = false;
+      let portBReached = false;
+
+      // Servidor B — alvo interno; nunca deve ser alcançado
+      const { server: internal, port: portB } = await startServer((_req, res) => {
+        portBReached = true;
+        res.writeHead(200, { "Server": "INTERNAL-REACHED", "Content-Type": "text/plain" });
+        res.end("recurso interno");
+      });
+
+      // Servidor A — responde 302 para o MESMO alvo interno, mas escrito como
+      // IPv4-mapeado em IPv6 (o vetor que o commit 2a770dd corrigiu).
+      const { server: redirector, port: portA } = await startServer((_req, res) => {
+        portAReached = true;
+        res.writeHead(302, { "Location": `http://[::ffff:127.0.0.1]:${portB}/` });
+        res.end();
+      });
+
+      try {
+        const result = await checkHttpHeaders(`127.0.0.1:${portA}`);
+
+        expect(portAReached).toBe(true);   // 1ª ligação passou — servidor A foi atingido
+        expect(portBReached).toBe(false);  // assertSafeRedirect bloqueou o redirect mapeado
+        expect(result.score).toBeNull();
+        expect(result.serverBanner).not.toBe("INTERNAL-REACHED");
+      } finally {
+        await stopServer(redirector);
+        await stopServer(internal);
+      }
+    },
+    15_000
+  );
 });
