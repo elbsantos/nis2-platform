@@ -6,6 +6,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import dns from "dns";
+import net from "net";
 
 // ---------------------------------------------------------------------------
 // Security headers middleware
@@ -125,8 +126,7 @@ export function isValidPublicIpv4(target: string): boolean {
 export function isSafeTarget(target: string): boolean {
   const lower = target.toLowerCase().trim();
 
-  if (BLOCKED_HOSTNAMES.has(lower)) return false;
-  if (PRIVATE_IP_RE.test(lower)) return false;
+  if (isPrivateOrBlockedIp(lower)) return false;
 
   // Accept valid public IPv4 (e.g. 185.1.2.3) — verified via HTTP .well-known
   if (IPV4_RE.test(lower)) return isValidPublicIpv4(lower);
@@ -149,10 +149,66 @@ export function assertSafeTarget(target: string): void {
 // SSRF connection-time guards — aplicar a TODOS os pontos de conexão (A2)
 // ---------------------------------------------------------------------------
 
-/** Verifica se um IP resolvido é privado ou bloqueado — reutiliza os ranges existentes. */
+/**
+ * Canonicaliza um literal IPv6 para a forma comprimida (RFC 5952), reutilizando
+ * o parser de URL do próprio Node (WHATWG URL Standard) em vez de reimplementar
+ * expansão/compressão de IPv6 à mão. Cobre variações de escrita do mesmo
+ * endereço — ex. "0:0:0:0:0:0:0:1" e "::1" ficam ambos "::1".
+ * Devolve null se `address` não for um IPv6 válido (não deve acontecer, o
+ * chamador já filtra com net.isIPv6, mas falha de forma segura).
+ */
+function canonicalizeIpv6(address: string): string | null {
+  try {
+    // new URL exige parênteses para hosts IPv6; .hostname devolve em
+    // minúsculas e já na forma comprimida canónica, mas MANTÉM os parênteses
+    // (confirmado empiricamente nesta versão do Node) — removê-los aqui.
+    return new URL(`http://[${address}]`).hostname.replace(/^\[|\]$/g, "");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Se `address` for um IPv4 mapeado em IPv6 (RFC 4291 — ex. "::ffff:169.254.169.254"
+ * ou a sua forma canónica em hex "::ffff:a9fe:a9fe"), devolve o IPv4 embutido em
+ * notação decimal. Caso contrário, null. Aceita as duas formas para não depender
+ * só da canonicalização ter tido sucesso.
+ */
+function extractMappedIpv4(address: string): string | null {
+  const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(address);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    return [(hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff].join(".");
+  }
+  const dotted = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i.exec(address);
+  return dotted ? dotted[1] : null;
+}
+
+/**
+ * Verifica se um IP resolvido é privado ou bloqueado — reutiliza os ranges
+ * existentes (PRIVATE_IP_RE). Fonte única partilhada por isSafeTarget,
+ * safeLookup e assertSafeRedirect.
+ *
+ * IPv6: normaliza para a forma canónica primeiro (cobre variações de escrita
+ * do mesmo endereço, ex. loopback expandido), depois desembrulha um eventual
+ * IPv4 mapeado (::ffff:x.x.x.x) e revalida-o com a MESMA regra IPv4
+ * (PRIVATE_IP_RE) que já protege 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+ * 127.0.0.0/8 e 169.254.0.0/16 — cobre a classe inteira de endereços
+ * IPv4-mapeados privados, não só exemplos avulsos.
+ */
 export function isPrivateOrBlockedIp(ip: string): boolean {
   const lower = ip.toLowerCase().trim();
-  return BLOCKED_HOSTNAMES.has(lower) || PRIVATE_IP_RE.test(lower);
+  if (BLOCKED_HOSTNAMES.has(lower)) return true;
+
+  if (net.isIPv6(lower)) {
+    const canonical = canonicalizeIpv6(lower) ?? lower;
+    const mappedIpv4 = extractMappedIpv4(canonical) ?? extractMappedIpv4(lower);
+    if (mappedIpv4) return PRIVATE_IP_RE.test(mappedIpv4);
+    return PRIVATE_IP_RE.test(canonical);
+  }
+
+  return PRIVATE_IP_RE.test(lower);
 }
 
 /**
@@ -169,7 +225,7 @@ export function safeLookup(
 ): void {
   // Caminho rápido: hostname conhecido como bloqueado ou IP literal privado
   const lower = hostname.toLowerCase();
-  if (BLOCKED_HOSTNAMES.has(lower) || PRIVATE_IP_RE.test(lower)) {
+  if (isPrivateOrBlockedIp(lower)) {
     callback(
       Object.assign(new Error(`SSRF bloqueado: ${hostname}`), { code: "SSRF_BLOCKED" }) as NodeJS.ErrnoException,
       "", 0
@@ -238,7 +294,7 @@ export async function assertSafeRedirect(url: string): Promise<void> {
   }
 
   // IP literal ou hostname bloqueado — sem DNS
-  if (PRIVATE_IP_RE.test(hostname) || BLOCKED_HOSTNAMES.has(hostname.toLowerCase())) {
+  if (isPrivateOrBlockedIp(hostname)) {
     throw new Error(`SSRF bloqueado: redirect para ${hostname} não permitido`);
   }
 

@@ -49,6 +49,60 @@ describe("isPrivateOrBlockedIp", () => {
 });
 
 // ---------------------------------------------------------------------------
+// isPrivateOrBlockedIp — IPv4 mapeado em IPv6 (bypass SSRF real, corrigido)
+//
+// PRIVATE_IP_RE sozinha nunca reconheceu ::ffff:x.x.x.x — um atacante com um
+// registo DNS AAAA a apontar para ::ffff:169.254.169.254 (metadata cloud) ou
+// ::ffff:127.0.0.1 (loopback) atravessava isPrivateOrBlockedIp/safeLookup sem
+// ser bloqueado. O fix desembrulha o IPv4 embutido e revalida-o com a mesma
+// PRIVATE_IP_RE — cobre a classe inteira (10/8, 172.16/12, 192.168/16, 127/8,
+// 169.254/16 mapeados), não só os dois exemplos do relatório.
+// ---------------------------------------------------------------------------
+
+describe("isPrivateOrBlockedIp — IPv4 mapeado em IPv6 (SSRF fix)", () => {
+  it.each([
+    ["::ffff:127.0.0.1",        "loopback"],
+    ["::FFFF:127.0.0.1",        "loopback, capitalização alternativa"],
+    ["::ffff:169.254.169.254",  "metadata cloud (AWS/GCP IMDS)"],
+    ["::ffff:10.0.0.1",         "RFC1918 10.0.0.0/8"],
+    ["::ffff:192.168.1.1",      "RFC1918 192.168.0.0/16"],
+    ["::ffff:172.16.0.1",       "RFC1918 172.16.0.0/12"],
+  ])("bloqueia %s (%s)", (ip) => {
+    expect(isPrivateOrBlockedIp(ip)).toBe(true);
+  });
+
+  it.each([
+    ["0:0:0:0:0:0:0:1", "loopback totalmente expandido"],
+    ["::1",             "loopback comprimido (não-regressão)"],
+    ["::FFFF:10.0.0.1", "capitalização ::FFFF: maiúscula"],
+  ])("bloqueia %s (%s) — normalização para a forma canónica antes de comparar", (ip) => {
+    expect(isPrivateOrBlockedIp(ip)).toBe(true);
+  });
+
+  it("NÃO bloqueia um IPv6 público legítimo (2606:4700:4700::1111 — DNS da Cloudflare)", () => {
+    // Regressão: um domínio com AAAA público real (scan legítimo) não pode ficar bloqueado.
+    expect(isPrivateOrBlockedIp("2606:4700:4700::1111")).toBe(false);
+  });
+
+  it.each([
+    ["127.0.0.1"],
+    ["10.0.0.1"],
+    ["192.168.1.1"],
+    ["172.16.0.1"],
+    ["169.254.169.254"],
+  ])("regressão — IPv4 puro %s continua bloqueado (não afetado pelo ramo IPv6)", (ip) => {
+    expect(isPrivateOrBlockedIp(ip)).toBe(true);
+  });
+
+  it.each([
+    ["8.8.8.8"],
+    ["185.1.2.3"],
+  ])("regressão — IPv4 público %s continua permitido", (ip) => {
+    expect(isPrivateOrBlockedIp(ip)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // safeLookup — dns.lookup stubado
 // ---------------------------------------------------------------------------
 
