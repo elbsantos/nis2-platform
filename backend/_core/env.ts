@@ -36,6 +36,10 @@ export const ENV = {
   jwtSecret: required("JWT_SECRET"),
   cookieSecret: required("COOKIE_SECRET"),
 
+  // ── Encryption at rest (M365 tokens e outros segredos futuros) ─────────────
+  // 32 bytes em base64 — validação de comprimento em utils/encryption.ts.
+  m365EncryptionKey: required("M365_ENCRYPTION_KEY"),
+
   // ── OAuth (existing) ──────────────────────────────────────────────────────
   appId: optional("VITE_APP_ID"),
   oAuthServerUrl: optional("OAUTH_SERVER_URL"),

@@ -14,6 +14,7 @@ import { registerDocsHandler } from "../middlewares/docs.handler";
 import { securityHeaders, corsHeaders } from "../middlewares/security";
 import { logEnvStatus } from "./env";
 import { runStartupMigrations } from "./startup-migrations";
+import { assertEncryptionKey } from "../utils/encryption";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -32,6 +33,16 @@ async function findAvailablePort(start = 3000): Promise<number> {
 
 async function startServer() {
   logEnvStatus();
+
+  // ── Chave de cifragem M365 — valida cedo (32 bytes em base64), antes de
+  // qualquer uso real; nenhum token deve poder chegar a ser cifrado com uma
+  // chave ausente ou mal formada. ─────────────────────────────────────────
+  try {
+    assertEncryptionKey();
+  } catch (err) {
+    console.error("[Encryption] M365_ENCRYPTION_KEY inválida — a abortar o arranque:", (err as Error).message);
+    process.exit(1);
+  }
 
   // ── 0. Schema migrations — corre antes de qualquer query ───────────────
   await runStartupMigrations().catch((err: Error) => {
