@@ -339,6 +339,53 @@ const MIGRATIONS: Migration[] = [
       return "applied";
     },
   },
+
+  // ── Connector M365 — ligações + snapshots de conformidade ──────────────────
+
+  {
+    name: "m365_connections.create",
+    run: async (db) => {
+      if (await tableExists(db, "m365_connections")) return "skipped";
+      // CREATE TABLE with IF NOT EXISTS as belt-and-suspenders.
+      await db.execute(sql.raw(
+        "CREATE TABLE IF NOT EXISTS `m365_connections` (" +
+        "  `id`              INT          NOT NULL AUTO_INCREMENT," +
+        "  `organizationId`  INT          NOT NULL," +
+        "  `tenantId`        VARCHAR(100) NOT NULL," +
+        "  `accessTokenEnc`  TEXT         NULL," +
+        "  `refreshTokenEnc` TEXT         NULL," +
+        "  `tokenExpiresAt`  TIMESTAMP    NULL," +
+        "  `status`          VARCHAR(20)  NOT NULL DEFAULT 'connected'," +
+        "  `lastError`       VARCHAR(500) NULL," +
+        "  `createdAt`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+        "  `updatedAt`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
+        "  PRIMARY KEY (`id`)," +
+        "  UNIQUE KEY `uq_m365_conn_org` (`organizationId`)" +
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+      ));
+      return "applied";
+    },
+  },
+
+  {
+    name: "m365_snapshots.create",
+    run: async (db) => {
+      if (await tableExists(db, "m365_snapshots")) return "skipped";
+      // CREATE TABLE with IF NOT EXISTS as belt-and-suspenders.
+      await db.execute(sql.raw(
+        "CREATE TABLE IF NOT EXISTS `m365_snapshots` (" +
+        "  `id`             INT       NOT NULL AUTO_INCREMENT," +
+        "  `organizationId` INT       NOT NULL," +
+        "  `verdicts`       JSON      NULL," +
+        "  `capturedAt`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+        "  `createdAt`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+        "  PRIMARY KEY (`id`)," +
+        "  KEY `idx_m365_snap_org` (`organizationId`)" +
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+      ));
+      return "applied";
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────

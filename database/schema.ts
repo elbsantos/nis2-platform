@@ -334,6 +334,58 @@ export const controlEvidence = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// M365 connections — uma ligação OAuth por organização.
+//
+// accessTokenEnc/refreshTokenEnc guardam SEMPRE o output de
+// utils/encryption.encrypt(); nunca escrever tokens em claro nestas colunas.
+// ---------------------------------------------------------------------------
+
+export const m365Connections = mysqlTable(
+  "m365_connections",
+  {
+    id:              int("id").autoincrement().primaryKey(),
+    organizationId:  int("organizationId").notNull(),
+    tenantId:        varchar("tenantId", { length: 100 }).notNull(),
+    accessTokenEnc:  text("accessTokenEnc"),
+    refreshTokenEnc: text("refreshTokenEnc"),
+    tokenExpiresAt:  timestamp("tokenExpiresAt"),
+    status:          varchar("status", { length: 20 }).notNull().default("connected"),
+    lastError:       varchar("lastError", { length: 500 }),
+    createdAt:       timestamp("createdAt").notNull().defaultNow(),
+    updatedAt:       timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_m365_conn_org").on(t.organizationId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
+// M365 snapshots — histórico de veredictos agregados de conformidade.
+//
+// verdicts guarda APENAS agregados por controlo (contagens e estado, ex.
+// { "j-1": { verdict: "contradicted", total: 40, nonCompliant: 3 } }).
+// NUNCA dados pessoais de trabalhadores (nomes, emails, logs de login,
+// localizações) — Compromisso 3 do ADR M365.
+// ---------------------------------------------------------------------------
+
+export const m365Snapshots = mysqlTable(
+  "m365_snapshots",
+  {
+    id:             int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    verdicts:       json("verdicts").$type<Record<string, {
+                      verdict: "verified" | "contradicted" | "unconfirmed" | "not_observable";
+                      [k: string]: unknown;
+                    }>>(),
+    capturedAt:     timestamp("capturedAt").notNull().defaultNow(),
+    createdAt:      timestamp("createdAt").notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_m365_snap_org").on(t.organizationId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
 
@@ -346,3 +398,5 @@ export type ControlEvidence       = typeof controlEvidence.$inferSelect;
 export type RemediationLibraryEntry = typeof remediationLibrary.$inferSelect;
 export type QuestionnaireExplanationLibraryEntry = typeof questionnaireExplanationLibrary.$inferSelect;
 export type FrameworkAssessment   = typeof frameworkAssessments.$inferSelect;
+export type M365Connection        = typeof m365Connections.$inferSelect;
+export type M365Snapshot          = typeof m365Snapshots.$inferSelect;
