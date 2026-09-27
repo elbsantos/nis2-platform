@@ -15,6 +15,7 @@ import {
   scans,
   vulnerabilities,
   subscriptions,
+  m365Connections,
 } from "../database/schema";
 import { eq, desc, asc, and, gte, like, sql, isNull } from "drizzle-orm";
 
@@ -990,4 +991,46 @@ export async function updateOrgProfile(orgId: number, data: OrgProfileData) {
     .update(organizations)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(organizations.id, orgId));
+}
+
+// ---------------------------------------------------------------------------
+// M365 connections — uma ligação OAuth por organização.
+//
+// accessTokenEnc/refreshTokenEnc DEVEM SEMPRE conter o output de
+// utils/encryption.encrypt() — nunca escrever tokens em claro aqui.
+// ---------------------------------------------------------------------------
+
+export async function getM365Connection(organizationId: number) {
+  const rows = await getDb()
+    .select()
+    .from(m365Connections)
+    .where(eq(m365Connections.organizationId, organizationId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertM365Connection(data: {
+  organizationId: number;
+  tenantId: string;
+  accessTokenEnc: string;
+  refreshTokenEnc: string | null;
+  tokenExpiresAt: Date | null;
+  status?: string;
+}) {
+  const existing = await getDb()
+    .select({ id: m365Connections.id })
+    .from(m365Connections)
+    .where(eq(m365Connections.organizationId, data.organizationId))
+    .limit(1);
+
+  const values = { status: "connected", ...data };
+
+  if (existing.length > 0) {
+    return getDb()
+      .update(m365Connections)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(m365Connections.organizationId, data.organizationId));
+  }
+
+  return getDb().insert(m365Connections).values(values);
 }

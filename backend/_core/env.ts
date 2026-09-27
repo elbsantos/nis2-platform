@@ -40,6 +40,13 @@ export const ENV = {
   // 32 bytes em base64 — validação de comprimento em utils/encryption.ts.
   m365EncryptionKey: required("M365_ENCRYPTION_KEY"),
 
+  // ── M365 (Microsoft Graph OAuth admin-consent) ──────────────────────────────
+  // Opcionais: sem elas o connector fica desativado (503 nas rotas), nunca
+  // fatal — o tenant/credenciais Microsoft ainda não existem (ver ADR M365).
+  m365ClientId:     optional("M365_CLIENT_ID"),
+  m365ClientSecret: optional("M365_CLIENT_SECRET"),
+  m365TenantId:     optional("M365_TENANT_ID"),
+
   // ── OAuth (existing) ──────────────────────────────────────────────────────
   appId: optional("VITE_APP_ID"),
   oAuthServerUrl: optional("OAUTH_SERVER_URL"),
@@ -107,6 +114,9 @@ const OPTIONAL_BUT_WARN = [
   ["ANTHROPIC_API_KEY", "Questionário IA e remediação desactivados"],
   ["STRIPE_SECRET_KEY", "Billing desactivado — todos os utilizadores em Free"],
   ["RESEND_API_KEY", "Emails transaccionais desactivados"],
+  ["M365_CLIENT_ID", "Connector Microsoft 365 desativado"],
+  ["M365_CLIENT_SECRET", "Connector Microsoft 365 desativado"],
+  ["M365_TENANT_ID", "Connector Microsoft 365 desativado"],
 ] as const;
 
 export function logEnvStatus(): void {
